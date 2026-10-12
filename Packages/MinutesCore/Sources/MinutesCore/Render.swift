@@ -92,8 +92,12 @@ public enum Render {
         ].filter { !$0.1.isEmpty }
     }
 
+    static let notesPendingText =
+        "The notes aren't written yet: iOS limited the language model while this meeting was being processed. Open Minutes and it writes them and sends a second email."
+
     public static func notesText(_ m: Meeting) -> String {
         guard let n = m.notes, !n.isEmpty else {
+            if m.notesPending == true { return notesPendingText + " The full transcript follows." }
             if let e = m.notesError { return "Notes could not be written: \(sentence(e)) The full transcript follows." }
             return ""
         }
@@ -177,8 +181,12 @@ public enum Render {
                 html += "<p style=\"margin:14px 0 0;color:#8A5200\">\(n.skippedSections) of \(n.totalSections) parts of the transcript could not be summarized and are missing from these notes.</p>"
             }
         } else {
-            let why = m.notesError.map { " (" + e($0.trimmingCharacters(in: CharacterSet(charactersIn: ". "))) + ")" } ?? ""
-            html += "<p style=\"margin:18px 0 0;color:#8A5200\">Notes could not be written\(why). The full transcript is below; open Minutes to try the notes again.</p>"
+            if m.notesPending == true {
+                html += "<p style=\"margin:18px 0 0;color:#8A5200\">\(e(notesPendingText)) The full transcript is below.</p>"
+            } else {
+                let why = m.notesError.map { " (" + e($0.trimmingCharacters(in: CharacterSet(charactersIn: ". "))) + ")" } ?? ""
+                html += "<p style=\"margin:18px 0 0;color:#8A5200\">Notes could not be written\(why). The full transcript is below; open Minutes to try the notes again.</p>"
+            }
         }
 
         html += "<hr style=\"border:0;border-top:1px solid #D5DBE1;margin:30px 0 0\">" + h2("Transcript")

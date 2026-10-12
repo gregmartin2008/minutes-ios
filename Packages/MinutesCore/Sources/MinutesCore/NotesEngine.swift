@@ -124,8 +124,10 @@ public struct NotesEngine: Sendable {
         public var limits: [NoteKind: Int] = [
             .keyPoints: 12, .decisions: 10, .actionItems: 15, .openQuestions: 10, .figures: 24,
         ]
-        /// Waits between retries when the system throttles the model.
-        public var rateLimitBackoff: [Double] = [3, 10, 30, 60, 120, 120]
+        /// Waits between retries when the system throttles the model. The last value repeats.
+        public var rateLimitBackoff: [Double] = [3, 10, 20, 30, 60]
+        /// How long, in total, one call keeps retrying a throttled model before it gives up.
+        public var rateLimitPatience: Double = 30 * 60
         /// Assumed characters per token until the model has been asked.
         public var charactersPerToken = 3.3
 
@@ -154,6 +156,7 @@ public struct NotesEngine: Sendable {
         guard !cleaned.isEmpty else { throw NotesModelError.other("The transcript is empty.") }
 
         let fingerprint = Self.fingerprint(cleaned)
+        let giveUpAt = Date().addingTimeInterval(options.rateLimitPatience)
         var saved: NotesCheckpoint
         if let resume, resume.fingerprint == fingerprint, resume.budgetTokens > 0, resume.charactersPerToken > 0 {
             saved = resume
@@ -182,7 +185,7 @@ public struct NotesEngine: Sendable {
             try Task.checkCancellation()
             let results = await extractAdaptive(
                 section: section, index: index, count: sections.count,
-                previousGist: previousGist, model: model, depth: 0)
+                previousGist: previousGist, model: model, depth: 0, giveUpAt: giveUpAt)
             var done = NotesCheckpoint.Section(fragments: [], skipped: 0)
             for r in results {
                 switch r {
@@ -218,7 +221,7 @@ public struct NotesEngine: Sendable {
             let limit = options.limits[kind] ?? 12
             merged[kind] = try await reduce(
                 kind: kind, items: all, limit: limit, sectionCount: fragments.count,
-                budgetTokens: sectionBudget, ratio: ratio, model: model)
+                budgetTokens: sectionBudget, ratio: ratio, model: model, giveUpAt: giveUpAt)
             progress?(0.8 + 0.15 * Double(i + 1) / Double(NoteKind.allCases.count))
         }
 
@@ -228,7 +231,7 @@ public struct NotesEngine: Sendable {
         do {
             let points = merged[.keyPoints] ?? [], decided = merged[.decisions] ?? []
             let leadGists = Array(gists.prefix(12))
-            let o = try await withBackoff {
+            let o = try await withBackoff(until: giveUpAt) {
                 try await model.overview(
                     keyPoints: points, decisions: decided, gists: leadGists, titleHint: titleHint)
             }
@@ -257,14 +260,15 @@ public struct NotesEngine: Sendable {
 
     /// Extracts from one section, halving it and trying again if the model says it does not fit.
     private func extractAdaptive(
-        section: [String], index: Int, count: Int, previousGist: String, model: NotesModel, depth: Int
+        section: [String], index: Int, count: Int, previousGist: String, model: NotesModel, depth: Int,
+        giveUpAt: Date
     ) async -> [Result<NotesFragment, NotesModelError>] {
         var context = count > 1 ? "Part \(index + 1) of \(count) of the meeting." : "The whole meeting."
         if !previousGist.isEmpty { context += " Just before this: \(previousGist)" }
         do {
             let text = section.joined(separator: "\n")
             let where_ = context
-            let fragment = try await withBackoff {
+            let fragment = try await withBackoff(until: giveUpAt) {
                 try await model.extract(section: text, context: where_)
             }
             return [.success(Self.clean(fragment))]
@@ -274,12 +278,12 @@ public struct NotesEngine: Sendable {
                 if halves.count == 2 {
                     let a = await extractAdaptive(
                         section: halves[0], index: index, count: count, previousGist: previousGist,
-                        model: model, depth: depth + 1)
+                        model: model, depth: depth + 1, giveUpAt: giveUpAt)
                     var gist = previousGist
                     if case .success(let f)? = a.last, !f.gist.isEmpty { gist = f.gist }
                     let b = await extractAdaptive(
                         section: halves[1], index: index, count: count, previousGist: gist,
-                        model: model, depth: depth + 1)
+                        model: model, depth: depth + 1, giveUpAt: giveUpAt)
                     return a + b
                 }
             }
@@ -307,17 +311,18 @@ public struct NotesEngine: Sendable {
         return "\(lines.count)-" + String(hash, radix: 16)
     }
 
-    /// Runs `body`, waiting and retrying when the system throttles the model.
-    private func withBackoff<T: Sendable>(_ body: @Sendable () async throws -> T) async throws -> T {
+    /// Runs `body`, waiting and retrying while the system throttles the model, until `deadline`.
+    private func withBackoff<T: Sendable>(until deadline: Date, _ body: @Sendable () async throws -> T) async throws -> T {
         var attempt = 0
         while true {
             do {
                 return try await body()
             } catch let e as NotesModelError where e == .rateLimited {
-                guard attempt < options.rateLimitBackoff.count else { throw e }
-                let wait = options.rateLimitBackoff[attempt]
+                guard let last = options.rateLimitBackoff.last else { throw e }
+                let wait = attempt < options.rateLimitBackoff.count ? options.rateLimitBackoff[attempt] : last
+                guard Date().addingTimeInterval(wait) <= deadline else { throw e }
                 attempt += 1
-                try await Task.sleep(nanoseconds: UInt64(wait * 1_000_000_000))
+                try await Task.sleep(nanoseconds: UInt64(max(0, wait) * 1_000_000_000))
             }
         }
     }
@@ -326,7 +331,7 @@ public struct NotesEngine: Sendable {
 
     private func reduce(
         kind: NoteKind, items: [String], limit: Int, sectionCount: Int, budgetTokens: Int, ratio: Double,
-        model: NotesModel
+        model: NotesModel, giveUpAt: Date
     ) async throws -> [String] {
         guard !items.isEmpty else { return [] }
         // A single section's list is already consistent, and short merged lists need no rewriting.
@@ -345,7 +350,7 @@ public struct NotesEngine: Sendable {
             if tokens <= budgetTokens {
                 do {
                     let batch = current
-                    let out = try await withBackoff {
+                    let out = try await withBackoff(until: giveUpAt) {
                         try await model.consolidate(kind: kind, items: batch, limit: limit)
                     }
                     let cleaned = Self.dedupe(out)
@@ -364,7 +369,7 @@ public struct NotesEngine: Sendable {
             var next: [String] = []
             for half in [Array(current[..<mid]), Array(current[mid...])] {
                 do {
-                    let out = try await withBackoff {
+                    let out = try await withBackoff(until: giveUpAt) {
                         try await model.consolidate(kind: kind, items: half, limit: max(3, limit * 2 / 3))
                     }
                     next += out.isEmpty ? half : out
