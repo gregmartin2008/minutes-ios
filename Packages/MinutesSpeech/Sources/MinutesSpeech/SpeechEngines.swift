@@ -98,6 +98,9 @@ public struct FluidSeparator: SpeakerSeparating {
         }
 
         deinit { source.cleanup() }
+
+        /// Length of the recording in seconds.
+        public var seconds: Double { Double(source.sampleCount) / 16_000 }
     }
 
     static func configuration(options: SpeechOptions, speakers: SpeakerCount) -> OfflineDiarizerConfig {
@@ -181,23 +184,23 @@ public struct FluidSeparator: SpeakerSeparating {
         if let n = headCount, n >= 1, exactly || o.headCountIsExact {
             return (try await group(analysis, speakers: .exactly(n), options: o).result, nil)
         }
-        guard o.countSpeakersFirst else {
+        guard o.countSpeakersFirst, analysis.seconds < o.countOnlyUnderSeconds else {
             let count: SpeakerCount = headCount.map { .atMost(max(1, $0)) } ?? .automatic
             return (try await group(analysis, speakers: count, options: o).result, nil)
         }
-        // A first grouping, only to get at the voices heard in each window.
+        // The library's own grouping first: its result is kept unless the count says it missed people.
         let first = try await group(analysis, speakers: .automatic, options: o, includeWindowVoices: true)
-        guard var estimate = SpeakerCounter.estimate(voices: first.windowVoices.map { $0.embedding }, options: o.counting) else {
+        let found = Set(first.result.turns.map { $0.speaker }).count
+        guard let counted = SpeakerCounter.estimate(voices: first.windowVoices.map { $0.embedding }, options: o.counting) else {
             return (first.result, nil)
         }
-        // The library's own grouping errs toward too few people, so when it found more than the
-        // count did, the larger number is the safer one.
-        estimate = max(estimate, Set(first.result.turns.map { $0.speaker }).count)
-        let counted = estimate
-        // A head count from the person is an upper bound: someone in the room may never speak.
-        if let n = headCount, n >= 1 { estimate = min(estimate, n) }
-        let final = try await group(analysis, speakers: .exactly(estimate), options: o)
-        return (final.result, counted)
+        // The library errs toward too few people on short recordings, so the larger number is the
+        // safer one. A head count from the person is an upper bound: someone may never speak.
+        var wanted = max(counted, found)
+        if let n = headCount, n >= 1 { wanted = min(wanted, n) }
+        if wanted == found { return (first.result, counted) }
+        let regrouped = try await group(analysis, speakers: .exactly(wanted), options: o)
+        return (regrouped.result, counted)
     }
 
     public func separate(
