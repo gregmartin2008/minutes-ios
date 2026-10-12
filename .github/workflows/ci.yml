@@ -1,0 +1,75 @@
+name: ci
+on:
+  push:
+    branches: [main]
+    paths-ignore: ["README.md", ".github/workflows/probe.yml"]
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+env:
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+jobs:
+  core:
+    name: Core logic and mail
+    runs-on: macos-26
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Unit tests
+        run: |
+          mkdir -p out
+          cd Packages/MinutesCore
+          set -o pipefail
+          swift test 2>&1 | tee ../../out/core-tests.log | grep -E "error|failed|Executed|warning: unre" || true
+          grep -q "with 0 failures" ../../out/core-tests.log && ! grep -q "error:" ../../out/core-tests.log
+      - name: Mail code against a real SMTP server
+        run: |
+          python3 -m venv /tmp/venv && /tmp/venv/bin/pip -q install aiosmtpd
+          /tmp/venv/bin/python scripts/smtp_integration.py Packages/MinutesCore 2>&1 | tee out/smtp-integration.log | grep -E "PASS|FAIL|checks passed"
+          grep -q "13/13 checks passed" out/smtp-integration.log
+      - name: Encrypted connection to Gmail
+        run: |
+          cd Packages/MinutesCore
+          MINUTES_LIVE_SMTP=1 swift test --filter NetworkTransportTests 2>&1 | tee ../../out/live-smtp.log | grep -E "error|passed|failed|Executed" || true
+          grep -q "Executed 3 tests, with 0 failures" ../../out/live-smtp.log
+      - name: Publish results
+        if: always()
+        run: scripts/ci_publish.sh out ci-core
+
+  speech:
+    name: Speech pipeline on a synthetic meeting
+    runs-on: macos-26
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: ~/Library/Application Support/FluidAudio
+          key: speech-models-ultra-v1
+      - uses: actions/cache@v4
+        with:
+          path: Packages/MinutesSpeech/.build
+          key: speech-build-${{ hashFiles('Packages/MinutesSpeech/Package.swift') }}
+      - name: Build the benchmark tool
+        run: |
+          mkdir -p out
+          cd Packages/MinutesSpeech
+          set -o pipefail
+          swift build -c release --product minutes-bench 2>&1 | tee ../../out/speech-build.log | grep -E "error|warning: var|Compiling MinutesSpeech|Build complete" || true
+          grep -q "Build complete" ../../out/speech-build.log
+      - name: Make a six-person test meeting with crosstalk
+        run: python3 scripts/make_test_meeting.py out 2>&1 | tee out/make-meeting.log
+      - name: Run the pipeline
+        run: |
+          cd Packages/MinutesSpeech
+          swift run -c release minutes-bench ../../out/meeting.wav --out ../../out/result.json 2>&1 | tee ../../out/bench.log | tail -5
+      - name: Score
+        run: python3 scripts/score_meeting.py out/result.json out/meeting.ref.json --json out/score.json | tee out/score.log
+      - name: Publish results
+        if: always()
+        run: |
+          rm -f out/meeting.wav
+          scripts/ci_publish.sh out ci-speech
