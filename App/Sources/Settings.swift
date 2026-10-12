@@ -10,6 +10,8 @@ struct MailSettings: Codable, Equatable {
     var address = ""
     /// Where the notes go. Empty means "to the same address".
     var recipient = ""
+    /// Set only by the automated end-to-end test, which talks to a mail server on the build machine.
+    var unencrypted: Bool?
 
     var recipients: [String] {
         let to = recipient.trimmingCharacters(in: .whitespacesAndNewlines)

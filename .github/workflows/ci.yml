@@ -99,6 +99,15 @@ jobs:
       - name: Photograph every screen
         timeout-minutes: 20
         run: scripts/ci_screenshots.sh
+      - name: Whole app, end to end, in the simulator
+        if: success() || failure()
+        timeout-minutes: 35
+        run: |
+          set -o pipefail
+          test -d build/sim/Build/Products/Debug-iphonesimulator/Minutes.app
+          /usr/bin/python3 -m venv /tmp/venv && /tmp/venv/bin/pip -q install aiosmtpd
+          python3 scripts/make_test_meeting.py build/e2e > out/e2e-make.log 2>&1
+          /tmp/venv/bin/python scripts/e2e_app.py build/e2e/meeting.wav build/e2e/meeting.ref.json out 2>&1 | tee out/e2e.log
       - name: Publish results
         if: always()
         run: scripts/ci_publish.sh out ci-app

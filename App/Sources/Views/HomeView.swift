@@ -1,11 +1,13 @@
 import MinutesCore
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// The first screen: one button to record, and the meetings recorded so far.
 struct HomeView: View {
     @EnvironmentObject private var model: AppModel
     @Binding var path: [Route]
     @State private var pendingDelete: Meeting?
+    @State private var importing = false
 
     private var needsSetup: Bool { !model.setup.ready || !model.mailReady }
 
@@ -48,12 +50,31 @@ struct HomeView: View {
         .navigationTitle("Minutes")
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                Button {
-                    path.append(.settings)
+                Menu {
+                    Button {
+                        importing = true
+                    } label: {
+                        Label("Import a recording", systemImage: "square.and.arrow.down")
+                    }
+                    Button {
+                        path.append(.settings)
+                    } label: {
+                        Label("Settings", systemImage: "gearshape")
+                    }
                 } label: {
-                    Image(systemName: "gearshape")
+                    Image(systemName: "ellipsis.circle")
                 }
-                .accessibilityLabel("Settings")
+                .accessibilityLabel("More")
+            }
+        }
+        .fileImporter(isPresented: $importing, allowedContentTypes: [.audio]) { result in
+            switch result {
+            case .success(let url):
+                Task {
+                    if let problem = await model.importAudio(from: url) { model.banner = problem }
+                }
+            case .failure(let error):
+                model.banner = "The file couldn't be opened: \(error.localizedDescription)"
             }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
