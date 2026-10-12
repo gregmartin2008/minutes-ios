@@ -81,6 +81,9 @@ extension Meeting {
         case .failed:
             return MeetingBadge(text: "Needs attention", symbol: "exclamationmark.triangle", color: Theme.record)
         case .done:
+            if emailedAt != nil, notesPending == true {
+                return MeetingBadge(text: "Transcript emailed, notes to follow", symbol: "clock", color: Theme.warn)
+            }
             if let sent = emailedAt {
                 let sameDay = Calendar.current.isDate(sent, inSameDayAs: Date())
                 return MeetingBadge(

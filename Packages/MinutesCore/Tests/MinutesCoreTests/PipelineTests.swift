@@ -78,6 +78,7 @@ final class PipelineTests: XCTestCase {
         let result = modelResult!
         var options = NotesEngine.Options()
         options.rateLimitBackoff = [0.01]
+        options.rateLimitPatience = 0.015
         return MeetingPipeline(
             store: store,
             services: PipelineServices(
@@ -120,15 +121,17 @@ final class PipelineTests: XCTestCase {
         useLongMeeting()
         model.rateLimitFromCall = 3                    // two sections, then iOS throttles the model
         let m = try newMeeting()
-        let waiting = await pipeline().run(m) { _, _ in }
-        XCTAssertEqual(waiting.status, .waiting)
-        XCTAssertEqual(waiting.stage, .writeNotes)
-        XCTAssertEqual(waiting.notesCheckpoint?.sections.count, 2)
+        let first = await pipeline().run(m) { _, _ in }
+        XCTAssertEqual(first.status, .done)
+        XCTAssertEqual(first.notesPending, true)
+        XCTAssertEqual(first.notesCheckpoint?.sections.count, 2)
         XCTAssertEqual(store.load(id: m.id)?.notesCheckpoint?.sections.count, 2, "finished sections are on disk")
-        XCTAssertTrue(mailer.sent.isEmpty)
+        XCTAssertEqual(mailer.sent.count, 1)
+        XCTAssertNil(mailer.sent[0].notes)
 
         model.rateLimitFromCall = .max
-        var again = waiting
+        var again = first
+        again.stage = .writeNotes
         again.status = .processing
         let done = await pipeline().run(again) { _, _ in }
         XCTAssertEqual(done.status, .done)
@@ -138,7 +141,8 @@ final class PipelineTests: XCTestCase {
         XCTAssertEqual(Set(model.sections).count, model.sections.count)
         XCTAssertEqual(separator.calls, 1)
         XCTAssertEqual(transcriber.calls, 1)
-        XCTAssertEqual(mailer.sent.count, 1)
+        XCTAssertEqual(mailer.sent.count, 2)
+        XCTAssertNotNil(mailer.sent[1].notes)
     }
 
     func testSeparatingAgainKeepsTheTranscribedWords() async throws {
@@ -229,19 +233,40 @@ final class PipelineTests: XCTestCase {
         XCTAssertEqual(model.sections.count, 1)
     }
 
-    func testBackgroundThrottlingPausesAtNotesWithoutSendingAHalfEmail() async throws {
+    func testThrottledNotesDoNotHoldUpTheEmail() async throws {
         let m = try newMeeting()
         model.alwaysRateLimit = true
         let out = await pipeline().run(m) { _, _ in }
-        XCTAssertEqual(out.status, .waiting)
-        XCTAssertEqual(out.stage, .writeNotes)
-        XCTAssertTrue(out.waitingReason?.contains("Open Minutes") ?? false)
-        XCTAssertTrue(mailer.sent.isEmpty)
+        XCTAssertEqual(out.status, .done)
+        XCTAssertNil(out.notes)
+        XCTAssertEqual(out.notesPending, true)
+        XCTAssertEqual(mailer.sent.count, 1, "the transcript goes out without waiting for the notes")
+        let email = Render.email(for: mailer.sent[0], from: "a@b.c", to: ["a@b.c"])
+        XCTAssertTrue(email.html!.contains("The notes aren&#39;t written yet") || email.html!.contains("The notes aren't written yet"))
+        XCTAssertTrue(email.text.contains("sends a second email"))
+        XCTAssertEqual(email.attachments.count, 1)
 
-        model.alwaysRateLimit = false
-        let resumed = await pipeline().run(out) { _, _ in }
-        XCTAssertEqual(resumed.status, .done)
+        // The app tries again when it is next open. Still throttled: no second, identical email.
+        var again = out
+        again.stage = .writeNotes
+        again.status = .processing
+        let still = await pipeline().run(again) { _, _ in }
+        XCTAssertEqual(still.status, .done)
+        XCTAssertEqual(still.notesPending, true)
         XCTAssertEqual(mailer.sent.count, 1)
+
+        // Then the model is allowed to run: notes are written and a second email carries them.
+        model.alwaysRateLimit = false
+        var third = still
+        third.stage = .writeNotes
+        third.status = .processing
+        let done = await pipeline().run(third) { _, _ in }
+        XCTAssertEqual(done.status, .done)
+        XCTAssertNotNil(done.notes)
+        XCTAssertNil(done.notesPending)
+        XCTAssertNil(done.notesError)
+        XCTAssertEqual(mailer.sent.count, 2)
+        XCTAssertEqual(done.emailCount, 2)
     }
 
     func testModelUnavailableStillEmailsTheTranscript() async throws {

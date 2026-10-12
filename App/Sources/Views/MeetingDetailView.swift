@@ -319,7 +319,8 @@ private struct StatusCard: View {
     private var sentDetail: String {
         let to = model.mail.recipients.joined(separator: ", ")
         let times = meeting.emailCount > 1 ? " Sent \(meeting.emailCount) times." : ""
-        return (to.isEmpty ? "Notes and transcript attached." : "To \(to), with the notes and transcript attached.") + times
+        let what = meeting.notes == nil ? "the transcript" : "the notes and transcript"
+        return (to.isEmpty ? "With \(what) attached." : "To \(to), with \(what) attached.") + times
     }
 
     private func stageList(current: Stage, spinning: Bool) -> some View {
@@ -406,14 +407,14 @@ private struct NotesTab: View {
                 .padding(.top, 8)
         } else {
             VStack(alignment: .leading, spacing: 12) {
-                Text("The notes weren't written")
+                Text(meeting.notesPending == true ? "The notes aren't written yet" : "The notes weren't written")
                     .font(.system(size: 17, weight: .semibold))
                     .foregroundStyle(Theme.ink)
                 Text(meeting.notesError ?? "The language model didn't return any notes for this meeting.")
                     .font(.body)
                     .foregroundStyle(Theme.muted)
                     .fixedSize(horizontal: false, vertical: true)
-                Button("Write the notes again", action: rewrite)
+                Button(meeting.notesPending == true ? "Write the notes now" : "Write the notes again", action: rewrite)
                     .buttonStyle(SolidButtonStyle())
             }
             .card()

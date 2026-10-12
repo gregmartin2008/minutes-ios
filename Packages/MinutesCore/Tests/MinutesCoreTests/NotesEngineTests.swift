@@ -94,6 +94,7 @@ final class NotesEngineTests: XCTestCase {
     func fastOptions() -> NotesEngine.Options {
         var o = NotesEngine.Options()
         o.rateLimitBackoff = [0.01, 0.01]
+        o.rateLimitPatience = 0.025
         return o
     }
 

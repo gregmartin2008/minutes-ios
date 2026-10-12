@@ -217,6 +217,11 @@ public struct Meeting: Codable, Equatable, Identifiable, Sendable {
     public var notesError: String?
     /// Notes work in progress, kept so an interrupted run continues where it stopped.
     public var notesCheckpoint: NotesCheckpoint?
+    /// True when the transcript was sent without notes because iOS would not let the language model
+    /// run; the notes are written, and sent in a second email, the next time the app is open.
+    public var notesPending: Bool?
+    /// How many times the app has tried by itself to finish pending notes.
+    public var notesRetries: Int?
     public var emailedAt: Date?
     public var emailCount: Int
     public var audioDeleted: Bool
@@ -247,6 +252,8 @@ public struct Meeting: Codable, Equatable, Identifiable, Sendable {
         self.notes = nil
         self.notesError = nil
         self.notesCheckpoint = nil
+        self.notesPending = nil
+        self.notesRetries = nil
         self.emailedAt = nil
         self.emailCount = 0
         self.audioDeleted = false

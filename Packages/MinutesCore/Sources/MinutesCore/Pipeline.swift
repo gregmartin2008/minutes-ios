@@ -234,14 +234,20 @@ public final class MeetingPipeline: @unchecked Sendable {
                     m.notes = notes
                     m.notesError = nil
                     m.notesCheckpoint = nil
+                    m.notesPending = nil
+                    m.notesRetries = nil
                     if m.titleIsAuto, !notes.title.isEmpty {
                         m.title = notes.title
                         m.titleIsAuto = false
                     }
                 } catch let e as NotesModelError where e == .rateLimited {
+                    // iOS kept the language model from running (it does this to apps in the background)
+                    // for as long as we were willing to wait. Don't hold the email: send the transcript
+                    // now, keep the sections already done, and finish the notes when the app is next open.
                     m.notesCheckpoint = saved.value
-                    throw PipelineError.mustWait(
-                        "iOS paused the notes because Minutes is in the background. Open Minutes and it finishes on its own.")
+                    m.notes = nil
+                    m.notesError = Self.notesDelayedMessage
+                    m.notesPending = true
                 } catch is CancellationError {
                     m.notesCheckpoint = saved.value
                     throw CancellationError()
@@ -253,6 +259,8 @@ public final class MeetingPipeline: @unchecked Sendable {
             }
 
         case .email:
+            // The transcript already went out and the notes still aren't written: nothing new to send.
+            if m.notesPending == true, m.notes == nil, m.emailCount > 0 { break }
             do {
                 switch try await services.mailer.send(m) {
                 case .sent:
@@ -270,6 +278,9 @@ public final class MeetingPipeline: @unchecked Sendable {
             break
         }
     }
+
+    public static let notesDelayedMessage =
+        "iOS limited the language model, so the transcript was sent without notes. Minutes writes the notes and emails them the next time it is open."
 
     private func audioURL(for m: Meeting) throws -> URL {
         guard store.hasAudio(id: m.id) else { throw PipelineError.audioMissing }

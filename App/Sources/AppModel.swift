@@ -152,7 +152,19 @@ final class AppModel: ObservableObject {
         guard !isDemo else { return }
         if recorder.state == .interrupted { recorder.attemptRestart(reason: "app became active") }
         resumeWaiting(onlyEmail: false)
+        finishPendingNotes()
         kick()
+    }
+
+    /// Notes that iOS wouldn't let the app write earlier are tried again now that it is open.
+    /// Limited to a few automatic tries per meeting; "Write the notes again" is always available.
+    private func finishPendingNotes() {
+        for var m in meetings where m.status == .done && m.notesPending == true && (m.notesRetries ?? 0) < 3 {
+            m.notesRetries = (m.notesRetries ?? 0) + 1
+            m.stage = .writeNotes
+            m.status = .processing
+            save(m)
+        }
     }
 
     // MARK: Recording
@@ -395,7 +407,10 @@ final class AppModel: ObservableObject {
         guard !isDemo, UIApplication.shared.applicationState != .active else { return }
         switch m.status {
         case .done:
-            if m.emailedAt != nil {
+            if m.emailedAt != nil, m.notesPending == true {
+                Notifier.post(
+                    title: "Transcript emailed", body: "\(m.title). Open Minutes and the notes follow in a second email.", id: m.id)
+            } else if m.emailedAt != nil {
                 Notifier.post(title: "Notes emailed", body: m.title, id: m.id)
             } else {
                 Notifier.post(title: "Notes are ready", body: "\(m.title). Email isn't set up, so nothing was sent.", id: m.id)
