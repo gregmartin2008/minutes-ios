@@ -105,6 +105,12 @@ public final class WAVWriter {
         return Data(h)
     }
 
+    /// A complete WAV file of silence, in memory.
+    public static func silence(seconds: Double, sampleRate: Int = 16_000) -> Data {
+        let bytes = Int(seconds * Double(sampleRate)) * 2
+        return header(sampleRate: sampleRate, channels: 1, dataBytes: bytes) + Data(count: bytes)
+    }
+
     /// Rewrites the header of a recording that was not closed properly so its lengths match the file.
     /// Returns the duration in seconds, or nil if the file is not one of ours.
     @discardableResult
