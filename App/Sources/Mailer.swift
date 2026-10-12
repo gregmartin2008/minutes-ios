@@ -16,7 +16,8 @@ struct SMTPMailer: MailSending {
     static func deliver(_ message: EmailMessage, settings: MailSettings, password: String) async throws {
         // Google shows app passwords in four groups separated by spaces; the spaces are not part of it.
         let secret = settings.isGmail ? password.filter { !$0.isWhitespace } : password
-        let transport = NetworkSMTPTransport(host: settings.host, port: settings.port, timeout: 40)
+        let transport = NetworkSMTPTransport(
+            host: settings.host, port: settings.port, useTLS: settings.unencrypted != true, timeout: 40)
         let client = SMTPClient(transport: transport)
         do {
             let reply = try await client.send(message, username: settings.address, password: secret)

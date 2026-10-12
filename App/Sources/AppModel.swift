@@ -279,6 +279,36 @@ final class AppModel: ObservableObject {
         kick()
     }
 
+    /// Brings in a recording made elsewhere and processes it like a meeting recorded here.
+    /// Returns nil on success or the reason it couldn't be imported.
+    @discardableResult
+    func importAudio(from source: URL, title: String? = nil) async -> String? {
+        let now = Date()
+        let named = (title ?? source.deletingPathExtension().lastPathComponent).trimmingCharacters(in: .whitespacesAndNewlines)
+        var m = Meeting(title: named.isEmpty ? Render.defaultTitle(for: now) : named, titleIsAuto: named.isEmpty, createdAt: now)
+        let destination = store.audioURL(for: m.id)
+        do {
+            try store.save(m)
+            let scoped = source.startAccessingSecurityScopedResource()
+            defer { if scoped { source.stopAccessingSecurityScopedResource() } }
+            m.duration = try await Task.detached(priority: .userInitiated) {
+                try AudioImporter.convert(source, to: destination)
+            }.value
+        } catch {
+            store.delete(id: m.id)
+            Log.shared.error("import failed: \(MeetingPipeline.describe(error))")
+            return MeetingPipeline.describe(error)
+        }
+        m.status = .processing
+        m.stage = .separateSpeakers
+        m.remarks.append("Imported from a recording made outside Minutes.")
+        save(m)
+        Log.shared.info("imported \(Int(m.duration))s of audio as meeting \(m.id)")
+        openMeetingID = m.id
+        kick()
+        return nil
+    }
+
     // MARK: Processing
 
     private func services() -> PipelineServices {

@@ -54,5 +54,8 @@ struct RootView: View {
         .onAppear {
             if let route = model.demoRoute { path = route }
         }
+        #if DEBUG
+        .task { await EndToEnd.run(model) }
+        #endif
     }
 }
