@@ -14,6 +14,7 @@ import MinutesSpeech
 // A variant separates the speakers again with different settings, reusing the transcription and,
 // where the settings allow, the voice analysis. Keys:
 //   grouping:  threshold=0.5  fa=0.2  fb=4  speakers=auto|ref|N  exact=true  recover=false  apart=false
+//              count=false (leave the count to the library)  cd=1.05  cs=0.04 (counting distance and share)
 //   analysis:  step=0.2  minseg=1.0  overlap=false
 // --voices also writes <name>.voices.json: every window's voice embeddings, for studying the grouping.
 
@@ -108,6 +109,9 @@ func parseVariant(_ spec: String, base: SpeechOptions) -> Variant {
         case "fa": variant.options.clusteringFa = Double(kv[1]) ?? base.clusteringFa
         case "fb": variant.options.clusteringFb = Double(kv[1]) ?? base.clusteringFb
         case "apart": variant.options.keepSimultaneousVoicesApart = kv[1] == "true"
+        case "count": variant.options.countSpeakersFirst = kv[1] == "true"
+        case "cd": variant.options.counting.mergeDistance = Double(kv[1]) ?? base.counting.mergeDistance
+        case "cs": variant.options.counting.minimumShare = Double(kv[1]) ?? base.counting.minimumShare
         case "minseg": variant.options.minimumVoiceSeconds = Double(kv[1]) ?? base.minimumVoiceSeconds
         case "overlap": variant.options.ignoreOverlapWhenComparingVoices = kv[1] != "true"
         case "exact": variant.options.headCountIsExact = kv[1] == "true"
@@ -145,6 +149,7 @@ func describe(_ o: SpeechOptions, speakers: String) -> [String: String] {
         "recover": String(o.recoverUnassignedSpeech), "speakers": speakers, "exact": String(o.headCountIsExact),
         "fa": String(o.clusteringFa), "fb": String(o.clusteringFb), "minseg": String(o.minimumVoiceSeconds),
         "overlap": String(!o.ignoreOverlapWhenComparingVoices), "apart": String(o.keepSimultaneousVoicesApart),
+        "count": String(o.countSpeakersFirst), "cd": String(o.counting.mergeDistance), "cs": String(o.counting.minimumShare),
     ]
 }
 
@@ -180,13 +185,17 @@ do {
 
             func separate(_ o: SpeechOptions, speakers: Int?, label: String, voicesTo: URL? = nil) async throws -> SeparationOutput {
                 let (prepared, prepareSeconds) = try await analysis(for: o)
-                let count: SpeakerCount
-                if let n = speakers { count = o.headCountIsExact ? .exactly(n) : .atMost(n) } else { count = .automatic }
                 let started = Date()
-                let grouped = try await FluidSeparator(models: models, options: o)
-                    .group(prepared, speakers: count, options: o, includeWindowVoices: voicesTo != nil)
+                let separator = FluidSeparator(models: models, options: o)
+                let grouped = try await separator.group(prepared, headCount: speakers, options: o)
                 let seconds = prepareSeconds + Date().timeIntervalSince(started)
-                if let voicesTo { try JSONEncoder().encode(grouped.windowVoices).write(to: voicesTo) }
+                if let voicesTo {
+                    // The voices as the library's own grouping sees them, for studying other ways to group.
+                    let stock = try await separator.group(prepared, speakers: .automatic, options: o, includeWindowVoices: true)
+                    try JSONEncoder().encode(stock.windowVoices).write(to: voicesTo)
+                }
+                var settings = describe(o, speakers: label)
+                settings["estimated"] = grouped.estimated.map(String.init) ?? ""
                 let separation = grouped.result
                 return SeparationOutput(
                     speakers: Set(separation.turns.map { $0.speaker }).count,
@@ -195,7 +204,7 @@ do {
                     voices: separation.voices.mapValues { SpeakerMatcher.normalized($0) },
                     crosstalkSeconds: TranscriptAssembler.crosstalkSeconds(separation.turns),
                     separationSeconds: seconds,
-                    settings: describe(o, speakers: label))
+                    settings: settings)
             }
 
             let voicesURL = writeVoices ? job.out.map { URL(fileURLWithPath: $0.path.replacingOccurrences(of: ".result.json", with: ".voices.json")) } : nil

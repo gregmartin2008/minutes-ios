@@ -169,20 +169,40 @@ public struct FluidSeparator: SpeakerSeparating {
         return (Self.convert(result), voices)
     }
 
+    /// Groups the voices into people, deciding how many people there are.
+    ///
+    /// - Parameter headCount: How many people the person says were in the room, if they said.
+    /// - Returns: The result, and the number of speakers estimated from the voices (nil if the
+    ///   estimate was not needed or not possible).
+    public func group(
+        _ analysis: Analysis, headCount: Int?, options: SpeechOptions? = nil
+    ) async throws -> (result: SeparationResult, estimated: Int?) {
+        let o = options ?? analysis.options
+        if let n = headCount, n >= 1, o.headCountIsExact {
+            return (try await group(analysis, speakers: .exactly(n), options: o).result, nil)
+        }
+        guard o.countSpeakersFirst else {
+            let count: SpeakerCount = headCount.map { .atMost(max(1, $0)) } ?? .automatic
+            return (try await group(analysis, speakers: count, options: o).result, nil)
+        }
+        // A first grouping, only to get at the voices heard in each window.
+        let first = try await group(analysis, speakers: .automatic, options: o, includeWindowVoices: true)
+        guard var estimate = SpeakerCounter.estimate(voices: first.windowVoices.map { $0.embedding }, options: o.counting) else {
+            return (first.result, nil)
+        }
+        let counted = estimate
+        // A head count from the person is an upper bound: someone in the room may never speak.
+        if let n = headCount, n >= 1 { estimate = min(estimate, n) }
+        let final = try await group(analysis, speakers: .exactly(estimate), options: o)
+        return (final.result, counted)
+    }
+
     public func separate(
         audio: URL, expectedSpeakers: Int?, progress: @escaping @Sendable (Double) -> Void
     ) async throws -> SeparationResult {
-        let options = overrides ?? models.options
         // Analysis is the long, countable part; leave the last tenth for grouping.
         let analysis = try await analyze(audio: audio) { progress(0.9 * $0) }
-        let count: SpeakerCount
-        if let n = expectedSpeakers, n >= 1 {
-            // By default a head count is an upper bound: someone in the room may never speak.
-            count = options.headCountIsExact ? .exactly(n) : .atMost(n)
-        } else {
-            count = .automatic
-        }
-        let grouped = try await group(analysis, speakers: count)
+        let grouped = try await group(analysis, headCount: expectedSpeakers)
         progress(1)
         return grouped.result
     }
