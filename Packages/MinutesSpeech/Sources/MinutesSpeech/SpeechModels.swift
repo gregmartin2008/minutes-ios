@@ -28,6 +28,10 @@ public struct SpeechOptions: Sendable {
     public var ignoreOverlapWhenComparingVoices = true
     /// Two voices heard in the same ten-second window are never treated as one person.
     public var keepSimultaneousVoicesApart = true
+    /// Count the speakers from the voices heard in each window before grouping them, rather than
+    /// leaving the count to the grouping step (which undercounts on short, lively meetings).
+    public var countSpeakersFirst = true
+    public var counting = SpeakerCounter.Options()
 
     public init() {}
 
