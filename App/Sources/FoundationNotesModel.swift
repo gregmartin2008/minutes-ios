@@ -161,6 +161,6 @@ struct FoundationNotesModel: NotesModel {
     /// framework's own text for these is a bare error number, so the detail goes to the log instead.
     private static func plain(_ error: Error, _ what: String) -> String {
         Log.shared.error("language model error: \(String(reflecting: error))")
-        return "Apple's language model couldn't write the notes: \(what)"
+        return "Apple's language model couldn't write the notes: \(what)."
     }
 }

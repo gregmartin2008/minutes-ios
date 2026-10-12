@@ -38,8 +38,8 @@ jobs:
       - name: Download meetings
         run: |
           source scripts/bench/long.env
-          python3 scripts/bench/fetch_nxt.py --corpus icsi --meetings "$ICSI" --shard ${{ matrix.shard }}/2 --out data 2>&1 | tee out/fetch.log
-          python3 scripts/bench/fetch_nxt.py --corpus ami --meetings "$AMI" --shard ${{ matrix.shard }}/2 --out data 2>&1 | tee -a out/fetch.log
+          python3 scripts/bench/fetch_nxt.py --corpus icsi --meetings "$ICSI" --shard ${{ matrix.shard }}/2 --out data $FETCH_OPTIONS 2>&1 | tee out/fetch.log
+          python3 scripts/bench/fetch_nxt.py --corpus ami --meetings "$AMI" --shard ${{ matrix.shard }}/2 --out data $FETCH_OPTIONS 2>&1 | tee -a out/fetch.log
       - name: Run the pipeline
         run: |
           source scripts/bench/long.env
@@ -51,7 +51,7 @@ jobs:
       - name: Pack the voice embeddings
         run: |
           /usr/bin/python3 -m venv /tmp/venv && /tmp/venv/bin/pip -q install numpy
-          /tmp/venv/bin/python scripts/bench/pack_voices.py out/results --no-rho | tail -3
+          /tmp/venv/bin/python scripts/bench/pack_voices.py out/results --no-rho | tail -3 || true
       - name: Publish results
         if: always()
         run: scripts/ci_publish.sh out ci-long-${{ matrix.shard }}

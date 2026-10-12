@@ -12,8 +12,11 @@ For each meeting this writes <out>/<meeting>.wav, <out>/<meeting>.ref.json and a
 <out>/files.tsv, in the same form as fetch_notsofar.py.
 
 usage: fetch_nxt.py --corpus icsi|ami --meetings Bmr021,Bed016 --out DIR [--shard 0/2]
+                    [--clips 360,720] [--no-full]
+--clips also writes the first N seconds of each meeting as its own recording (<meeting>_c<N>), to
+measure how the length of a recording affects the result; --no-full then leaves out the whole one.
 """
-import argparse, io, json, os, re, sys, time, urllib.request, zipfile
+import argparse, io, json, os, re, struct, sys, time, urllib.request, zipfile
 from concurrent.futures import ThreadPoolExecutor
 import xml.etree.ElementTree as ET
 
@@ -103,8 +106,42 @@ def lines_for(speaker, words, pause=0.6):
     return lines
 
 
+def clip_wav(data, seconds):
+    """The first `seconds` of a PCM WAV file, as a new WAV file."""
+    pos, fmt, body = 12, None, None
+    while pos + 8 <= len(data):
+        tag, size = data[pos:pos + 4], struct.unpack("<I", data[pos + 4:pos + 8])[0]
+        if tag == b"fmt ":
+            fmt = data[pos + 8:pos + 8 + size]
+        elif tag == b"data":
+            body = data[pos + 8:pos + 8 + size]
+            break
+        pos += 8 + size + (size & 1)
+    if fmt is None or body is None:
+        raise ValueError("not a PCM WAV file")
+    channels, rate = struct.unpack("<HI", fmt[2:8])
+    width = struct.unpack("<H", fmt[14:16])[0] // 8
+    keep = int(seconds * rate) * channels * width
+    body = body[:keep]
+    header = b"RIFF" + struct.pack("<I", 36 + len(body)) + b"WAVE" + b"fmt " + struct.pack("<I", 16) + fmt[:16]
+    return header + b"data" + struct.pack("<I", len(body)) + body
+
+
+def clip_lines(lines, seconds):
+    out = []
+    for l in lines:
+        words = [w for w in l["words"] if w["end"] <= seconds]
+        if not words:
+            continue
+        out.append({"speaker": l["speaker"], "start": l["start"], "end": min(l["end"], seconds, max(w["end"] for w in words)),
+                    "text": " ".join(w["text"] for w in words), "words": words})
+    return out
+
+
 def main():
     ap = argparse.ArgumentParser()
+    ap.add_argument("--clips", default="")
+    ap.add_argument("--no-full", action="store_true")
     ap.add_argument("--corpus", required=True, choices=sorted(CORPORA))
     ap.add_argument("--meetings", required=True)
     ap.add_argument("--out", required=True)
@@ -114,6 +151,7 @@ def main():
     shard, shards = [int(x) for x in a.shard.split("/")]
     meetings = [m for m in a.meetings.split(",") if m][shard::shards]
     os.makedirs(a.out, exist_ok=True)
+    clips = [int(x) for x in a.clips.split(",") if x]
 
     print(f"downloading {a.corpus} annotations", flush=True)
     archive = zipfile.ZipFile(io.BytesIO(get(corpus["zip"])))
@@ -144,18 +182,34 @@ def main():
         except Exception as e:
             print(f"{m}: audio download failed ({e}), skipped", flush=True)
             return None
-        wav_path = os.path.join(a.out, m + ".wav")
-        with open(wav_path, "wb") as f:
-            f.write(wav)
-        with open(os.path.join(a.out, m + ".ref.json"), "w") as f:
-            json.dump({"meeting": m, "corpus": a.corpus, "device": corpus["device"], "speakers": speakers, "lines": lines}, f)
+        made = []
+        if not a.no_full:
+            wav_path = os.path.join(a.out, m + ".wav")
+            with open(wav_path, "wb") as f:
+                f.write(wav)
+            with open(os.path.join(a.out, m + ".ref.json"), "w") as f:
+                json.dump({"meeting": m, "corpus": a.corpus, "device": corpus["device"], "speakers": speakers, "lines": lines}, f)
+            made.append(f"{wav_path}\t{len(speakers)}")
+        for seconds in clips:
+            part = clip_lines(lines, seconds)
+            if not part or lines[-1]["end"] < seconds:
+                continue        # the meeting is shorter than this clip
+            name = f"{m}_c{seconds}"
+            wav_path = os.path.join(a.out, name + ".wav")
+            with open(wav_path, "wb") as f:
+                f.write(clip_wav(wav, seconds))
+            part_speakers = sorted({l["speaker"] for l in part})
+            with open(os.path.join(a.out, name + ".ref.json"), "w") as f:
+                json.dump({"meeting": name, "corpus": a.corpus, "device": corpus["device"], "clip": seconds,
+                           "speakers": part_speakers, "lines": part}, f)
+            made.append(f"{wav_path}\t{len(part_speakers)}")
         words_total = sum(len(l["words"]) for l in lines)
         print(f"{m}: {len(speakers)} speakers, {len(lines)} lines, {words_total} words, {len(wav) / 1e6:.0f} MB, ends {lines[-1]['end'] / 60:.0f} min", flush=True)
-        return f"{wav_path}\t{len(speakers)}"
+        return made
 
     # The archive server is slow per connection, so several recordings are downloaded at once.
     with ThreadPoolExecutor(max_workers=6) as pool:
-        rows = [r for r in pool.map(fetch, [m for m in meetings if m in references]) if r]
+        rows = [row for made in pool.map(fetch, [m for m in meetings if m in references]) if made for row in made]
 
     mode = "a" if os.path.exists(os.path.join(a.out, "files.tsv")) else "w"
     with open(os.path.join(a.out, "files.tsv"), mode) as f:

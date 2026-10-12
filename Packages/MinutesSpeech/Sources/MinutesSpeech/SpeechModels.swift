@@ -32,6 +32,9 @@ public struct SpeechOptions: Sendable {
     /// leaving the count to the grouping step (which undercounts on short, lively meetings).
     public var countSpeakersFirst = true
     public var counting = SpeakerCounter.Options()
+    /// Recordings at least this long skip the counting step and keep the library's own grouping,
+    /// which has enough to go on once every speaker has been heard for a while.
+    public var countOnlyUnderSeconds = Double.infinity
 
     public init() {}
 

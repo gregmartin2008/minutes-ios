@@ -16,6 +16,7 @@ import MinutesSpeech
 // where the settings allow, the voice analysis. Keys:
 //   grouping:  threshold=0.5  fa=0.2  fb=4  speakers=auto|ref|N  exact=true  recover=false  apart=false
 //              count=false (leave the count to the library)  cd=1.05  cs=0.04 (counting distance and share)
+//              under=600 (count only in recordings shorter than this many seconds)
 //   analysis:  step=0.2  minseg=1.0  overlap=false
 // --voices also writes <name>.voices.json: every window's voice embeddings, for studying the grouping.
 // --eend adds a variant named "eend": who-spoke-when from a different kind of model (LS-EEND, which
@@ -117,6 +118,7 @@ func parseVariant(_ spec: String, base: SpeechOptions) -> Variant {
         case "count": variant.options.countSpeakersFirst = kv[1] == "true"
         case "cd": variant.options.counting.mergeDistance = Double(kv[1]) ?? base.counting.mergeDistance
         case "cs": variant.options.counting.minimumShare = Double(kv[1]) ?? base.counting.minimumShare
+        case "under": variant.options.countOnlyUnderSeconds = Double(kv[1]) ?? base.countOnlyUnderSeconds
         case "minseg": variant.options.minimumVoiceSeconds = Double(kv[1]) ?? base.minimumVoiceSeconds
         case "overlap": variant.options.ignoreOverlapWhenComparingVoices = kv[1] != "true"
         case "exact": variant.options.headCountIsExact = kv[1] == "true"
