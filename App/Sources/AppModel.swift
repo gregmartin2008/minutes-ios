@@ -27,6 +27,8 @@ struct SetupStatus: Equatable {
     var downloading = false
     var transcription = 0.0
     var separation = 0.0
+    /// The download is done and iOS is compiling a model for this iPhone, which shows no progress.
+    var preparing = false
     var error: String?
 }
 
@@ -594,12 +596,14 @@ final class AppModel: ObservableObject {
         setup.downloading = true
         setup.error = nil
         do {
-            try await models.prepareAll { [weak self] kind, fraction in
+            try await models.prepareAll { [weak self] kind, fraction, preparing in
                 Task { @MainActor in
+                    guard let self else { return }
                     switch kind {
-                    case .transcription: self?.setup.transcription = fraction
-                    case .separation: self?.setup.separation = fraction
+                    case .transcription: self.setup.transcription = max(self.setup.transcription, fraction)
+                    case .separation: self.setup.separation = max(self.setup.separation, fraction)
                     }
+                    if self.setup.preparing != preparing { self.setup.preparing = preparing }
                 }
             }
             await models.unloadAll()
@@ -610,6 +614,7 @@ final class AppModel: ObservableObject {
             setup.error = "The download didn't finish: \(error.localizedDescription) Check the connection and try again."
             Log.shared.error("model download failed: \(error)")
         }
+        setup.preparing = false
         setup.downloading = false
     }
 
