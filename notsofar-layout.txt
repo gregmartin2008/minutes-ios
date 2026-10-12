@@ -1,0 +1,767 @@
+benchmark-datasets -> ['dev_set', 'eval_set', 'train_set']
+benchmark-datasets/dev_set -> ['240130.1_dev', '240208.2_dev', '240825.1_dev1']
+benchmark-datasets/eval_set -> ['240629.1_eval_small', '240629.1_eval_small_with_GT', '240825.1_eval_full_with_GT']
+benchmark-datasets/train_set -> ['240130.1_train', '240208.2_train', '240229.1_train', '240415.1_train', '240501.1_train', '240825.1_train']
+benchmark-datasets/dev_set/240825.1_dev1 36 meetings ['MTG_30860', 'MTG_30861', 'MTG_30862', 'MTG_30864', 'MTG_30865', 'MTG_30866', 'MTG_30868', 'MTG_30869'] ...
+    directory MTG_30860/close_talk 0
+    directory MTG_30860/mc_plaza_0 0
+    directory MTG_30860/mc_rockfall_0 0
+    directory MTG_30860/mc_rockfall_2 0
+    directory MTG_30860/sc_meetup_0 0
+    directory MTG_30860/sc_plaza_0 0
+    directory MTG_30860/sc_rockfall_0 0
+    directory MTG_30860/sc_rockfall_1 0
+    directory MTG_30860/sc_rockfall_2 0
+    file MTG_30860/close_talk/CT_21.wav 11663888
+    file MTG_30860/close_talk/CT_22.wav 11663888
+    file MTG_30860/close_talk/CT_23.wav 11663888
+    file MTG_30860/close_talk/CT_24.wav 11663888
+    file MTG_30860/close_talk/CT_25.wav 11663888
+    file MTG_30860/devices.json 2736
+    file MTG_30860/gt_meeting_metadata.json 518
+    file MTG_30860/gt_transcription.json 184626
+    file MTG_30860/mc_plaza_0/ch0.wav 11663888
+    file MTG_30860/mc_plaza_0/ch1.wav 11663888
+    file MTG_30860/mc_plaza_0/ch2.wav 11663888
+    file MTG_30860/mc_plaza_0/ch3.wav 11663888
+    file MTG_30860/mc_plaza_0/ch4.wav 11663888
+    file MTG_30860/mc_plaza_0/ch5.wav 11663888
+    file MTG_30860/mc_plaza_0/ch6.wav 11663888
+    file MTG_30860/mc_rockfall_0/ch0.wav 11663888
+    file MTG_30860/mc_rockfall_0/ch1.wav 11663888
+    file MTG_30860/mc_rockfall_0/ch2.wav 11663888
+    file MTG_30860/mc_rockfall_0/ch3.wav 11663888
+    file MTG_30860/mc_rockfall_0/ch4.wav 11663888
+    file MTG_30860/mc_rockfall_0/ch5.wav 11663888
+    file MTG_30860/mc_rockfall_0/ch6.wav 11663888
+    file MTG_30860/mc_rockfall_2/ch0.wav 11663888
+    file MTG_30860/mc_rockfall_2/ch1.wav 11663888
+    file MTG_30860/mc_rockfall_2/ch2.wav 11663888
+    file MTG_30860/mc_rockfall_2/ch3.wav 11663888
+    file MTG_30860/mc_rockfall_2/ch4.wav 11663888
+    file MTG_30860/mc_rockfall_2/ch5.wav 11663888
+    file MTG_30860/mc_rockfall_2/ch6.wav 11663888
+    file MTG_30860/sc_meetup_0/ch0.wav 11663888
+    file MTG_30860/sc_plaza_0/ch0.wav 11663888
+    file MTG_30860/sc_rockfall_0/ch0.wav 11663888
+    file MTG_30860/sc_rockfall_1/ch0.wav 11663888
+    file MTG_30860/sc_rockfall_2/ch0.wav 11663888
+== gt_transcription.json 184626 bytes
+[
+    {
+        "speaker_id":"Ernie",
+        "ct_wav_file_name":"close_talk\/CT_21.wav",
+        "start_time":18.06,
+        "end_time":18.42,
+        "text":"Hmm.",
+        "word_timing":[
+            [
+                "hmm",
+                18.1,
+                18.4
+            ]
+        ]
+    },
+    {
+        "speaker_id":"Ernie",
+        "ct_wav_file_name":"close_talk\/CT_21.wav",
+        "start_time":25.07,
+        "end_time":26.8,
+        "text":"I was thinking like no wheels.",
+        "word_timing":[
+            [
+                "i",
+                25.12,
+                25.31
+            ],
+            [
+                "was",
+                25.31,
+                25.47
+            ],
+            [
+                "thinking",
+                25.47,
+                25.77
+            ],
+            [
+                "like",
+                25.77,
+                25.93
+            ],
+            [
+                "no",
+                25.93,
+                26.19
+            ],
+            [
+                "wheels",
+                26.19,
+                26.78
+            ]
+        ]
+    },
+    {
+        "speaker_id":"Ernie",
+        "ct_wav_file_name":"close_talk\/CT_21.wav",
+        "start_time":27.18,
+        "end_time":27.97,
+        "text":"No wheels.",
+        "word_timing":[
+            [
+                "no",
+                27.2,
+                27.49
+            ],
+            [
+                "wheels",
+                27.49,
+                27.95
+            ]
+        ]
+    },
+    {
+        "speaker_id":"Ernie",
+        "ct_wav_file_name":"close_talk\/CT_21.wav",
+        "start_time":28.89,
+        "end_time":30.72,
+        "text":"We were the only car that can fly.",
+        "word_timing":[
+            [
+                "we",
+                28.92,
+                29.14
+            ],
+            [
+                "were",
+                29.14,
+                29.29
+            ],
+            [
+                "the",
+                29.29,
+                29.45
+            ],
+            [
+                "only",
+                29.45,
+                29.72
+            ],
+            [
+                "car",
+                29.72,
+                29.95
+            ],
+            [
+                "that",
+                29.95,
+                30.07
+            ],
+            [
+                "can",
+                30.07,
+                30.21
+            ],
+            [
+                "fly",
+                30.21,
+              
+== gt_meeting_metadata.json 518 bytes
+{
+    "meeting_id": "MTG_30860",
+    "MtgType": "mtg",
+    "MeetingDurationSec": 364.495125,
+    "Room": "ROOM_10008",
+    "NumParticipants": 5,
+    "ParticipantAliases": [
+        "Ernie",
+        "Peter",
+        "Olivia",
+        "Bert",
+        "Walter"
+    ],
+    "Topic": "Design the car of the future",
+    "Hashtags": "#NaturalMeeting",
+    "ParticipantAliasToCtDevice": {
+        "Ernie": "CT_21",
+        "Peter": "CT_22",
+        "Olivia": "CT_23",
+        "Bert": "CT_24",
+        "Walter": "CT_25"
+    }
+}
+== devices.json 2736 bytes
+[
+    {
+        "device_name": "CT_21",
+        "is_mc": false,
+        "is_close_talk": true,
+        "channels_num": 1,
+        "wav_file_names": "close_talk\/CT_21.wav"
+    },
+    {
+        "device_name": "CT_22",
+        "is_mc": false,
+        "is_close_talk": true,
+        "channels_num": 1,
+        "wav_file_names": "close_talk\/CT_22.wav"
+    },
+    {
+        "device_name": "CT_23",
+        "is_mc": false,
+        "is_close_talk": true,
+        "channels_num": 1,
+        "wav_file_names": "close_talk\/CT_23.wav"
+    },
+    {
+        "device_name": "CT_24",
+        "is_mc": false,
+        "is_close_talk": true,
+        "channels_num": 1,
+        "wav_file_names": "close_talk\/CT_24.wav"
+    },
+    {
+        "device_name": "CT_25",
+        "is_mc": false,
+        "is_close_talk": true,
+        "channels_num": 1,
+        "wav_file_names": "close_talk\/CT_25.wav"
+    },
+    {
+        "device_name": "plaza_0",
+        "is_mc": true,
+        "is_close_talk": false,
+        "channels_num": 7,
+        "wav_file_names": "mc_plaza_0\/ch0.wav,mc_plaza_0\/ch1.wav,mc_plaza_0\/ch2.wav,mc_plaza_0\/ch3.wav,mc_plaza_0\/ch4.wav,mc_plaza_0\/ch5.wav,mc_plaza_0\/ch6.wav"
+    },
+    {
+        "device_name": "plaza_0",
+        "is_mc": false,
+        "is_close_talk": false,
+        "channels_num": 1,
+        "wav_file_names": "sc_plaza_0\/ch0.wav"
+    },
+    {
+        "device_name": "rockfall_0",
+        "is_mc": true,
+        "is_close_talk": false,
+        "channels_num": 7,
+        "wav_file_names": "mc_rockfall_0\/ch0.wav,mc_rockfall_0\/ch1.wav,mc_rockfall_0\/ch2.wav,mc_rockfall_0\/ch3.wav,mc_rockfall_0\/ch4.wav,mc_rockfall_0\/ch5.wav,mc_rockfall_0\/ch6.wav"
+    },
+    {
+        "device_name": "rockfall_0",
+        "is_mc": false,
+        "is_close_talk": false,
+        "channels_num": 1,
+        "wav_file_names": "sc_rockfall_0\/ch0.wav"
+    },
+    {
+        "device_name": "rockfall_1",
+        "is_mc": false,
+        "is_close_talk": false,
+        "channels_num": 1,
+        "wav_file_names": "sc_rockfall_1\/ch0.wav"
+    },
+    {
+        "device_name": "rockfall_2",
+        "is_mc": true,
+        "is_close_talk": false,
+        "channels_num": 7,
+        "wav_file_names": "mc_rockfall_2\/ch0.wav,mc_rockfall_2\/ch1.wav,mc_rockfall_2\/ch2.wav,mc_rockfall_2\/ch3.wav,mc_rockfall_2\/ch4.wav,mc_rockfall_2\/ch5.wav,mc_rockfall_2\/ch6.wav"
+    },
+    {
+        "device_name": "rockfall_2",
+        "is_mc": false,
+        "is_close_talk": false,
+        "channels_num": 1,
+  
+benchmark-datasets/eval_set/240629.1_eval_small_with_GT 80 meetings ['MTG_32000', 'MTG_32003', 'MTG_32004', 'MTG_32005', 'MTG_32006', 'MTG_32007', 'MTG_32008', 'MTG_32009'] ...
+    directory MTG_32000/close_talk 0
+    directory MTG_32000/mc_plaza_0 0
+    directory MTG_32000/mc_rockfall_0 0
+    directory MTG_32000/sc_meetup_0 0
+    directory MTG_32000/sc_rockfall_0 0
+    file MTG_32000/close_talk/CT_20.wav 11628288
+    file MTG_32000/close_talk/CT_21.wav 11628288
+    file MTG_32000/close_talk/CT_22.wav 11628288
+    file MTG_32000/close_talk/CT_24.wav 11628288
+    file MTG_32000/devices.json 1692
+    file MTG_32000/gt_meeting_metadata.json 461
+    file MTG_32000/gt_transcription.json 213302
+    file MTG_32000/mc_plaza_0/ch0.wav 11628288
+    file MTG_32000/mc_plaza_0/ch1.wav 11628288
+    file MTG_32000/mc_plaza_0/ch2.wav 11628288
+    file MTG_32000/mc_plaza_0/ch3.wav 11628288
+    file MTG_32000/mc_plaza_0/ch4.wav 11628288
+    file MTG_32000/mc_plaza_0/ch5.wav 11628288
+    file MTG_32000/mc_plaza_0/ch6.wav 11628288
+    file MTG_32000/mc_rockfall_0/ch0.wav 11628288
+    file MTG_32000/mc_rockfall_0/ch1.wav 11628288
+    file MTG_32000/mc_rockfall_0/ch2.wav 11628288
+    file MTG_32000/mc_rockfall_0/ch3.wav 11628288
+    file MTG_32000/mc_rockfall_0/ch4.wav 11628288
+    file MTG_32000/mc_rockfall_0/ch5.wav 11628288
+    file MTG_32000/mc_rockfall_0/ch6.wav 11628288
+    file MTG_32000/sc_meetup_0/ch0.wav 11628288
+    file MTG_32000/sc_rockfall_0/ch0.wav 11628288
+== gt_transcription.json 213302 bytes
+[
+    {
+        "speaker_id":"Ron",
+        "ct_wav_file_name":"close_talk\/CT_20.wav",
+        "start_time":61.39,
+        "end_time":63.67,
+        "text":"We should probably list the <ST\/>",
+        "word_timing":[
+            [
+                "we",
+                61.41,
+                61.67
+            ],
+            [
+                "should",
+                61.67,
+                61.89
+            ],
+            [
+                "probably",
+                61.89,
+                62.43
+            ],
+            [
+                "list",
+                62.43,
+                63.13
+            ],
+            [
+                "the",
+                63.15,
+                63.65
+            ]
+        ]
+    },
+    {
+        "speaker_id":"Ron",
+        "ct_wav_file_name":"close_talk\/CT_20.wav",
+        "start_time":63.99,
+        "end_time":67.35,
+        "text":"<ST\/> things that are important to have within the park.",
+        "word_timing":[
+            [
+                "things",
+                64.01,
+                64.44
+            ],
+            [
+                "that",
+                64.44,
+                64.57
+            ],
+            [
+                "are",
+                64.57,
+                64.69
+            ],
+            [
+                "important",
+                64.69,
+                65.59
+            ],
+            [
+                "to",
+                65.66,
+                66.05
+            ],
+            [
+                "have",
+                66.05,
+                66.39
+            ],
+            [
+                "within",
+                66.39,
+                66.75
+            ],
+            [
+                "the",
+                66.75,
+                66.85
+            ],
+            [
+                "park",
+                66.85,
+                67.33
+            ]
+        ]
+    },
+    {
+        "speaker_id":"Ron",
+        "ct_wav_file_name":"close_talk\/CT_20.wav",
+        "start_time":67.75,
+        "end_time":68.86,
+        "text":"<ST\/> and then <ST\/>",
+        "word_timing":[
+            [
+                "and",
+                67.8,
+                68.07
+            ],
+            [
+                "then",
+                68.07,
+                68.84
+            ]
+        ]
+    },
+    {
+        "speaker_id":"Ron",
+        "ct_wav_file_name":"close_talk\/CT_20.wav",
+        "start_time":69.34,
+        "end_time":72.76,
+        "text":"<ST\/> that will be fit into the <ST\/> to the area. That'
+== gt_meeting_metadata.json 461 bytes
+{
+    "meeting_id": "MTG_32000",
+    "MtgType": "mtg",
+    "MeetingDurationSec": 363.382625,
+    "Room": "ROOM_10030",
+    "NumParticipants": 4,
+    "ParticipantAliases": [
+        "Ron",
+        "Sarah",
+        "Linda",
+        "Rachel"
+    ],
+    "Topic": "Design a city park",
+    "Hashtags": "#NaturalMeeting",
+    "ParticipantAliasToCtDevice": {
+        "Ron": "CT_20",
+        "Sarah": "CT_21",
+        "Linda": "CT_22",
+        "Rachel": "CT_24"
+    }
+}
+== devices.json 1692 bytes
+[
+    {
+        "device_name": "CT_20",
+        "is_mc": false,
+        "is_close_talk": true,
+        "channels_num": 1,
+        "wav_file_names": "close_talk\/CT_20.wav"
+    },
+    {
+        "device_name": "CT_21",
+        "is_mc": false,
+        "is_close_talk": true,
+        "channels_num": 1,
+        "wav_file_names": "close_talk\/CT_21.wav"
+    },
+    {
+        "device_name": "CT_22",
+        "is_mc": false,
+        "is_close_talk": true,
+        "channels_num": 1,
+        "wav_file_names": "close_talk\/CT_22.wav"
+    },
+    {
+        "device_name": "CT_24",
+        "is_mc": false,
+        "is_close_talk": true,
+        "channels_num": 1,
+        "wav_file_names": "close_talk\/CT_24.wav"
+    },
+    {
+        "device_name": "plaza_0",
+        "is_mc": true,
+        "is_close_talk": false,
+        "channels_num": 7,
+        "wav_file_names": "mc_plaza_0\/ch0.wav,mc_plaza_0\/ch1.wav,mc_plaza_0\/ch2.wav,mc_plaza_0\/ch3.wav,mc_plaza_0\/ch4.wav,mc_plaza_0\/ch5.wav,mc_plaza_0\/ch6.wav"
+    },
+    {
+        "device_name": "rockfall_0",
+        "is_mc": true,
+        "is_close_talk": false,
+        "channels_num": 7,
+        "wav_file_names": "mc_rockfall_0\/ch0.wav,mc_rockfall_0\/ch1.wav,mc_rockfall_0\/ch2.wav,mc_rockfall_0\/ch3.wav,mc_rockfall_0\/ch4.wav,mc_rockfall_0\/ch5.wav,mc_rockfall_0\/ch6.wav"
+    },
+    {
+        "device_name": "rockfall_0",
+        "is_mc": false,
+        "is_close_talk": false,
+        "channels_num": 1,
+        "wav_file_names": "sc_rockfall_0\/ch0.wav"
+    },
+    {
+        "device_name": "meetup_0",
+        "is_mc": false,
+        "is_close_talk": false,
+        "channels_num": 1,
+        "wav_file_names": "sc_meetup_0\/ch0.wav"
+    }
+]
+benchmark-datasets/eval_set/240825.1_eval_full_with_GT 129 meetings ['MTG_32000', 'MTG_32003', 'MTG_32004', 'MTG_32005', 'MTG_32006', 'MTG_32007', 'MTG_32008', 'MTG_32009'] ...
+    directory MTG_32000/close_talk 0
+    directory MTG_32000/mc_plaza_0 0
+    directory MTG_32000/mc_rockfall_0 0
+    directory MTG_32000/mc_rockfall_2 0
+    directory MTG_32000/sc_meetup_0 0
+    directory MTG_32000/sc_plaza_0 0
+    directory MTG_32000/sc_rockfall_0 0
+    directory MTG_32000/sc_rockfall_1 0
+    directory MTG_32000/sc_rockfall_2 0
+    file MTG_32000/close_talk/CT_20.wav 11628288
+    file MTG_32000/close_talk/CT_21.wav 11628288
+    file MTG_32000/close_talk/CT_22.wav 11628288
+    file MTG_32000/close_talk/CT_24.wav 11628288
+    file MTG_32000/devices.json 2529
+    file MTG_32000/gt_meeting_metadata.json 461
+    file MTG_32000/gt_transcription.json 213302
+    file MTG_32000/mc_plaza_0/ch0.wav 11628288
+    file MTG_32000/mc_plaza_0/ch1.wav 11628288
+    file MTG_32000/mc_plaza_0/ch2.wav 11628288
+    file MTG_32000/mc_plaza_0/ch3.wav 11628288
+    file MTG_32000/mc_plaza_0/ch4.wav 11628288
+    file MTG_32000/mc_plaza_0/ch5.wav 11628288
+    file MTG_32000/mc_plaza_0/ch6.wav 11628288
+    file MTG_32000/mc_rockfall_0/ch0.wav 11628288
+    file MTG_32000/mc_rockfall_0/ch1.wav 11628288
+    file MTG_32000/mc_rockfall_0/ch2.wav 11628288
+    file MTG_32000/mc_rockfall_0/ch3.wav 11628288
+    file MTG_32000/mc_rockfall_0/ch4.wav 11628288
+    file MTG_32000/mc_rockfall_0/ch5.wav 11628288
+    file MTG_32000/mc_rockfall_0/ch6.wav 11628288
+    file MTG_32000/mc_rockfall_2/ch0.wav 11628288
+    file MTG_32000/mc_rockfall_2/ch1.wav 11628288
+    file MTG_32000/mc_rockfall_2/ch2.wav 11628288
+    file MTG_32000/mc_rockfall_2/ch3.wav 11628288
+    file MTG_32000/mc_rockfall_2/ch4.wav 11628288
+    file MTG_32000/mc_rockfall_2/ch5.wav 11628288
+    file MTG_32000/mc_rockfall_2/ch6.wav 11628288
+    file MTG_32000/sc_meetup_0/ch0.wav 11628288
+    file MTG_32000/sc_plaza_0/ch0.wav 11628288
+    file MTG_32000/sc_rockfall_0/ch0.wav 11628288
+    file MTG_32000/sc_rockfall_1/ch0.wav 11628288
+    file MTG_32000/sc_rockfall_2/ch0.wav 11628288
+== gt_transcription.json 213302 bytes
+[
+    {
+        "speaker_id":"Ron",
+        "ct_wav_file_name":"close_talk\/CT_20.wav",
+        "start_time":61.39,
+        "end_time":63.67,
+        "text":"We should probably list the <ST\/>",
+        "word_timing":[
+            [
+                "we",
+                61.41,
+                61.67
+            ],
+            [
+                "should",
+                61.67,
+                61.89
+            ],
+            [
+                "probably",
+                61.89,
+                62.43
+            ],
+            [
+                "list",
+                62.43,
+                63.13
+            ],
+            [
+                "the",
+                63.15,
+                63.65
+            ]
+        ]
+    },
+    {
+        "speaker_id":"Ron",
+        "ct_wav_file_name":"close_talk\/CT_20.wav",
+        "start_time":63.99,
+        "end_time":67.35,
+        "text":"<ST\/> things that are important to have within the park.",
+        "word_timing":[
+            [
+                "things",
+                64.01,
+                64.44
+            ],
+            [
+                "that",
+                64.44,
+                64.57
+            ],
+            [
+                "are",
+                64.57,
+                64.69
+            ],
+            [
+                "important",
+                64.69,
+                65.59
+            ],
+            [
+                "to",
+                65.66,
+                66.05
+            ],
+            [
+                "have",
+                66.05,
+                66.39
+            ],
+            [
+                "within",
+                66.39,
+                66.75
+            ],
+            [
+                "the",
+                66.75,
+                66.85
+            ],
+            [
+                "park",
+                66.85,
+                67.33
+            ]
+        ]
+    },
+    {
+        "speaker_id":"Ron",
+        "ct_wav_file_name":"close_talk\/CT_20.wav",
+        "start_time":67.75,
+        "end_time":68.86,
+        "text":"<ST\/> and then <ST\/>",
+        "word_timing":[
+            [
+                "and",
+                67.8,
+                68.07
+            ],
+            [
+                "then",
+                68.07,
+                68.84
+            ]
+        ]
+    },
+    {
+        "speaker_id":"Ron",
+        "ct_wav_file_name":"close_talk\/CT_20.wav",
+        "start_time":69.34,
+        "end_time":72.76,
+        "text":"<ST\/> that will be fit into the <ST\/> to the area. That'
+== gt_meeting_metadata.json 461 bytes
+{
+    "meeting_id": "MTG_32000",
+    "MtgType": "mtg",
+    "MeetingDurationSec": 363.382625,
+    "Room": "ROOM_10030",
+    "NumParticipants": 4,
+    "ParticipantAliases": [
+        "Ron",
+        "Sarah",
+        "Linda",
+        "Rachel"
+    ],
+    "Topic": "Design a city park",
+    "Hashtags": "#NaturalMeeting",
+    "ParticipantAliasToCtDevice": {
+        "Ron": "CT_20",
+        "Sarah": "CT_21",
+        "Linda": "CT_22",
+        "Rachel": "CT_24"
+    }
+}
+== devices.json 2529 bytes
+[
+    {
+        "device_name": "CT_20",
+        "is_mc": false,
+        "is_close_talk": true,
+        "channels_num": 1,
+        "wav_file_names": "close_talk/CT_20.wav"
+    },
+    {
+        "device_name": "CT_21",
+        "is_mc": false,
+        "is_close_talk": true,
+        "channels_num": 1,
+        "wav_file_names": "close_talk/CT_21.wav"
+    },
+    {
+        "device_name": "CT_22",
+        "is_mc": false,
+        "is_close_talk": true,
+        "channels_num": 1,
+        "wav_file_names": "close_talk/CT_22.wav"
+    },
+    {
+        "device_name": "CT_24",
+        "is_mc": false,
+        "is_close_talk": true,
+        "channels_num": 1,
+        "wav_file_names": "close_talk/CT_24.wav"
+    },
+    {
+        "device_name": "plaza_0",
+        "is_mc": true,
+        "is_close_talk": false,
+        "channels_num": 7,
+        "wav_file_names": "mc_plaza_0/ch0.wav,mc_plaza_0/ch1.wav,mc_plaza_0/ch2.wav,mc_plaza_0/ch3.wav,mc_plaza_0/ch4.wav,mc_plaza_0/ch5.wav,mc_plaza_0/ch6.wav"
+    },
+    {
+        "device_name": "plaza_0",
+        "is_mc": false,
+        "is_close_talk": false,
+        "channels_num": 1,
+        "wav_file_names": "sc_plaza_0/ch0.wav"
+    },
+    {
+        "device_name": "rockfall_0",
+        "is_mc": true,
+        "is_close_talk": false,
+        "channels_num": 7,
+        "wav_file_names": "mc_rockfall_0/ch0.wav,mc_rockfall_0/ch1.wav,mc_rockfall_0/ch2.wav,mc_rockfall_0/ch3.wav,mc_rockfall_0/ch4.wav,mc_rockfall_0/ch5.wav,mc_rockfall_0/ch6.wav"
+    },
+    {
+        "device_name": "rockfall_0",
+        "is_mc": false,
+        "is_close_talk": false,
+        "channels_num": 1,
+        "wav_file_names": "sc_rockfall_0/ch0.wav"
+    },
+    {
+        "device_name": "rockfall_1",
+        "is_mc": false,
+        "is_close_talk": false,
+        "channels_num": 1,
+        "wav_file_names": "sc_rockfall_1/ch0.wav"
+    },
+    {
+        "device_name": "rockfall_2",
+        "is_mc": true,
+        "is_close_talk": false,
+        "channels_num": 7,
+        "wav_file_names": "mc_rockfall_2/ch0.wav,mc_rockfall_2/ch1.wav,mc_rockfall_2/ch2.wav,mc_rockfall_2/ch3.wav,mc_rockfall_2/ch4.wav,mc_rockfall_2/ch5.wav,mc_rockfall_2/ch6.wav"
+    },
+    {
+        "device_name": "rockfall_2",
+        "is_mc": false,
+        "is_close_talk": false,
+        "channels_num": 1,
+        "wav_file_names": "sc_rockfall_2/ch0.wav"
+    },
+    {
+        "device_name": "meetup_0",
+        "is_mc": false,
+        "is_close_talk": false,
+        "channels_num": 1,
+        "wav_file_names": 
