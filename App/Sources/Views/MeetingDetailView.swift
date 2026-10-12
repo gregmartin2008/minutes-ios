@@ -233,7 +233,7 @@ private struct StatusCard: View {
             stageList(current: meeting.stage, spinning: true)
             ProgressView(value: progress ?? MeetingPipeline.overallProgress(stage: meeting.stage, fraction: 0))
                 .tint(Theme.ink)
-            Text("You can lock the iPhone or use other apps. If iOS pauses the work, Minutes sends a notification and finishes when you open it.")
+            Text("Fastest with Minutes left open; the screen stays on until the email is sent. You can also lock the iPhone or use other apps. If iOS pauses the work, Minutes sends a notification and finishes when you open it.")
                 .font(.footnote)
                 .foregroundStyle(Theme.muted)
                 .fixedSize(horizontal: false, vertical: true)

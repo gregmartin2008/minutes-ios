@@ -24,6 +24,7 @@ final class BackgroundKeeper {
     private var lastTitle = ""
     private var lastSubtitle = ""
     private var lastFraction = 0.0
+    private var interruptionObserver: NSObjectProtocol?
 
     /// True while a meeting is being processed and this object owns the audio session.
     var isActive: Bool { active }
@@ -139,6 +140,18 @@ final class BackgroundKeeper {
             p.prepareToPlay()
             p.play()
             player = p
+            if interruptionObserver == nil {
+                // A phone call stops the silent audio; start it again when the call ends.
+                interruptionObserver = NotificationCenter.default.addObserver(
+                    forName: AVAudioSession.interruptionNotification, object: session, queue: .main
+                ) { [weak self] note in
+                    guard let self, let player = self.player,
+                          let raw = note.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt,
+                          AVAudioSession.InterruptionType(rawValue: raw) == .ended else { return }
+                    try? AVAudioSession.sharedInstance().setActive(true)
+                    player.play()
+                }
+            }
         } catch {
             Log.shared.warn("silent audio could not start: \(error.localizedDescription)")
         }

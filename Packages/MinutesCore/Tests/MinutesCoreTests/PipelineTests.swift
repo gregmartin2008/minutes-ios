@@ -99,6 +99,68 @@ final class PipelineTests: XCTestCase {
         return m
     }
 
+    /// A meeting long enough that its notes take several requests to the language model.
+    func useLongMeeting() {
+        var turns: [SpeakerTurn] = []
+        var words: [Word] = []
+        for i in 0..<240 {
+            let start = Double(i) * 5
+            turns.append(SpeakerTurn(speaker: "S\(i % 2 + 1)", start: start, end: start + 4.5))
+            for w in 0..<10 {
+                let at = start + Double(w) * 0.4
+                words.append(Word(text: w == 9 ? "point\(i)." : "word", start: at, end: at + 0.3))
+            }
+        }
+        separator.result = SeparationResult(turns: turns, voices: ["S1": [1, 0, 0], "S2": [0, 1, 0]])
+        transcriber.words = words
+        model.context = 2048
+    }
+
+    func testThrottledNotesKeepFinishedSectionsAndContinue() async throws {
+        useLongMeeting()
+        model.rateLimitFromCall = 3                    // two sections, then iOS throttles the model
+        let m = try newMeeting()
+        let waiting = await pipeline().run(m) { _, _ in }
+        XCTAssertEqual(waiting.status, .waiting)
+        XCTAssertEqual(waiting.stage, .writeNotes)
+        XCTAssertEqual(waiting.notesCheckpoint?.sections.count, 2)
+        XCTAssertEqual(store.load(id: m.id)?.notesCheckpoint?.sections.count, 2, "finished sections are on disk")
+        XCTAssertTrue(mailer.sent.isEmpty)
+
+        model.rateLimitFromCall = .max
+        var again = waiting
+        again.status = .processing
+        let done = await pipeline().run(again) { _, _ in }
+        XCTAssertEqual(done.status, .done)
+        XCTAssertNil(done.notesCheckpoint)
+        XCTAssertGreaterThan(model.sections.count, 3)
+        XCTAssertEqual(done.notes?.totalSections, model.sections.count, "no section was sent to the model twice")
+        XCTAssertEqual(Set(model.sections).count, model.sections.count)
+        XCTAssertEqual(separator.calls, 1)
+        XCTAssertEqual(transcriber.calls, 1)
+        XCTAssertEqual(mailer.sent.count, 1)
+    }
+
+    func testSeparatingAgainKeepsTheTranscribedWords() async throws {
+        let m = try newMeeting()
+        var first = await pipeline().run(m) { _, _ in }
+        XCTAssertEqual(first.status, .done)
+        // What the app does when the person asks for the voices to be separated again.
+        first.expectedSpeakers = 3
+        first.turns = nil
+        first.utterances = nil
+        first.notes = nil
+        first.stage = .separateSpeakers
+        first.status = .processing
+        let second = await pipeline().run(first) { _, _ in }
+        XCTAssertEqual(second.status, .done)
+        XCTAssertEqual(separator.calls, 2)
+        XCTAssertEqual(separator.seenExpected, .some(3))
+        XCTAssertEqual(transcriber.calls, 1, "the audio is not transcribed a second time")
+        XCTAssertEqual(second.utterances?.count, 2)
+        XCTAssertEqual(mailer.sent.count, 2)
+    }
+
     func testFullRun() async throws {
         let m = try newMeeting()
         let seen = Recorder()

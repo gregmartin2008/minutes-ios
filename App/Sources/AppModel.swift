@@ -53,6 +53,9 @@ final class AppModel: ObservableObject {
     private let recorder = Recorder()
     private var runner: Task<Void, Never>?
     private var runningID: String?
+    /// Changes the person made to a meeting while it was being processed. The pipeline works on its
+    /// own copy, so these are applied to that copy when it reports back.
+    private var editsDuringRun: [String: [(inout Meeting) -> Void]] = [:]
     private var finishedRuns = Set<String>()
     private let pathMonitor = NWPathMonitor()
     private var online = true
@@ -314,27 +317,34 @@ final class AppModel: ObservableObject {
               let next = meetings.filter({ $0.status == .processing }).min(by: { $0.createdAt < $1.createdAt }) {
             if !began {
                 BackgroundKeeper.shared.begin(title: "Minutes is writing your notes")
+                // With Minutes left open, keep the screen on: iOS gives foreground work full speed.
+                UIApplication.shared.isIdleTimerDisabled = true
                 began = true
             }
             finishedRuns.remove(next.id)
             runningID = next.id
             let pipeline = MeetingPipeline(store: store, services: services())
-            let result = await pipeline.run(next) { [weak self] snapshot, fraction in
+            var result = await pipeline.run(next) { [weak self] snapshot, fraction in
                 Task { @MainActor in self?.apply(snapshot, fraction: fraction) }
             }
             runningID = nil
             finishedRuns.insert(result.id)
             progress[result.id] = nil
+            let edits = editsDuringRun.removeValue(forKey: result.id) ?? []
             guard meeting(result.id) != nil else {
                 // Deleted while it was being processed: remove what the run wrote back.
                 store.delete(id: result.id)
                 continue
             }
+            edits.forEach { $0(&result) }
             save(result)
             if result.status != .done { allSucceeded = false }
             announce(result)
         }
-        if began { BackgroundKeeper.shared.end(success: allSucceeded) }
+        if began {
+            BackgroundKeeper.shared.end(success: allSucceeded)
+            UIApplication.shared.isIdleTimerDisabled = false
+        }
         if !isDemo { await models.unloadAll() }
     }
 
@@ -342,7 +352,9 @@ final class AppModel: ObservableObject {
     private func apply(_ snapshot: Meeting, fraction: Double) {
         guard !finishedRuns.contains(snapshot.id), let i = meetings.firstIndex(where: { $0.id == snapshot.id }) else { return }
         if meetings[i].stage != snapshot.stage || meetings[i].status != snapshot.status {
-            meetings[i] = snapshot
+            var updated = snapshot
+            editsDuringRun[snapshot.id]?.forEach { $0(&updated) }
+            meetings[i] = updated
         }
         progress[snapshot.id] = fraction
         BackgroundKeeper.shared.update(fraction: fraction, title: snapshot.title, subtitle: snapshot.stage.label)
@@ -422,26 +434,37 @@ final class AppModel: ObservableObject {
 
     // MARK: Editing a meeting
 
+    /// Applies a change to a meeting. If the meeting is being processed, the change is also kept
+    /// to be applied to the processed result, which would otherwise overwrite it.
+    private func edit(_ id: String, _ change: @escaping (inout Meeting) -> Void) {
+        guard var m = meeting(id) else { return }
+        change(&m)
+        if m.status == .processing { editsDuringRun[id, default: []].append(change) }
+        save(m)
+    }
+
     func rename(_ id: String, to title: String) {
         let t = title.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard var m = meeting(id), !t.isEmpty, t != m.title else { return }
-        m.title = t
-        m.titleIsAuto = false
-        save(m)
+        guard let m = meeting(id), !t.isEmpty, t != m.title else { return }
+        edit(id) { meeting in
+            meeting.title = t
+            meeting.titleIsAuto = false
+        }
     }
 
     /// Names a voice in this meeting and remembers the voice for future meetings.
     func nameSpeaker(_ label: String, as name: String, in id: String) {
-        guard var m = meeting(id) else { return }
-        m.setName(name, for: label)
+        guard let m = meeting(id) else { return }
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        var profileID: String?
         if !trimmed.isEmpty, let voice = m.voiceEmbeddings?[label], !voice.isEmpty {
-            if let profileID = profiles.learn(name: trimmed, embedding: voice) {
-                m.speakerProfiles[label] = profileID
-                try? store.saveProfiles(profiles)
-            }
+            profileID = profiles.learn(name: trimmed, embedding: voice)
+            if profileID != nil { try? store.saveProfiles(profiles) }
         }
-        save(m)
+        edit(id) { meeting in
+            meeting.setName(name, for: label)
+            if let profileID { meeting.speakerProfiles[label] = profileID }
+        }
     }
 
     func forgetVoice(_ profileID: String) {
@@ -453,6 +476,7 @@ final class AppModel: ObservableObject {
         store.delete(id: id)
         meetings.removeAll { $0.id == id }
         progress[id] = nil
+        if runningID != id { editsDuringRun[id] = nil }
         // If it is being processed right now, stop that work; the rest of the queue restarts by itself.
         if runningID == id { runner?.cancel() }
     }

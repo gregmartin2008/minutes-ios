@@ -213,25 +213,42 @@ public final class MeetingPipeline: @unchecked Sendable {
             case .failure(let reason):
                 m.notes = nil
                 m.notesError = Self.describe(reason)
+                m.notesCheckpoint = nil
             case .success(let model):
+                // Each finished section is saved as it completes, so an interruption costs one section at most.
+                let saved = CheckpointBox(m.notesCheckpoint)
+                let snapshot = m
+                let store = self.store
                 do {
                     let engine = NotesEngine(options: services.notesOptions)
                     let notes = try await engine.write(
-                        lines: lines, titleHint: m.titleIsAuto ? nil : m.title, model: model, progress: progress)
+                        lines: lines, titleHint: m.titleIsAuto ? nil : m.title, model: model,
+                        resume: m.notesCheckpoint,
+                        checkpoint: { checkpoint in
+                            saved.set(checkpoint)
+                            var copy = snapshot
+                            copy.notesCheckpoint = checkpoint
+                            try? store.save(copy)
+                        },
+                        progress: progress)
                     m.notes = notes
                     m.notesError = nil
+                    m.notesCheckpoint = nil
                     if m.titleIsAuto, !notes.title.isEmpty {
                         m.title = notes.title
                         m.titleIsAuto = false
                     }
                 } catch let e as NotesModelError where e == .rateLimited {
+                    m.notesCheckpoint = saved.value
                     throw PipelineError.mustWait(
                         "iOS paused the notes because Minutes is in the background. Open Minutes and it finishes on its own.")
                 } catch is CancellationError {
+                    m.notesCheckpoint = saved.value
                     throw CancellationError()
                 } catch {
                     m.notes = nil
                     m.notesError = Self.describe(error)
+                    m.notesCheckpoint = nil
                 }
             }
 
@@ -292,6 +309,26 @@ public final class MeetingPipeline: @unchecked Sendable {
         }
         if let e = error as? LocalizedError, let d = e.errorDescription { return d }
         return String(describing: error)
+    }
+}
+
+/// Holds the latest notes checkpoint reported from the engine's callback.
+final class CheckpointBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var stored: NotesCheckpoint?
+
+    init(_ initial: NotesCheckpoint?) { stored = initial }
+
+    func set(_ checkpoint: NotesCheckpoint) {
+        lock.lock()
+        stored = checkpoint
+        lock.unlock()
+    }
+
+    var value: NotesCheckpoint? {
+        lock.lock()
+        defer { lock.unlock() }
+        return stored
     }
 }
 

@@ -215,6 +215,8 @@ public struct Meeting: Codable, Equatable, Identifiable, Sendable {
     // Notes and delivery
     public var notes: MeetingNotes?
     public var notesError: String?
+    /// Notes work in progress, kept so an interrupted run continues where it stopped.
+    public var notesCheckpoint: NotesCheckpoint?
     public var emailedAt: Date?
     public var emailCount: Int
     public var audioDeleted: Bool
@@ -244,6 +246,7 @@ public struct Meeting: Codable, Equatable, Identifiable, Sendable {
         self.matchScores = [:]
         self.notes = nil
         self.notesError = nil
+        self.notesCheckpoint = nil
         self.emailedAt = nil
         self.emailCount = 0
         self.audioDeleted = false
