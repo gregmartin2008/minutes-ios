@@ -235,10 +235,14 @@ do {
             if let eend {
                 let started = Date()
                 let timeline = try eend.processComplete(audioFileURL: job.audio)
-                let turns = timeline.finalizedSegments
-                    .map { SpeakerTurn(speaker: "S\($0.speakerIndex + 1)", start: Double($0.startTime), end: Double($0.endTime)) }
-                    .filter { $0.end > $0.start }
-                    .sorted { $0.start < $1.start }
+                var turns: [SpeakerTurn] = []
+                for segment in timeline.finalizedSegments {
+                    let label = "S" + String(segment.speakerIndex + 1)
+                    let start = Double(segment.startTime)
+                    let end = Double(segment.endTime)
+                    if end > start { turns.append(SpeakerTurn(speaker: label, start: start, end: end)) }
+                }
+                turns.sort { (a: SpeakerTurn, b: SpeakerTurn) -> Bool in a.start < b.start }
                 extra["eend"] = SeparationOutput(
                     speakers: Set(turns.map { $0.speaker }).count, turns: turns,
                     utterances: TranscriptAssembler.assemble(words: words, turns: turns), voices: [:],

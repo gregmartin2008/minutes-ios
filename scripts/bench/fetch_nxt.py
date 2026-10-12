@@ -14,6 +14,7 @@ For each meeting this writes <out>/<meeting>.wav, <out>/<meeting>.ref.json and a
 usage: fetch_nxt.py --corpus icsi|ami --meetings Bmr021,Bed016 --out DIR [--shard 0/2]
 """
 import argparse, io, json, os, re, sys, time, urllib.request, zipfile
+from concurrent.futures import ThreadPoolExecutor
 import xml.etree.ElementTree as ET
 
 BASE = "https://groups.inf.ed.ac.uk/ami/"
@@ -118,7 +119,8 @@ def main():
     archive = zipfile.ZipFile(io.BytesIO(get(corpus["zip"])))
     names = set(archive.namelist())
 
-    rows = []
+    # Read the reference words first (quick, from the archive already in memory).
+    references = {}
     for m in meetings:
         lines, speakers = [], []
         for s in "ABCDEFGHIJKLMNOP":
@@ -133,19 +135,27 @@ def main():
             print(f"{m}: no reference words found, skipped", flush=True)
             continue
         lines.sort(key=lambda l: l["start"])
+        references[m] = (lines, speakers)
+
+    def fetch(m):
+        lines, speakers = references[m]
         try:
             wav = get(corpus["audio"].format(m=m))
         except Exception as e:
             print(f"{m}: audio download failed ({e}), skipped", flush=True)
-            continue
+            return None
         wav_path = os.path.join(a.out, m + ".wav")
         with open(wav_path, "wb") as f:
             f.write(wav)
         with open(os.path.join(a.out, m + ".ref.json"), "w") as f:
             json.dump({"meeting": m, "corpus": a.corpus, "device": corpus["device"], "speakers": speakers, "lines": lines}, f)
-        rows.append(f"{wav_path}\t{len(speakers)}")
         words_total = sum(len(l["words"]) for l in lines)
         print(f"{m}: {len(speakers)} speakers, {len(lines)} lines, {words_total} words, {len(wav) / 1e6:.0f} MB, ends {lines[-1]['end'] / 60:.0f} min", flush=True)
+        return f"{wav_path}\t{len(speakers)}"
+
+    # The archive server is slow per connection, so several recordings are downloaded at once.
+    with ThreadPoolExecutor(max_workers=6) as pool:
+        rows = [r for r in pool.map(fetch, [m for m in meetings if m in references]) if r]
 
     mode = "a" if os.path.exists(os.path.join(a.out, "files.tsv")) else "w"
     with open(os.path.join(a.out, "files.tsv"), mode) as f:
