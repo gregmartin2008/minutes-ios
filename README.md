@@ -10,10 +10,17 @@ or AI service, there is no account, and there is nothing to pay for, however muc
 This repository holds the app's source and the automation that builds and tests it on GitHub's
 Macs. It contains no keys, passwords, or meeting content.
 
+**Status.** The app builds for iPhone and passes its automated tests, including a full run in the
+iPhone simulator from a recording to the email arriving, and its speech pipeline has been measured
+on 190 recorded meetings (see "How accurate it is"). It has not yet been run on a physical iPhone,
+so what depends on the phone itself (the microphone, working while locked, the notes) is built but
+unproven.
+
 ## What it does
 
-- **Records** with the screen locked, through phone calls and other interruptions (the gap is noted
-  in the transcript), and keeps what was recorded if the phone dies mid-meeting.
+- **Records** with the screen locked. It is built to resume after phone calls and other
+  interruptions (the gap is noted in the transcript) and to keep what was recorded if the phone
+  dies mid-meeting.
 - **Tells the speakers apart**, with no fixed limit on how many, and marks the passages where
   people talked over each other.
 - **Names people it has heard before.** Name a voice once ("Speaker 3" becomes "Dana") and it is
@@ -67,8 +74,8 @@ it, Minutes still emails the full transcript and says why there are no notes.
   readable from across the table. You can name the meeting and say how many people are in the room
   while it records; both are optional.
 - **End meeting** asks once for confirmation, then processes the recording. Leave Minutes open and
-  it finishes fastest (the screen stays on until the email is sent); it also keeps working with the
-  phone locked.
+  it finishes fastest (the screen stays on until the email is sent); it is built to keep working
+  with the phone locked as well.
 - The email arrives when processing finishes.
 - In the **Speakers** tab, name the voices. Minutes updates the transcript and notes, remembers
   the voices, and can send the corrected email (menu > *Email again*).
@@ -129,8 +136,8 @@ What the tables mean in practice:
   meetings, tcpWER was 37.0% with four people, 52.9% with five, 54.6% with six, 61.0% with seven,
   and 56.9% in the three-person meetings. On hour-long meetings with six to nine people it was 30.4%.
 - **More than four people is not a limit**, but the count is less certain as the room fills. In
-  the eight hour-long meetings with seven to nine speakers, Minutes found everyone in five and missed
-  one or two people in the other three. In the eleven short meetings with seven people it found all
+  the eight hour-long meetings with seven to nine speakers, Minutes found the right number in five
+  and was one or two short in the other three. In the eleven short meetings with seven people it found all
   seven in two and was one short in most of the rest. A person who is missed has their words
   credited to someone else.
 - **Counting the speakers** is the step these tests changed most. On short meetings the separation
