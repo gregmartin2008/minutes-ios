@@ -1,0 +1,52 @@
+name: probe
+# Records what the build machine provides (Xcode, SDK interfaces, simulators) so the app is
+# written against the real toolchain. Results are committed to the `ci` branch.
+on:
+  workflow_dispatch:
+  push:
+    paths: [".github/workflows/probe.yml"]
+permissions:
+  contents: write
+jobs:
+  sdk:
+    runs-on: macos-26
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Collect toolchain facts
+        run: |
+          set -x
+          mkdir -p out
+          {
+            sw_vers; uname -m; sysctl -n hw.ncpu hw.memsize
+            xcodebuild -version; swift --version 2>&1
+            ls /Applications | grep -i xcode
+            xcrun --sdk iphoneos --show-sdk-version; xcrun --sdk iphoneos --show-sdk-path
+            xcrun --sdk macosx --show-sdk-version
+            which xcodegen || echo "xcodegen: not installed"
+            brew --version | head -1
+            python3 --version
+            df -h / | tail -1
+          } > out/toolchain.txt 2>&1
+          xcrun simctl list devices available > out/simulators.txt 2>&1 || true
+          xcrun simctl list runtimes > out/runtimes.txt 2>&1 || true
+          SDK=$(xcrun --sdk iphoneos --show-sdk-path)
+          for fw in FoundationModels Speech BackgroundTasks; do
+            f=$(find "$SDK/System/Library/Frameworks/$fw.framework" -name "arm64e-apple-ios.swiftinterface" 2>/dev/null | head -1)
+            [ -n "$f" ] && cp "$f" "out/$fw.swiftinterface" || echo "no swiftinterface for $fw" >> out/toolchain.txt
+          done
+          cp -R "$SDK/System/Library/Frameworks/BackgroundTasks.framework/Headers" out/BackgroundTasksHeaders || true
+          ls -la out
+      - name: Publish results to the ci branch
+        run: |
+          set -e
+          git config user.name "minutes-ci"
+          git config user.email "minutes-ci@users.noreply.github.com"
+          cp -R out /tmp/probe-out
+          git checkout --orphan ci-tmp
+          git rm -rf . > /dev/null
+          mkdir -p probe && cp -R /tmp/probe-out/. probe/
+          echo "run ${GITHUB_RUN_ID} at $(date -u +%FT%TZ) for ${GITHUB_SHA}" > probe/RUN.txt
+          git add probe
+          git commit -q -m "probe results for ${GITHUB_SHA}"
+          git push -f origin ci-tmp:ci-probe
