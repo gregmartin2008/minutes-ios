@@ -6,9 +6,11 @@ final class FakeSeparator: SpeakerSeparating, @unchecked Sendable {
     var error: Error? = nil
     var calls = 0
     var seenExpected: Int?? = nil
-    func separate(audio: URL, expectedSpeakers: Int?, progress: @escaping @Sendable (Double) -> Void) async throws -> SeparationResult {
+    var seenExactly: Bool? = nil
+    func separate(audio: URL, expectedSpeakers: Int?, exactly: Bool, progress: @escaping @Sendable (Double) -> Void) async throws -> SeparationResult {
         calls += 1
         seenExpected = expectedSpeakers
+        seenExactly = exactly
         progress(0.5)
         if let e = error { throw e }
         return result
@@ -151,6 +153,7 @@ final class PipelineTests: XCTestCase {
         XCTAssertEqual(first.status, .done)
         // What the app does when the person asks for the voices to be separated again.
         first.expectedSpeakers = 3
+        first.expectedSpeakersIsExact = true
         first.turns = nil
         first.utterances = nil
         first.notes = nil
@@ -160,6 +163,7 @@ final class PipelineTests: XCTestCase {
         XCTAssertEqual(second.status, .done)
         XCTAssertEqual(separator.calls, 2)
         XCTAssertEqual(separator.seenExpected, .some(3))
+        XCTAssertEqual(separator.seenExactly, true, "a corrected count is used as given")
         XCTAssertEqual(transcriber.calls, 1, "the audio is not transcribed a second time")
         XCTAssertEqual(second.utterances?.count, 2)
         XCTAssertEqual(mailer.sent.count, 2)

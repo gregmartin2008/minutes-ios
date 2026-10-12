@@ -159,7 +159,7 @@ enum DemoData {
 
     // Stand-ins so buttons do something sensible in the demo.
     struct Separator: SpeakerSeparating {
-        func separate(audio: URL, expectedSpeakers: Int?, progress: @escaping @Sendable (Double) -> Void) async throws -> SeparationResult {
+        func separate(audio: URL, expectedSpeakers: Int?, exactly: Bool, progress: @escaping @Sendable (Double) -> Void) async throws -> SeparationResult {
             SeparationResult(turns: [], voices: [:])
         }
     }

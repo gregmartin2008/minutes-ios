@@ -464,6 +464,7 @@ final class AppModel: ObservableObject {
     func reseparate(_ id: String, speakers: Int?) {
         guard var m = meeting(id), m.status == .done || m.status == .failed, store.hasAudio(id: id) else { return }
         m.expectedSpeakers = speakers
+        m.expectedSpeakersIsExact = speakers != nil
         m.turns = nil
         m.voiceEmbeddings = nil
         m.utterances = nil

@@ -193,6 +193,9 @@ public struct Meeting: Codable, Equatable, Identifiable, Sendable {
     public var gaps: [RecordingGap]
     /// Number of people the person said were in the room, if they said.
     public var expectedSpeakers: Int?
+    /// True when that number came from the person correcting the result, so it is used as given
+    /// rather than as an upper bound.
+    public var expectedSpeakersIsExact: Bool?
 
     // Speaker separation
     public var turns: [SpeakerTurn]?
@@ -241,6 +244,7 @@ public struct Meeting: Codable, Equatable, Identifiable, Sendable {
         self.remarks = []
         self.gaps = []
         self.expectedSpeakers = nil
+        self.expectedSpeakersIsExact = nil
         self.turns = nil
         self.voiceEmbeddings = nil
         self.words = nil
