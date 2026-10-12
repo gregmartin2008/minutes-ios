@@ -179,7 +179,9 @@ struct SettingsView: View {
                     Text("Speaker separation model")
                         .font(.subheadline)
                     ProgressView(value: model.setup.separation)
-                    Text("Keep Minutes open until both finish.")
+                    Text(model.setup.preparing
+                        ? "Preparing the models for this iPhone. This takes a minute or two and happens once."
+                        : "Keep Minutes open until both finish.")
                         .font(.footnote)
                         .foregroundStyle(Theme.muted)
                 }

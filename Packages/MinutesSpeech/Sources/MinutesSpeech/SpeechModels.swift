@@ -48,22 +48,28 @@ public actor SpeechModels {
     }
 
     /// Downloads and compiles both models. Safe to call again; it returns quickly once they are present.
-    /// `progress` receives the model being prepared and a fraction from 0 to 1.
-    public func prepareAll(progress: @escaping @Sendable (SpeechModelKind, Double) -> Void) async throws {
-        _ = try await transcriber { progress(.transcription, $0) }
-        progress(.transcription, 1)
-        _ = try await separationModels { progress(.separation, $0) }
-        progress(.separation, 1)
+    /// `progress` receives the model being prepared, a fraction from 0 to 1, and whether the download
+    /// is over and the model is now being compiled for this device (which has no meaningful fraction).
+    public func prepareAll(progress: @escaping @Sendable (SpeechModelKind, Double, Bool) -> Void) async throws {
+        _ = try await transcriber { progress(.transcription, $0, $1) }
+        progress(.transcription, 1, false)
+        _ = try await separationModels { progress(.separation, $0, $1) }
+        progress(.separation, 1, false)
     }
 
-    func transcriber(progress: (@Sendable (Double) -> Void)? = nil) async throws -> AsrManager {
+    private static func isCompiling(_ phase: DownloadPhase) -> Bool {
+        if case .compiling = phase { return true }
+        return false
+    }
+
+    func transcriber(progress: (@Sendable (Double, Bool) -> Void)? = nil) async throws -> AsrManager {
         if let asr { return asr }
         let started = Date()
         let configuration = MLModelConfiguration()
         configuration.computeUnits = options.computeUnits
         let models = try await AsrModels.downloadAndLoad(
             configuration: configuration, version: .ultra,
-            progressHandler: { p in progress?(p.fractionCompleted) })
+            progressHandler: { p in progress?(p.fractionCompleted, Self.isCompiling(p.phase)) })
         let manager = AsrManager(config: .default)
         try await manager.loadModels(models)
         asr = manager
@@ -71,13 +77,14 @@ public actor SpeechModels {
         return manager
     }
 
-    func separationModels(progress: (@Sendable (Double) -> Void)? = nil) async throws -> OfflineDiarizerModels {
+    func separationModels(progress: (@Sendable (Double, Bool) -> Void)? = nil) async throws -> OfflineDiarizerModels {
         if let diarizerModels { return diarizerModels }
         let started = Date()
         let configuration = MLModelConfiguration()
         configuration.computeUnits = options.computeUnits
         let models = try await OfflineDiarizerModels.load(
-            configuration: configuration, progressHandler: { p in progress?(p.fractionCompleted) })
+            configuration: configuration,
+            progressHandler: { p in progress?(p.fractionCompleted, Self.isCompiling(p.phase)) })
         diarizerModels = models
         log.info(String(format: "speaker-separation models ready in %.1fs", Date().timeIntervalSince(started)))
         return models

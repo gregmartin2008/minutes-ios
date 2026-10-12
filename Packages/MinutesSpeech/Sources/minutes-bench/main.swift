@@ -143,7 +143,7 @@ var failures = 0
 
 do {
     let loadStart = Date()
-    try await models.prepareAll { _, _ in }
+    try await models.prepareAll { _, _, _ in }
     let loadSeconds = Date().timeIntervalSince(loadStart)
     print(String(format: "models ready in %.1fs", loadSeconds))
 

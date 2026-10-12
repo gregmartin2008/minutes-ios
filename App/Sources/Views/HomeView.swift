@@ -194,7 +194,9 @@ private struct SetupCard: View {
                     VStack(alignment: .leading, spacing: 6) {
                         ProgressView(value: downloadFraction)
                             .tint(Theme.ink)
-                        Text("Downloading, \(Int((downloadFraction * 100).rounded()))%. Keep Minutes open until it finishes.")
+                        Text(model.setup.preparing
+                            ? "Preparing the models for this iPhone. This takes a minute or two and happens once."
+                            : "Downloading, \(Int((downloadFraction * 100).rounded()))%. Keep Minutes open until it finishes.")
                             .font(.footnote)
                             .foregroundStyle(Theme.muted)
                     }
