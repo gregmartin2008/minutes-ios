@@ -1,52 +1,72 @@
 name: probe
-# Records what the build machine provides (Xcode, SDK interfaces, simulators) so the app is
-# written against the real toolchain. Results are committed to the `ci` branch.
+# Checks which public meeting recordings (with reference transcripts) can be downloaded for
+# measuring accuracy, and records how their annotation files are laid out.
 on:
   workflow_dispatch:
   push:
     paths: [".github/workflows/probe.yml"]
 permissions:
   contents: write
+env:
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 jobs:
-  sdk:
-    runs-on: macos-26
+  data:
+    runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
-      - name: Collect toolchain facts
+      - name: Check sources
         run: |
-          set -x
-          mkdir -p out
+          mkdir -p out && cd out
+          head() { echo "== $1"; curl -sIL --max-time 40 "$1" | grep -iE "^HTTP|content-length|content-type|accept-ranges|location" ; echo; }
           {
-            sw_vers; uname -m; sysctl -n hw.ncpu hw.memsize
-            xcodebuild -version; swift --version 2>&1
-            ls /Applications | grep -i xcode
-            xcrun --sdk iphoneos --show-sdk-version; xcrun --sdk iphoneos --show-sdk-path
-            xcrun --sdk macosx --show-sdk-version
-            which xcodegen || echo "xcodegen: not installed"
-            brew --version | head -1
-            python3 --version
-            df -h / | tail -1
-          } > out/toolchain.txt 2>&1
-          xcrun simctl list devices available > out/simulators.txt 2>&1 || true
-          xcrun simctl list runtimes > out/runtimes.txt 2>&1 || true
-          SDK=$(xcrun --sdk iphoneos --show-sdk-path)
-          for fw in FoundationModels Speech BackgroundTasks; do
-            f=$(find "$SDK/System/Library/Frameworks/$fw.framework" -name "arm64e-apple-ios.swiftinterface" 2>/dev/null | head -1)
-            [ -n "$f" ] && cp "$f" "out/$fw.swiftinterface" || echo "no swiftinterface for $fw" >> out/toolchain.txt
-          done
-          cp -R "$SDK/System/Library/Frameworks/BackgroundTasks.framework/Headers" out/BackgroundTasksHeaders || true
-          ls -la out
-      - name: Publish results to the ci branch
+            head https://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/ES2004a/audio/ES2004a.Array1-01.wav
+            head https://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/ES2004a/audio/ES2004a.Mix-Headset.wav
+            head https://groups.inf.ed.ac.uk/ami/AMICorpusAnnotations/ami_public_manual_1.6.2.zip
+            head https://raw.githubusercontent.com/pyannote/AMI-diarization-setup/main/only_words/rttms/test/ES2004a.rttm
+            head https://groups.inf.ed.ac.uk/ami/ICSIsignals/NXT/Bmr021.interaction.wav
+            head https://groups.inf.ed.ac.uk/ami/ICSICorpusAnnotations/ICSI_core_NXT.zip
+            head https://groups.inf.ed.ac.uk/ami/ICSIsignals/SPH/Bmr021/chan0.sph
+            head https://groups.inf.ed.ac.uk/ami/ICSIsignals/SPH/Bmr021/chanE.sph
+            head https://groups.inf.ed.ac.uk/ami/ICSIsignals/SPH/Bmr021/chanF.sph
+            head https://www.robots.ox.ac.uk/~vgg/data/voxconverse/data/voxconverse_test_wav.zip
+            head https://raw.githubusercontent.com/joonson/voxconverse/master/test/aepyx.rttm
+            head https://huggingface.co/api/datasets/microsoft/NOTSOFAR/tree/main/benchmark-datasets/dev_set/240825.1_dev1
+            head https://huggingface.co/datasets/microsoft/NOTSOFAR/resolve/main/README.md
+          } > sources.txt 2>&1
+          curl -sL --max-time 40 https://huggingface.co/api/datasets/microsoft/NOTSOFAR > notsofar-api.json || true
+          curl -sL --max-time 40 "https://huggingface.co/api/datasets/microsoft/NOTSOFAR/tree/main/benchmark-datasets/dev_set/240825.1_dev1" > notsofar-dev.json || true
+          curl -sL --max-time 40 "https://huggingface.co/api/datasets/microsoft/NOTSOFAR/tree/main/benchmark-datasets/dev_set/240825.1_dev1/MTG" | head -c 6000 > notsofar-mtg.json || true
+          curl -sL --max-time 60 https://groups.inf.ed.ac.uk/ami/ICSIsignals/SPH/Bmr021/ | sed 's/<[^>]*>/ /g' | grep -v '^\s*$' | head -60 > icsi-sph-listing.txt || true
+          curl -sL --max-time 60 https://groups.inf.ed.ac.uk/ami/ICSIsignals/NXT/ | sed 's/<[^>]*>/ /g' | grep -v '^\s*$' | head -100 > icsi-nxt-listing.txt || true
+          curl -sL --max-time 60 https://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/ES2004a/audio/ | sed 's/<[^>]*>/ /g' | grep -v '^\s*$' | head -60 > ami-audio-listing.txt || true
+          cat sources.txt
+      - name: Look inside the annotations
         run: |
-          set -e
-          git config user.name "minutes-ci"
-          git config user.email "minutes-ci@users.noreply.github.com"
-          cp -R out /tmp/probe-out
-          git checkout --orphan ci-tmp
-          git rm -rf . > /dev/null
-          mkdir -p probe && cp -R /tmp/probe-out/. probe/
-          echo "run ${GITHUB_RUN_ID} at $(date -u +%FT%TZ) for ${GITHUB_SHA}" > probe/RUN.txt
-          git add probe
-          git commit -q -m "probe results for ${GITHUB_SHA}"
-          git push -f origin ci-tmp:ci-probe
+          cd out
+          mkdir -p /tmp/a && cd /tmp/a
+          curl -sL --max-time 300 -o icsi.zip https://groups.inf.ed.ac.uk/ami/ICSICorpusAnnotations/ICSI_core_NXT.zip || true
+          curl -sL --max-time 300 -o ami.zip https://groups.inf.ed.ac.uk/ami/AMICorpusAnnotations/ami_public_manual_1.6.2.zip || true
+          ls -la
+          o=$GITHUB_WORKSPACE/out
+          unzip -l icsi.zip > $o/icsi-zip-listing.txt 2>&1 || true
+          unzip -l ami.zip | head -400 > $o/ami-zip-listing.txt 2>&1 || true
+          mkdir -p icsi ami && (cd icsi && unzip -q ../icsi.zip || true) && (cd ami && unzip -q ../ami.zip || true)
+          find icsi -maxdepth 2 | head -80 > $o/icsi-tree.txt
+          find ami -maxdepth 2 | head -80 > $o/ami-tree.txt
+          for f in $(find icsi -name "Bmr021*" | head -30); do echo "== $f ($(wc -c < $f) bytes)"; head -c 1500 "$f"; echo; done > $o/icsi-samples.txt 2>&1 || true
+          for f in $(find icsi -iname "*speaker*" -o -iname "*meeting*" | head -6); do echo "== $f"; head -c 3000 "$f"; echo; done >> $o/icsi-samples.txt 2>&1 || true
+          for f in $(find ami -name "ES2004a*" | head -30); do echo "== $f ($(wc -c < $f) bytes)"; head -c 1200 "$f"; echo; done > $o/ami-samples.txt 2>&1 || true
+          for f in $(find ami -iname "meetings.xml" -o -iname "participants.xml" | head -4); do echo "== $f"; head -c 3000 "$f"; echo; done >> $o/ami-samples.txt 2>&1 || true
+          # Which ICSI meetings have the most speakers
+          python3 - <<'PY' > $o/icsi-speaker-counts.txt 2>&1 || true
+          import glob, os, re, collections
+          c = collections.defaultdict(set)
+          for f in glob.glob('icsi/**/*.words.xml', recursive=True) + glob.glob('icsi/**/*.segs.xml', recursive=True) + glob.glob('icsi/**/*.segments.xml', recursive=True):
+              m = re.match(r'([A-Za-z0-9]+)\.([A-Z])\.', os.path.basename(f))
+              if m: c[m.group(1)].add(m.group(2))
+          for k in sorted(c, key=lambda k: (-len(c[k]), k)): print(k, len(c[k]), ''.join(sorted(c[k])))
+          PY
+      - name: Publish
+        if: always()
+        run: scripts/ci_publish.sh out ci-probe
