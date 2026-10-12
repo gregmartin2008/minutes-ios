@@ -1,0 +1,63 @@
+name: Minutes
+options:
+  bundleIdPrefix: app.minutes
+  deploymentTarget:
+    iOS: "26.0"
+  createIntermediateGroups: true
+  generateEmptyDirectories: false
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    MARKETING_VERSION: "1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    ENABLE_USER_SCRIPT_SANDBOXING: "NO"
+packages:
+  MinutesCore:
+    path: Packages/MinutesCore
+  MinutesSpeech:
+    path: Packages/MinutesSpeech
+targets:
+  Minutes:
+    type: application
+    platform: iOS
+    sources:
+      - App/Sources
+      - App/Resources
+    dependencies:
+      - package: MinutesCore
+        product: MinutesCore
+      - package: MinutesSpeech
+        product: MinutesSpeech
+    info:
+      path: App/Info.plist
+      properties:
+        CFBundleDisplayName: Minutes
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
+        LSRequiresIPhoneOS: true
+        UILaunchScreen: {}
+        UIRequiredDeviceCapabilities: [arm64]
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        UIBackgroundModes: [audio, processing]
+        BGTaskSchedulerPermittedIdentifiers:
+          - "$(PRODUCT_BUNDLE_IDENTIFIER).notes"
+        NSMicrophoneUsageDescription: Minutes records your meetings so it can transcribe them on this iPhone.
+        ITSAppUsesNonExemptEncryption: false
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.minutes.recorder
+        PRODUCT_NAME: Minutes
+        TARGETED_DEVICE_FAMILY: "1"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        GENERATE_INFOPLIST_FILE: "NO"
+        SWIFT_STRICT_CONCURRENCY: minimal
+        SWIFT_EMIT_LOC_STRINGS: "NO"
+        DEAD_CODE_STRIPPING: "YES"
+schemes:
+  Minutes:
+    build:
+      targets:
+        Minutes: all
+    run:
+      config: Debug

@@ -27,7 +27,8 @@ jobs:
           grep -q "with 0 failures" ../../out/core-tests.log && ! grep -q "error:" ../../out/core-tests.log
       - name: Mail code against a real SMTP server
         run: |
-          python3 -m venv /tmp/venv && /tmp/venv/bin/pip -q install aiosmtpd
+          # The system Python (3.9) is used on purpose: the SMTP test server library predates Python 3.14.
+          /usr/bin/python3 -m venv /tmp/venv && /tmp/venv/bin/pip -q install aiosmtpd
           /tmp/venv/bin/python scripts/smtp_integration.py Packages/MinutesCore 2>&1 | tee out/smtp-integration.log | grep -E "PASS|FAIL|checks passed"
           grep -q "13/13 checks passed" out/smtp-integration.log
       - name: Encrypted connection to Gmail
@@ -58,14 +59,14 @@ jobs:
           mkdir -p out
           cd Packages/MinutesSpeech
           set -o pipefail
-          swift build -c release --product minutes-bench 2>&1 | tee ../../out/speech-build.log | grep -E "error|warning: var|Compiling MinutesSpeech|Build complete" || true
-          grep -q "Build complete" ../../out/speech-build.log
+          swift build -c release --product minutes-bench 2>&1 | tee ../../out/speech-build.log | grep -E "error|Compiling MinutesSpeech|complete!" || true
+          test -x .build/release/minutes-bench
       - name: Make a six-person test meeting with crosstalk
         run: python3 scripts/make_test_meeting.py out 2>&1 | tee out/make-meeting.log
       - name: Run the pipeline
         run: |
-          cd Packages/MinutesSpeech
-          swift run -c release minutes-bench ../../out/meeting.wav --out ../../out/result.json 2>&1 | tee ../../out/bench.log | tail -5
+          set -o pipefail
+          Packages/MinutesSpeech/.build/release/minutes-bench out/meeting.wav --out out/result.json 2>&1 | tee out/bench.log | tail -8
       - name: Score
         run: python3 scripts/score_meeting.py out/result.json out/meeting.ref.json --json out/score.json | tee out/score.log
       - name: Publish results
