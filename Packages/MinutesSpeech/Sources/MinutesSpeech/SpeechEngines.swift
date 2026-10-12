@@ -190,6 +190,9 @@ public struct FluidSeparator: SpeakerSeparating {
         guard var estimate = SpeakerCounter.estimate(voices: first.windowVoices.map { $0.embedding }, options: o.counting) else {
             return (first.result, nil)
         }
+        // The library's own grouping errs toward too few people, so when it found more than the
+        // count did, the larger number is the safer one.
+        estimate = max(estimate, Set(first.result.turns.map { $0.speaker }).count)
         let counted = estimate
         // A head count from the person is an upper bound: someone in the room may never speak.
         if let n = headCount, n >= 1 { estimate = min(estimate, n) }

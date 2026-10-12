@@ -78,7 +78,67 @@ participant's consent.
 
 ## How accurate it is
 
-ACCURACY_SECTION
+Measured, not estimated. The speech pipeline in the app is run on public recordings of real
+meetings that come with human transcripts, and scored with the tools the research field uses
+([MeetEval](https://github.com/fgnt/meeteval) and [pyannote.metrics](https://github.com/pyannote/pyannote-metrics)).
+The scripts are in `scripts/bench`; the numbers below can be reproduced from this repository.
+
+**The main test: 129 meetings, 13 hours, none used to choose any setting.** This is the evaluation
+set of Microsoft's [NOTSOFAR-1](https://arxiv.org/abs/2401.08887) corpus: three to seven people in
+ordinary conference rooms, recorded by a single device on the table, which is how Minutes is used.
+It is a deliberately hard test. People interrupt and talk over each other constantly: two or more
+people are talking during 30% of the speech.
+
+| | Result |
+|---|---|
+| Words captured when one person is talking | 93% |
+| Words captured while people talk over each other | 51% |
+| Word error overall, ignoring who spoke (tcORC-WER) | 30.0% |
+| Right number of speakers found | 66% of meetings; within one in 96% |
+| Speech time credited to the wrong person or missed (DER, 0.25 s collar) | 18.3% |
+| Word error counting a word given to the wrong person as wrong (tcpWER) | 50.1% |
+
+For scale, the NOTSOFAR-1 challenge published results for single-device systems on its evaluation
+meetings ([summary paper](https://arxiv.org/abs/2501.17304)): the organizers' reference system
+scored 35.5% tcORC-WER and 41.4% tcpWER, the best research entry 17.7% and 22.2%, and entries ranged
+up to 74.1% tcpWER. Those systems ran on servers; this is the pipeline that runs on the phone. Its wording is better
+than the reference system's and its speaker attribution is worse. The comparison is indicative
+rather than exact: the figures above use one of the table devices per meeting.
+
+What the table means in practice:
+
+- **Wording is reliable when people take turns** and degrades sharply in crosstalk. One microphone
+  hears one mixture; the recognizer follows the dominant voice and most of what is said underneath
+  is lost. No setting changes this. Minutes marks those passages so they can be checked by ear.
+- **Speaker labels are right most of the time and wrong often enough to check.** By meeting size,
+  tcpWER was 37.6% with four people, 53.2% with five, 55.7% with six and 60.8% with seven (and 64.0%
+  in the 16 three-person meetings, where the count was most often wrong). A meeting
+  with less crosstalk than this corpus will do better; how much better has not been measured.
+- **Counting the speakers** is the step that was changed most as a result of these tests. Left to
+  the separation library alone, the right number of people was found in 53% of these meetings (and
+  in 17% of the 36 development meetings, where it usually folded two or three people into one).
+  Minutes now counts the voices first, which finds the right number in 66% (50% on the development
+  meetings) and brought tcpWER there from 69.3% to about 58%.
+
+**Recognizing people across meetings.** On the 36 NOTSOFAR-1 development meetings (twelve people
+recurring in different rooms), with each person named the first time they appeared, 85 to 88% of
+their later appearances were named correctly, under 1% were given a wrong name, and the rest were
+left as "Speaker N" for the user to name.
+
+**A clean recording.** A scripted six-voice test meeting with brief talk-overs, built from
+synthetic voices, is transcribed with 4.6% word error. This runs with every build, through the app
+itself in the iPhone simulator, as a check that nothing has broken.
+
+**An alternative that was tried.** A different kind of speaker-separation model (LS-EEND, which
+tracks up to ten voices directly) scored 73.8% tcpWER on the same 129 meetings, against 50.1% for
+the approach used, so it was not adopted.
+
+LONG_MEETINGS_SECTION
+
+**What has not been tested.** All of the above is the speech pipeline running on GitHub's Macs with
+the same models and code as the app. On an actual iPhone, as of this writing, nothing has been
+measured: not the microphone path, not processing time or battery use, not behavior with the phone
+locked, and not the notes, which need Apple Intelligence and cannot run in a simulator.
 
 ## Privacy
 

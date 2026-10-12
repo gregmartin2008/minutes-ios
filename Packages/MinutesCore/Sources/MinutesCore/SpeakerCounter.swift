@@ -7,10 +7,10 @@ import Foundation
 /// those points by average-linkage clustering and counts the groups large enough to be a person.
 ///
 /// The stock grouping step of the separation library tends to fold several people into one on
-/// short, lively meetings. Measured on the NOTSOFAR-1 development meetings (five to seven people),
-/// it found the right number in 17% of meetings; counting this way first and then asking for that
-/// many speakers finds it in about half and is within one in about four of five, and brings the
-/// transcript's speaker errors down to what they are when the true number is given.
+/// short, lively meetings. On the 36 NOTSOFAR-1 development meetings (five to seven people) it
+/// found the right number in 17%; counting this way first finds it in half and is within one in
+/// four of five. On the 129 held-out evaluation meetings the figures are 53% for the library alone
+/// and 66% with this count (96% within one). The caller uses the larger of the two numbers.
 public enum SpeakerCounter {
 
     public struct Options: Sendable {

@@ -35,9 +35,17 @@ failures=0
 shoot() {  # name appearance scenario wait
   limited 30 xcrun simctl ui "$device" appearance "$2" >> "$log" 2>&1 || true
   limited 30 xcrun simctl terminate "$device" "$bundle" > /dev/null 2>&1 || true
-  limited 60 xcrun simctl launch "$device" "$bundle" -demo "$3" > out/launch.txt 2>> "$log" || note "launch of $1 did not return cleanly"
-  local pid
-  pid=$(awk '{print $NF}' out/launch.txt 2>/dev/null | tail -1)
+  local pid=""
+  local attempt
+  for attempt in 1 2 3; do
+    # The first launch after installing can take the simulator a long time; try again rather than fail.
+    if limited 90 xcrun simctl launch "$device" "$bundle" -demo "$3" > out/launch.txt 2>> "$log"; then
+      pid=$(awk '{print $NF}' out/launch.txt 2>/dev/null | tail -1)
+      [ -n "$pid" ] && break
+    fi
+    note "launch of $1 did not return (attempt $attempt)"
+    limited 30 xcrun simctl terminate "$device" "$bundle" > /dev/null 2>&1 || true
+  done
   sleep "$4"
   if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
     if limited 60 xcrun simctl io "$device" screenshot "out/shots/$1.png" > /dev/null 2>&1; then
