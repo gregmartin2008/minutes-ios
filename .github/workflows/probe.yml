@@ -1,6 +1,5 @@
 name: probe
-# Checks which public meeting recordings (with reference transcripts) can be downloaded for
-# measuring accuracy, and records how their annotation files are laid out.
+# Records how a public meeting corpus is laid out, so the accuracy benchmark can read it.
 on:
   workflow_dispatch:
   push:
@@ -15,57 +14,43 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
-      - name: Check sources
+      - name: NOTSOFAR layout
         run: |
-          mkdir -p out && cd out
-          head() { echo "== $1"; curl -sIL --max-time 40 "$1" | grep -iE "^HTTP|content-length|content-type|accept-ranges|location" ; echo; }
-          {
-            head https://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/ES2004a/audio/ES2004a.Array1-01.wav
-            head https://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/ES2004a/audio/ES2004a.Mix-Headset.wav
-            head https://groups.inf.ed.ac.uk/ami/AMICorpusAnnotations/ami_public_manual_1.6.2.zip
-            head https://raw.githubusercontent.com/pyannote/AMI-diarization-setup/main/only_words/rttms/test/ES2004a.rttm
-            head https://groups.inf.ed.ac.uk/ami/ICSIsignals/NXT/Bmr021.interaction.wav
-            head https://groups.inf.ed.ac.uk/ami/ICSICorpusAnnotations/ICSI_core_NXT.zip
-            head https://groups.inf.ed.ac.uk/ami/ICSIsignals/SPH/Bmr021/chan0.sph
-            head https://groups.inf.ed.ac.uk/ami/ICSIsignals/SPH/Bmr021/chanE.sph
-            head https://groups.inf.ed.ac.uk/ami/ICSIsignals/SPH/Bmr021/chanF.sph
-            head https://www.robots.ox.ac.uk/~vgg/data/voxconverse/data/voxconverse_test_wav.zip
-            head https://raw.githubusercontent.com/joonson/voxconverse/master/test/aepyx.rttm
-            head https://huggingface.co/api/datasets/microsoft/NOTSOFAR/tree/main/benchmark-datasets/dev_set/240825.1_dev1
-            head https://huggingface.co/datasets/microsoft/NOTSOFAR/resolve/main/README.md
-          } > sources.txt 2>&1
-          curl -sL --max-time 40 https://huggingface.co/api/datasets/microsoft/NOTSOFAR > notsofar-api.json || true
-          curl -sL --max-time 40 "https://huggingface.co/api/datasets/microsoft/NOTSOFAR/tree/main/benchmark-datasets/dev_set/240825.1_dev1" > notsofar-dev.json || true
-          curl -sL --max-time 40 "https://huggingface.co/api/datasets/microsoft/NOTSOFAR/tree/main/benchmark-datasets/dev_set/240825.1_dev1/MTG" | head -c 6000 > notsofar-mtg.json || true
-          curl -sL --max-time 60 https://groups.inf.ed.ac.uk/ami/ICSIsignals/SPH/Bmr021/ | sed 's/<[^>]*>/ /g' | grep -v '^\s*$' | head -60 > icsi-sph-listing.txt || true
-          curl -sL --max-time 60 https://groups.inf.ed.ac.uk/ami/ICSIsignals/NXT/ | sed 's/<[^>]*>/ /g' | grep -v '^\s*$' | head -100 > icsi-nxt-listing.txt || true
-          curl -sL --max-time 60 https://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/ES2004a/audio/ | sed 's/<[^>]*>/ /g' | grep -v '^\s*$' | head -60 > ami-audio-listing.txt || true
-          cat sources.txt
-      - name: Look inside the annotations
-        run: |
-          cd out
-          mkdir -p /tmp/a && cd /tmp/a
-          curl -sL --max-time 300 -o icsi.zip https://groups.inf.ed.ac.uk/ami/ICSICorpusAnnotations/ICSI_core_NXT.zip || true
-          curl -sL --max-time 300 -o ami.zip https://groups.inf.ed.ac.uk/ami/AMICorpusAnnotations/ami_public_manual_1.6.2.zip || true
-          ls -la
-          o=$GITHUB_WORKSPACE/out
-          unzip -l icsi.zip > $o/icsi-zip-listing.txt 2>&1 || true
-          unzip -l ami.zip | head -400 > $o/ami-zip-listing.txt 2>&1 || true
-          mkdir -p icsi ami && (cd icsi && unzip -q ../icsi.zip || true) && (cd ami && unzip -q ../ami.zip || true)
-          find icsi -maxdepth 2 | head -80 > $o/icsi-tree.txt
-          find ami -maxdepth 2 | head -80 > $o/ami-tree.txt
-          for f in $(find icsi -name "Bmr021*" | head -30); do echo "== $f ($(wc -c < $f) bytes)"; head -c 1500 "$f"; echo; done > $o/icsi-samples.txt 2>&1 || true
-          for f in $(find icsi -iname "*speaker*" -o -iname "*meeting*" | head -6); do echo "== $f"; head -c 3000 "$f"; echo; done >> $o/icsi-samples.txt 2>&1 || true
-          for f in $(find ami -name "ES2004a*" | head -30); do echo "== $f ($(wc -c < $f) bytes)"; head -c 1200 "$f"; echo; done > $o/ami-samples.txt 2>&1 || true
-          for f in $(find ami -iname "meetings.xml" -o -iname "participants.xml" | head -4); do echo "== $f"; head -c 3000 "$f"; echo; done >> $o/ami-samples.txt 2>&1 || true
-          # Which ICSI meetings have the most speakers
-          python3 - <<'PY' > $o/icsi-speaker-counts.txt 2>&1 || true
-          import glob, os, re, collections
-          c = collections.defaultdict(set)
-          for f in glob.glob('icsi/**/*.words.xml', recursive=True) + glob.glob('icsi/**/*.segs.xml', recursive=True) + glob.glob('icsi/**/*.segments.xml', recursive=True):
-              m = re.match(r'([A-Za-z0-9]+)\.([A-Z])\.', os.path.basename(f))
-              if m: c[m.group(1)].add(m.group(2))
-          for k in sorted(c, key=lambda k: (-len(c[k]), k)): print(k, len(c[k]), ''.join(sorted(c[k])))
+          mkdir -p out
+          python3 - <<'PY'
+          import json, urllib.request, urllib.parse, re, sys
+          API = "https://huggingface.co/api/datasets/microsoft/NOTSOFAR/tree/main/"
+          RES = "https://huggingface.co/datasets/microsoft/NOTSOFAR/resolve/main/"
+          def tree(path, recursive=False):
+              url = API + urllib.parse.quote(path) + "?limit=1000" + ("&recursive=true" if recursive else "")
+              out = []
+              while url:
+                  with urllib.request.urlopen(url, timeout=60) as r:
+                      out += json.load(r)
+                      link = r.headers.get("Link") or ""
+                  m = re.search(r'<([^>]+)>;\s*rel="next"', link)
+                  url = m.group(1) if m else None
+              return out
+          log = open("out/notsofar-layout.txt", "w")
+          def p(*a):
+              print(*a); print(*a, file=log)
+          for top in ["benchmark-datasets", "benchmark-datasets/dev_set", "benchmark-datasets/eval_set", "benchmark-datasets/train_set"]:
+              try: p(top, "->", [e["path"].split("/")[-1] for e in tree(top)])
+              except Exception as e: p(top, "ERROR", e)
+          for subset in ["benchmark-datasets/dev_set/240825.1_dev1", "benchmark-datasets/eval_set/240629.1_eval_small_with_GT", "benchmark-datasets/eval_set/240825.1_eval_full_with_GT"]:
+              try:
+                  mt = tree(subset + "/MTG")
+                  ids = [e["path"].split("/")[-1] for e in mt]
+                  p(subset, len(ids), "meetings", ids[:8], "...")
+                  one = tree(subset + "/MTG/" + ids[0], recursive=True)
+                  for e in one: p("   ", e["type"], e["path"].split("/MTG/")[1], e.get("size"))
+                  for name in ["gt_transcription.json", "gt_meeting_metadata.json", "devices.json"]:
+                      try:
+                          with urllib.request.urlopen(RES + urllib.parse.quote(subset + "/MTG/" + ids[0] + "/" + name), timeout=60) as r:
+                              text = r.read().decode("utf-8", "replace")
+                          p("==", name, len(text), "bytes"); p(text[:2500])
+                      except Exception as e: p("==", name, "ERROR", e)
+              except Exception as e: p(subset, "ERROR", e)
           PY
       - name: Publish
         if: always()

@@ -15,7 +15,7 @@ public enum NoteKind: String, CaseIterable, Codable, Sendable {
 }
 
 /// What the language model extracts from one section of the transcript.
-public struct NotesFragment: Equatable, Sendable {
+public struct NotesFragment: Codable, Equatable, Sendable {
     public var gist: String
     public var keyPoints: [String]
     public var decisions: [String]
@@ -43,6 +43,34 @@ public struct NotesFragment: Equatable, Sendable {
         case .openQuestions: return openQuestions
         case .figures: return figures
         }
+    }
+}
+
+/// Notes work saved part-way through, so that after an interruption (the app is closed, iOS
+/// throttles the model) it continues from the next section instead of starting again.
+public struct NotesCheckpoint: Codable, Equatable, Sendable {
+    public struct Section: Codable, Equatable, Sendable {
+        public var fragments: [NotesFragment]
+        public var skipped: Int
+        public init(fragments: [NotesFragment], skipped: Int) {
+            self.fragments = fragments
+            self.skipped = skipped
+        }
+    }
+
+    /// Identifies the transcript this work was done on.
+    public var fingerprint: String
+    /// The numbers the transcript was divided with, so it divides the same way again.
+    public var budgetTokens: Int
+    public var charactersPerToken: Double
+    /// Results for the sections finished so far, in order.
+    public var sections: [Section]
+
+    public init(fingerprint: String, budgetTokens: Int, charactersPerToken: Double, sections: [Section] = []) {
+        self.fingerprint = fingerprint
+        self.budgetTokens = budgetTokens
+        self.charactersPerToken = charactersPerToken
+        self.sections = sections
     }
 }
 
@@ -97,7 +125,7 @@ public struct NotesEngine: Sendable {
             .keyPoints: 12, .decisions: 10, .actionItems: 15, .openQuestions: 10, .figures: 24,
         ]
         /// Waits between retries when the system throttles the model.
-        public var rateLimitBackoff: [Double] = [2, 6, 15]
+        public var rateLimitBackoff: [Double] = [3, 10, 30, 60, 120, 120]
         /// Assumed characters per token until the model has been asked.
         public var charactersPerToken = 3.3
 
@@ -113,46 +141,69 @@ public struct NotesEngine: Sendable {
     /// - Parameters:
     ///   - lines: The transcript as "Name: what they said" lines, in order.
     ///   - titleHint: A title the person typed, if any.
+    ///   - resume: Work saved by an earlier, interrupted call for the same transcript.
+    ///   - checkpoint: Called after each section with everything done so far, to be saved for `resume`.
     ///   - progress: Called with 0...1 as sections complete.
     public func write(
         lines: [String], titleHint: String?, model: NotesModel,
+        resume: NotesCheckpoint? = nil,
+        checkpoint: (@Sendable (NotesCheckpoint) -> Void)? = nil,
         progress: (@Sendable (Double) -> Void)? = nil
     ) async throws -> MeetingNotes {
         let cleaned = lines.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
         guard !cleaned.isEmpty else { throw NotesModelError.other("The transcript is empty.") }
 
-        let context = max(1024, await model.contextSize())
-        let ratio = await calibrate(model: model, sample: cleaned)
-        let sectionBudget = max(
-            options.minimumSectionTokens,
-            context - options.promptOverhead - options.responseReserve)
+        let fingerprint = Self.fingerprint(cleaned)
+        var saved: NotesCheckpoint
+        if let resume, resume.fingerprint == fingerprint, resume.budgetTokens > 0, resume.charactersPerToken > 0 {
+            saved = resume
+        } else {
+            let context = max(1024, await model.contextSize())
+            saved = NotesCheckpoint(
+                fingerprint: fingerprint,
+                budgetTokens: max(options.minimumSectionTokens, context - options.promptOverhead - options.responseReserve),
+                charactersPerToken: await calibrate(model: model, sample: cleaned))
+        }
+        let ratio = saved.charactersPerToken
+        let sectionBudget = saved.budgetTokens
         let sections = Self.split(lines: cleaned, budgetTokens: sectionBudget, charactersPerToken: ratio)
+        if saved.sections.count > sections.count { saved.sections = [] }
 
         // Map: extract from each section, carrying a one-line gist forward for continuity.
-        var fragments: [NotesFragment] = []
-        var skipped = 0
-        var total = 0
+        var fragments: [NotesFragment] = saved.sections.flatMap { $0.fragments }
+        var skipped = saved.sections.reduce(0) { $0 + $1.skipped }
+        var total = fragments.count + skipped
         var firstError: NotesModelError? = nil
-        var previousGist = ""
-        for (index, section) in sections.enumerated() {
+        var previousGist = fragments.last(where: { !$0.gist.isEmpty })?.gist ?? ""
+        if !saved.sections.isEmpty {
+            progress?(0.8 * Double(saved.sections.count) / Double(sections.count))
+        }
+        for (index, section) in sections.enumerated() where index >= saved.sections.count {
             try Task.checkCancellation()
             let results = await extractAdaptive(
                 section: section, index: index, count: sections.count,
                 previousGist: previousGist, model: model, depth: 0)
+            var done = NotesCheckpoint.Section(fragments: [], skipped: 0)
             for r in results {
-                total += 1
                 switch r {
                 case .success(let f):
-                    fragments.append(f)
+                    done.fragments.append(f)
                     if !f.gist.isEmpty { previousGist = f.gist }
                 case .failure(let e):
                     // Throttling and unavailability affect every section; stop and let the caller wait.
+                    // This section is not recorded, so it is tried again when the work resumes.
                     if e == .rateLimited { throw e }
                     if case .unavailable = e { throw e }
-                    skipped += 1
+                    if case .other(let why) = e, why == Self.cancelledMarker { throw CancellationError() }
+                    done.skipped += 1
                     if firstError == nil { firstError = e }
                 }
             }
+            fragments += done.fragments
+            skipped += done.skipped
+            total += done.fragments.count + done.skipped
+            saved.sections.append(done)
+            checkpoint?(saved)
             progress?(0.8 * Double(index + 1) / Double(sections.count))
         }
         guard !fragments.isEmpty else {
@@ -234,10 +285,26 @@ public struct NotesEngine: Sendable {
             }
             return [.failure(e)]
         } catch is CancellationError {
-            return [.failure(.other("Cancelled."))]
+            return [.failure(.other(Self.cancelledMarker))]
         } catch {
             return [.failure(.other(String(describing: error)))]
         }
+    }
+
+    static let cancelledMarker = "Cancelled."
+
+    /// A short, stable identifier for a transcript (FNV-1a over its lines).
+    static func fingerprint(_ lines: [String]) -> String {
+        var hash: UInt64 = 0xcbf2_9ce4_8422_2325
+        for line in lines {
+            for byte in line.utf8 {
+                hash ^= UInt64(byte)
+                hash = hash &* 0x0000_0100_0000_01b3
+            }
+            hash ^= 0x0a
+            hash = hash &* 0x0000_0100_0000_01b3
+        }
+        return "\(lines.count)-" + String(hash, radix: 16)
     }
 
     /// Runs `body`, waiting and retrying when the system throttles the model.

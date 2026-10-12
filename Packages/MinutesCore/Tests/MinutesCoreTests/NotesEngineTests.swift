@@ -9,6 +9,8 @@ final class FakeNotesModel: NotesModel, @unchecked Sendable {
     var rejectSectionsLongerThan = Int.max
     var rateLimitFirstCalls = 0
     var alwaysRateLimit = false
+    /// Calls numbered this or higher are throttled, as when iOS cuts the model off part-way.
+    var rateLimitFromCall = Int.max
     var refuseSectionsContaining: String? = nil
     var failConsolidate = false
     var failOverview = false
@@ -28,7 +30,7 @@ final class FakeNotesModel: NotesModel, @unchecked Sendable {
         calls += 1
         let n = calls
         lock.unlock()
-        if alwaysRateLimit || n <= rateLimitFirstCalls { throw NotesModelError.rateLimited }
+        if alwaysRateLimit || n <= rateLimitFirstCalls || n >= rateLimitFromCall { throw NotesModelError.rateLimited }
     }
 
     func extract(section: String, context: String) async throws -> NotesFragment {
@@ -66,6 +68,17 @@ final class FakeNotesModel: NotesModel, @unchecked Sendable {
         lock.unlock()
         if failOverview { throw NotesModelError.other("boom") }
         return NotesOverview(title: "\"Add-on diligence review.\"", summary: "A summary of \(keyPoints.count) points.")
+    }
+}
+
+/// A value that can be written from a `@Sendable` callback in tests.
+final class Box<T>: @unchecked Sendable {
+    private let lock = NSLock()
+    private var stored: T
+    init(_ value: T) { stored = value }
+    var value: T {
+        get { lock.lock(); defer { lock.unlock() }; return stored }
+        set { lock.lock(); stored = newValue; lock.unlock() }
     }
 }
 
@@ -117,6 +130,50 @@ final class NotesEngineTests: XCTestCase {
         XCTAssertEqual(notes.decisions, ["Hold the bid at 6.5x"])      // "None" filler removed
         XCTAssertEqual(notes.actionItems.count, model.sections.count)
         XCTAssertEqual(notes.summary, "A summary of \(notes.keyPoints.count) points.")
+    }
+
+    func testInterruptedNotesContinueFromTheNextSection() async throws {
+        let model = FakeNotesModel()
+        model.context = 2048
+        model.rateLimitFromCall = 4                    // three sections succeed, then iOS throttles
+        let input = lines(120)
+        let saved = Box<NotesCheckpoint?>(nil)
+        let engine = NotesEngine(options: fastOptions())
+        do {
+            _ = try await engine.write(lines: input, titleHint: nil, model: model, checkpoint: { saved.value = $0 })
+            XCTFail("expected the run to be throttled")
+        } catch let e as NotesModelError {
+            XCTAssertEqual(e, .rateLimited)
+        }
+        let checkpoint = try XCTUnwrap(saved.value)
+        XCTAssertEqual(checkpoint.sections.count, 3)
+        XCTAssertEqual(model.sections.count, 3)
+
+        model.rateLimitFromCall = .max
+        let fractions = Box<[Double]>([])
+        let notes = try await engine.write(
+            lines: input, titleHint: nil, model: model, resume: checkpoint, checkpoint: { saved.value = $0 },
+            progress: { fractions.value.append($0) })
+        // Each section went to the model exactly once across the two runs, in order.
+        XCTAssertEqual(model.sections.joined(separator: "\n"), input.joined(separator: "\n"))
+        XCTAssertTrue(model.contexts[3].contains("Just before this: Gist 3."))
+        XCTAssertEqual(notes.totalSections, model.sections.count)
+        XCTAssertEqual(notes.actionItems.count, model.sections.count)
+        XCTAssertEqual(saved.value?.sections.count, model.sections.count)
+        // Progress starts from where the first run stopped, not from zero.
+        XCTAssertEqual(fractions.value.first ?? 0, 0.8 * 3 / Double(model.sections.count), accuracy: 0.0001)
+    }
+
+    func testSavedWorkForADifferentTranscriptIsIgnored() async throws {
+        let model = FakeNotesModel()
+        let stale = NotesCheckpoint(
+            fingerprint: "something else", budgetTokens: 100, charactersPerToken: 1,
+            sections: [.init(fragments: [NotesFragment(gist: "Stale.", keyPoints: ["Stale point"])], skipped: 0)])
+        let notes = try await NotesEngine(options: fastOptions()).write(
+            lines: ["Greg: Let us hold the bid.", "Dana: Agreed."], titleHint: nil, model: model, resume: stale)
+        XCTAssertEqual(model.sections.count, 1)
+        XCTAssertFalse(notes.keyPoints.contains("Stale point"))
+        XCTAssertEqual(notes.totalSections, 1)
     }
 
     func testLargerContextMeansFewerSections() async throws {
