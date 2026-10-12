@@ -20,6 +20,6 @@ status=$?
 grep -E "error:|warning: unre|BUILD (SUCCEEDED|FAILED)" "build/$kind.log" | sort -u | head -200 > "out/$kind-build.log"
 grep -A7 "error:" "build/$kind.log" | head -500 > "out/$kind-errors.log" || true
 grep -E "^/.*App/Sources.*warning:" "build/$kind.log" | sort -u | head -120 > "out/$kind-warnings.log" || true
-tail -40 "build/$kind.log" > "out/$kind-tail.log"
+tail -40 "build/$kind.log" | cut -c1-300 > "out/$kind-tail.log"
 cat "out/$kind-build.log"
 exit $status

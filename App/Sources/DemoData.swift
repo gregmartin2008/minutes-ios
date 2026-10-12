@@ -39,6 +39,7 @@ extension AppModel {
 
 enum DemoData {
 
+    @MainActor
     static func populate(_ model: AppModel, scenario: DemoScenario) {
         model.setup.ready = true
         model.mail = MailSettings(host: "smtp.gmail.com", port: 465, address: "you@example.com", recipient: "")

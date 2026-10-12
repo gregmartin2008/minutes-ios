@@ -57,7 +57,13 @@ final class AppSettings {
 
     var mailPassword: String {
         get { Keychain.get(Self.passwordKey) ?? "" }
-        set { newValue.isEmpty ? Keychain.delete(Self.passwordKey) : Keychain.set(newValue, for: Self.passwordKey) }
+        set {
+            if newValue.isEmpty {
+                Keychain.delete(Self.passwordKey)
+            } else {
+                Keychain.set(newValue, for: Self.passwordKey)
+            }
+        }
     }
 
     var mailIsConfigured: Bool { mail.hasAddress && !mailPassword.isEmpty }
