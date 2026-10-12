@@ -193,6 +193,8 @@ public final class MeetingPipeline: @unchecked Sendable {
             }
 
         case .transcribe:
+            // Already transcribed (the speakers are being separated again): keep the words.
+            if let existing = m.words, !existing.isEmpty { break }
             let audio = try audioURL(for: m)
             let words = try await services.transcriber.transcribe(audio: audio, progress: progress)
             guard !words.isEmpty else { throw PipelineError.noSpeech }

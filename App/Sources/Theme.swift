@@ -18,6 +18,8 @@ enum Theme {
     static let record = dynamic(0xC8102E, 0xD92643)
     static let ok = dynamic(0x1B6B50, 0x5CC29C)
     static let warn = dynamic(0x8A5200, 0xE3A948)
+    /// Tappable text inside forms, where ink alone would read as a plain label.
+    static let action = dynamic(0x1F5FBF, 0x7FB0FF)
 
     static let fieldRecording = Color(UIColor(hex: 0xB80F2A))
     static let fieldPaused = Color(UIColor(hex: 0x46535F))
@@ -54,10 +56,11 @@ extension UIColor {
 struct SolidButtonStyle: ButtonStyle {
     var fill: Color = Theme.ink
     var text: Color = Theme.paper
+    var height: CGFloat = 50
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.system(size: 17, weight: .semibold))
-            .frame(maxWidth: .infinity, minHeight: 50)
+            .frame(maxWidth: .infinity, minHeight: height)
             .padding(.horizontal, 16)
             .background(fill)
             .foregroundStyle(text)
@@ -68,15 +71,18 @@ struct SolidButtonStyle: ButtonStyle {
 
 struct OutlineButtonStyle: ButtonStyle {
     var text: Color = Theme.ink
+    var fill: Color = Theme.surface
+    var border: Color = Theme.line
+    var height: CGFloat = 50
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.system(size: 17, weight: .semibold))
-            .frame(maxWidth: .infinity, minHeight: 50)
+            .frame(maxWidth: .infinity, minHeight: height)
             .padding(.horizontal, 12)
-            .background(Theme.surface)
+            .background(fill)
             .foregroundStyle(text)
             .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Theme.line, lineWidth: 1))
+            .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(border, lineWidth: 1))
             .opacity(configuration.isPressed ? 0.7 : 1)
     }
 }

@@ -74,3 +74,30 @@ jobs:
         run: |
           rm -f out/meeting.wav
           scripts/ci_publish.sh out ci-speech
+
+  app:
+    name: iPhone app
+    runs-on: macos-26
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: build/spm
+          key: app-packages-${{ hashFiles('Packages/MinutesSpeech/Package.swift') }}
+      - name: Generate the Xcode project
+        run: |
+          mkdir -p out
+          brew install xcodegen > /dev/null 2>&1 || brew install xcodegen
+          xcodegen generate 2>&1 | tee out/xcodegen.log
+      - name: Build for the simulator
+        run: scripts/ci_xcodebuild.sh sim
+      - name: Photograph every screen
+        run: scripts/ci_screenshots.sh
+      - name: Build for iPhone
+        run: scripts/ci_xcodebuild.sh device
+      - name: Package the app
+        run: scripts/ci_package.sh
+      - name: Publish results
+        if: always()
+        run: scripts/ci_publish.sh out ci-app
