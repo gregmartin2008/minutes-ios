@@ -15,6 +15,12 @@ public enum TranscriptAssembler {
         public var crosstalkShare: Double = 0.35
         /// Words this close to a speaker change may be moved across it to keep sentences whole.
         public var boundarySnapWindow: Double = 0.35
+        /// A pause longer than this ends a clause even without punctuation.
+        public var clausePause: Double = 0.4
+        /// A clause is given whole to one speaker when that speaker has at least this share of it...
+        public var clauseMajority: Double = 0.7
+        /// ...and no more than this many of its words were attributed to someone else.
+        public var clauseMinorityWords: Int = 5
 
         public init() {}
     }
@@ -35,6 +41,7 @@ public enum TranscriptAssembler {
 
         var attributed = attribute(words: cleaned, turns: turns, options: options)
         snapBoundaries(&attributed, options: options)
+        settleClauses(&attributed, options: options)
         return group(attributed, options: options)
     }
 
@@ -185,6 +192,37 @@ public enum TranscriptAssembler {
                 }
             }
         }
+    }
+
+    /// Speaker separation is least sure of itself at the edges of turns, so a sentence often ends
+    /// up with a few words credited to a neighbor. When one speaker clearly owns a clause (a sentence,
+    /// or a run of words between pauses), the stray words in it are given back to that speaker. A
+    /// clause that is genuinely shared, or where the other voice has more than a few words, is left alone.
+    static func settleClauses(_ a: inout [Attributed], options: Options) {
+        guard options.clauseMinorityWords > 0, a.count >= 2 else { return }
+        var start = 0
+        func settle(_ range: Range<Int>, _ a: inout [Attributed]) {
+            guard range.count >= 2 else { return }
+            var time: [String: Double] = [:]
+            for i in range {
+                time[a[i].speaker, default: 0] += max(0.001, a[i].word.end - a[i].word.start)
+            }
+            guard time.count > 1 else { return }
+            // Ties are settled by name so the result doesn't depend on dictionary order.
+            let top = time.max { $0.value != $1.value ? $0.value < $1.value : $0.key > $1.key }!
+            let total = time.values.reduce(0, +)
+            let strays = range.filter { a[$0].speaker != top.key }
+            guard top.value / total >= options.clauseMajority, strays.count <= options.clauseMinorityWords else { return }
+            for i in strays { a[i].speaker = top.key }
+        }
+        for i in 1..<a.count {
+            let previous = a[i - 1]
+            if endsSentence(previous.word.text) || a[i].word.start - previous.word.end > options.clausePause {
+                settle(start..<i, &a)
+                start = i
+            }
+        }
+        settle(start..<a.count, &a)
     }
 
     // MARK: Grouping

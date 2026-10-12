@@ -13,8 +13,12 @@ public struct SeparationResult: Equatable, Sendable {
 }
 
 public protocol SpeakerSeparating: Sendable {
+    /// - Parameters:
+    ///   - expectedSpeakers: How many people the person says spoke, if they said.
+    ///   - exactly: True when that number is to be taken as given (the person looked at the result
+    ///     and corrected it); false when it is a head count of the room, which is only an upper bound.
     func separate(
-        audio: URL, expectedSpeakers: Int?, progress: @escaping @Sendable (Double) -> Void
+        audio: URL, expectedSpeakers: Int?, exactly: Bool, progress: @escaping @Sendable (Double) -> Void
     ) async throws -> SeparationResult
 }
 
@@ -183,7 +187,8 @@ public final class MeetingPipeline: @unchecked Sendable {
             let audio = try audioURL(for: m)
             do {
                 let result = try await services.separator.separate(
-                    audio: audio, expectedSpeakers: m.expectedSpeakers, progress: progress)
+                    audio: audio, expectedSpeakers: m.expectedSpeakers,
+                    exactly: m.expectedSpeakersIsExact == true, progress: progress)
                 m.turns = result.turns
                 m.voiceEmbeddings = result.voices.mapValues { SpeakerMatcher.normalized($0) }
             } catch let e as PipelineError where e == .noSpeech {

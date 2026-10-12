@@ -4,6 +4,10 @@ import Foundation
 /// embedding; a named voice profile is the running average of the embeddings confirmed for that person.
 public enum SpeakerMatcher {
 
+    /// The defaults were set on real far-field meetings (the NOTSOFAR-1 development set: twelve people
+    /// recurring across 36 meetings in different rooms, each person named the first time they appeared).
+    /// There, 85 to 88 percent of later appearances were named correctly and under 1 percent were
+    /// given the wrong name; the rest were left for the person to name.
     public struct Thresholds: Equatable, Sendable {
         /// Cosine similarity at or above which a voice is named automatically.
         public var accept: Float
@@ -12,7 +16,7 @@ public enum SpeakerMatcher {
         /// Similarity at or above which the app offers the name as a suggestion without applying it.
         public var suggest: Float
 
-        public init(accept: Float = 0.60, margin: Float = 0.06, suggest: Float = 0.45) {
+        public init(accept: Float = 0.60, margin: Float = 0.10, suggest: Float = 0.45) {
             self.accept = accept
             self.margin = margin
             self.suggest = suggest

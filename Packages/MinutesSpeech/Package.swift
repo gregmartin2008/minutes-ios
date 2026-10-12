@@ -25,7 +25,10 @@ let package = Package(
         ),
         .executableTarget(
             name: "minutes-bench",
-            dependencies: ["MinutesSpeech", .product(name: "MinutesCore", package: "MinutesCore")],
+            dependencies: [
+                "MinutesSpeech", .product(name: "MinutesCore", package: "MinutesCore"),
+                .product(name: "FluidAudio", package: "FluidAudio"),
+            ],
             path: "Sources/minutes-bench"
         ),
     ],

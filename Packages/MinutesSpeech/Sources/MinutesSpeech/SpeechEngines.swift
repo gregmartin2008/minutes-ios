@@ -175,10 +175,10 @@ public struct FluidSeparator: SpeakerSeparating {
     /// - Returns: The result, and the number of speakers estimated from the voices (nil if the
     ///   estimate was not needed or not possible).
     public func group(
-        _ analysis: Analysis, headCount: Int?, options: SpeechOptions? = nil
+        _ analysis: Analysis, headCount: Int?, exactly: Bool = false, options: SpeechOptions? = nil
     ) async throws -> (result: SeparationResult, estimated: Int?) {
         let o = options ?? analysis.options
-        if let n = headCount, n >= 1, o.headCountIsExact {
+        if let n = headCount, n >= 1, exactly || o.headCountIsExact {
             return (try await group(analysis, speakers: .exactly(n), options: o).result, nil)
         }
         guard o.countSpeakersFirst else {
@@ -198,11 +198,11 @@ public struct FluidSeparator: SpeakerSeparating {
     }
 
     public func separate(
-        audio: URL, expectedSpeakers: Int?, progress: @escaping @Sendable (Double) -> Void
+        audio: URL, expectedSpeakers: Int?, exactly: Bool, progress: @escaping @Sendable (Double) -> Void
     ) async throws -> SeparationResult {
         // Analysis is the long, countable part; leave the last tenth for grouping.
         let analysis = try await analyze(audio: audio) { progress(0.9 * $0) }
-        let grouped = try await group(analysis, headCount: expectedSpeakers)
+        let grouped = try await group(analysis, headCount: expectedSpeakers, exactly: exactly)
         progress(1)
         return grouped.result
     }

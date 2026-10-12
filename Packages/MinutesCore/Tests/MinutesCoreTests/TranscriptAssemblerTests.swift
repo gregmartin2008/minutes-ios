@@ -91,6 +91,38 @@ final class TranscriptAssemblerTests: XCTestCase {
         XCTAssertEqual(u[1].text, "Great, thank you.")
     }
 
+    func testLateTurnBoundaryDoesNotSplitASentence() {
+        // The second speaker starts at 1.2 s, but separation only notices at 1.95 s, so "Sure, the"
+        // is first credited to the wrong person. The sentence as a whole is plainly the second speaker's.
+        let w = words("Thanks everyone.", from: 0) + words("Sure, the headline for me is customer concentration.", from: 1.2)
+        let turns = [SpeakerTurn(speaker: "S1", start: 0, end: 1.95), SpeakerTurn(speaker: "S2", start: 1.95, end: 6)]
+        let u = TranscriptAssembler.assemble(words: w, turns: turns)
+        XCTAssertEqual(u.map { $0.speaker }, ["S1", "S2"])
+        XCTAssertEqual(u.map { $0.text }, ["Thanks everyone.", "Sure, the headline for me is customer concentration."])
+    }
+
+    func testASentenceTwoPeopleShareIsLeftSplit() {
+        // No punctuation or pause between them, and each has a real share: not a stray word or two.
+        let w = words("we could go with the seasonal average or we could push back on it again", from: 0)
+        let turns = [SpeakerTurn(speaker: "S1", start: 0, end: 2.7), SpeakerTurn(speaker: "S2", start: 2.7, end: 7)]
+        let u = TranscriptAssembler.assemble(words: w, turns: turns)
+        XCTAssertEqual(u.map { $0.speaker }, ["S1", "S2"])
+        XCTAssertEqual(u[0].text, "we could go with the seasonal average")
+    }
+
+    func testManyWordsFromAnotherVoiceAreNotOverruled() {
+        // Twenty-four words by one person with eight from another inside the same unpunctuated stretch:
+        // the first speaker has three quarters of it, but eight words is a turn, not a boundary error.
+        let w = words(Array(repeating: "word", count: 32).joined(separator: " "), from: 0)
+        let turns = [
+            SpeakerTurn(speaker: "S1", start: 0, end: 4.75), SpeakerTurn(speaker: "S2", start: 4.75, end: 7.95),
+            SpeakerTurn(speaker: "S1", start: 7.95, end: 13),
+        ]
+        let u = TranscriptAssembler.assemble(words: w, turns: turns)
+        XCTAssertEqual(u.map { $0.speaker }, ["S1", "S2", "S1"])
+        XCTAssertEqual(u[1].text.split(separator: " ").count, 8)
+    }
+
     func testShortInterjectionIsKept() {
         // A real "Right." from another person in a pause must not be absorbed.
         var w = words("So the numbers look fine.", from: 0)          // ends 1.9
