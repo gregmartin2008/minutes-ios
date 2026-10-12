@@ -80,6 +80,9 @@ def timed_pieces(utterances, words, size=8):
     return pieces
 
 
+_orc_cache = {}
+
+
 def score_one(name, ref, turns, utterances, words):
     out = {}
     reference = annotation(ref["lines"])
@@ -102,15 +105,17 @@ def score_one(name, ref, turns, utterances, words):
     tcp = meeteval.wer.tcpwer(r, h, collar=5)[name]
     out["tcp"] = {"errors": tcp.errors, "length": tcp.length, "insertions": tcp.insertions,
                   "deletions": tcp.deletions, "substitutions": tcp.substitutions}
-    try:
-        # One output stream: every word the recognizer wrote, regardless of whose turn it was put in.
-        single = SegLST.new([{**row, "speaker": "all"} for row in h])
-        orc = meeteval.wer.tcorcwer(r, single, collar=5)[name]
-        out["tcorc"] = {"errors": orc.errors, "length": orc.length, "insertions": orc.insertions,
-                        "deletions": orc.deletions, "substitutions": orc.substitutions}
-    except Exception as e:  # the assignment search can be too large for unusual inputs
-        out["tcorc"] = None
-        out["tcorc_error"] = str(e)[:200]
+    # The wording score ignores who spoke, so it is the same for every way of grouping the voices.
+    if name not in _orc_cache:
+        try:
+            # One output stream: every word the recognizer wrote, regardless of whose turn it was put in.
+            single = SegLST.new([{**row, "speaker": "all"} for row in h])
+            orc = meeteval.wer.tcorcwer(r, single, collar=5)[name]
+            _orc_cache[name] = {"errors": orc.errors, "length": orc.length, "insertions": orc.insertions,
+                                "deletions": orc.deletions, "substitutions": orc.substitutions}
+        except Exception as e:  # the assignment search can be too large for unusual inputs
+            _orc_cache[name] = None
+    out["tcorc"] = _orc_cache[name]
     return out
 
 

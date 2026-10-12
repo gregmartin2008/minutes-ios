@@ -1,0 +1,57 @@
+name: benchmark-long
+# Measures the speech pipeline on full-length recorded meetings: ICSI (seven to ten speakers,
+# about an hour each) and the AMI test set (four speakers, far-field microphone).
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ["scripts/bench/long.env", ".github/workflows/benchmark-long.yml"]
+permissions:
+  contents: write
+env:
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+jobs:
+  meetings:
+    name: Long meetings, part ${{ matrix.shard }}
+    runs-on: macos-26
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: ~/Library/Application Support/FluidAudio
+          key: speech-models-ultra-v1
+      - uses: actions/cache@v4
+        with:
+          path: Packages/MinutesSpeech/.build
+          key: speech-build-${{ hashFiles('Packages/MinutesSpeech/Package.swift') }}
+      - name: Build the benchmark tool
+        run: |
+          mkdir -p out
+          cd Packages/MinutesSpeech
+          swift build -c release --product minutes-bench 2>&1 | tee ../../out/build.log | grep -E "error|complete!" || true
+          test -x .build/release/minutes-bench
+      - name: Download meetings
+        run: |
+          source scripts/bench/long.env
+          python3 scripts/bench/fetch_nxt.py --corpus icsi --meetings "$ICSI" --shard ${{ matrix.shard }}/2 --out data 2>&1 | tee out/fetch.log
+          python3 scripts/bench/fetch_nxt.py --corpus ami --meetings "$AMI" --shard ${{ matrix.shard }}/2 --out data 2>&1 | tee -a out/fetch.log
+      - name: Run the pipeline
+        run: |
+          source scripts/bench/long.env
+          mkdir -p out/results
+          Packages/MinutesSpeech/.build/release/minutes-bench --list data/files.tsv --out-dir out/results $VARIANTS 2>&1 \
+            | grep -v "^\[Profiling\]" | tee out/bench.log
+          cp data/*.ref.json out/results/
+          cp scripts/bench/long.env out/
+      - name: Pack the voice embeddings
+        run: |
+          /usr/bin/python3 -m venv /tmp/venv && /tmp/venv/bin/pip -q install numpy
+          /tmp/venv/bin/python scripts/bench/pack_voices.py out/results --no-rho | tail -3
+      - name: Publish results
+        if: always()
+        run: scripts/ci_publish.sh out ci-long-${{ matrix.shard }}
