@@ -56,8 +56,12 @@ public struct FluidTranscriber: Transcribing {
 public struct FluidSeparator: SpeakerSeparating {
     let models: SpeechModels
 
-    public init(models: SpeechModels) {
+    /// Settings to use instead of the ones the models were created with (for measuring alternatives).
+    let overrides: SpeechOptions?
+
+    public init(models: SpeechModels, options: SpeechOptions? = nil) {
         self.models = models
+        self.overrides = options
     }
 
     static func configuration(options: SpeechOptions, expectedSpeakers: Int?) -> OfflineDiarizerConfig {
@@ -70,8 +74,12 @@ public struct FluidSeparator: SpeakerSeparating {
         config.postProcessing.exclusiveSegments = false
         config.zeroVoteReembed = OfflineDiarizerConfig.ZeroVoteReembed(enabled: options.recoverUnassignedSpeech)
         if let n = expectedSpeakers, n >= 1 {
-            // The person's head count is an upper bound: someone in the room may never speak.
-            config.clustering.maxSpeakers = n
+            if options.headCountIsExact {
+                config.clustering.numSpeakers = n
+            } else {
+                // The person's head count is an upper bound: someone in the room may never speak.
+                config.clustering.maxSpeakers = n
+            }
         }
         return config
     }
@@ -81,7 +89,7 @@ public struct FluidSeparator: SpeakerSeparating {
     ) async throws -> SeparationResult {
         let loaded = try await models.separationModels()
         let manager = OfflineDiarizerManager(
-            config: Self.configuration(options: models.options, expectedSpeakers: expectedSpeakers))
+            config: Self.configuration(options: overrides ?? models.options, expectedSpeakers: expectedSpeakers))
         manager.initialize(models: loaded)
 
         let result: DiarizationResult

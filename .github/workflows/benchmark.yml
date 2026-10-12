@@ -1,0 +1,52 @@
+name: benchmark
+# Measures the speech pipeline on real recorded meetings (Microsoft's NOTSOFAR-1 corpus: four to
+# eight people around a table, one far-field device). Results are published for scoring.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ["scripts/bench/config.env", ".github/workflows/benchmark.yml"]
+permissions:
+  contents: write
+env:
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+jobs:
+  meetings:
+    name: Meetings, part ${{ matrix.shard }}
+    runs-on: macos-26
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: ~/Library/Application Support/FluidAudio
+          key: speech-models-ultra-v1
+      - uses: actions/cache@v4
+        with:
+          path: Packages/MinutesSpeech/.build
+          key: speech-build-${{ hashFiles('Packages/MinutesSpeech/Package.swift') }}
+      - name: Build the benchmark tool
+        run: |
+          mkdir -p out
+          cd Packages/MinutesSpeech
+          swift build -c release --product minutes-bench 2>&1 | tee ../../out/build.log | grep -E "error|complete!" || true
+          test -x .build/release/minutes-bench
+      - name: Download meetings
+        run: |
+          source scripts/bench/config.env
+          python3 scripts/bench/fetch_notsofar.py --subset "$SUBSET" --limit "$LIMIT" --shard ${{ matrix.shard }}/4 --out data 2>&1 | tee out/fetch.log
+      - name: Run the pipeline
+        run: |
+          source scripts/bench/config.env
+          mkdir -p out/results
+          Packages/MinutesSpeech/.build/release/minutes-bench --list data/files.tsv --out-dir out/results $VARIANTS 2>&1 \
+            | grep -v "^\[Profiling\]" | tee out/bench.log
+          cp data/*.ref.json out/results/
+          cp scripts/bench/config.env out/
+      - name: Publish results
+        if: always()
+        run: scripts/ci_publish.sh out ci-bench-${{ matrix.shard }}

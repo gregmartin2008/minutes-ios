@@ -2,11 +2,27 @@ import Foundation
 import MinutesCore
 import MinutesSpeech
 
-// Runs the app's speech pipeline (speaker separation, transcription, transcript assembly) on an
-// audio file and writes everything it produced as JSON, so accuracy can be scored against
-// reference annotations with standard tools.
+// Runs the app's speech pipeline (speaker separation, transcription, transcript assembly) on audio
+// files and writes everything it produced as JSON, so accuracy can be scored against reference
+// annotations with standard tools.
 //
-// usage: minutes-bench <audio> --out result.json [--speakers N] [--step 0.1] [--threshold 0.6] [--no-recover]
+// One file:    minutes-bench <audio> --out result.json [--speakers N] [options]
+// Many files:  minutes-bench --list files.tsv --out-dir DIR [options] [--variant NAME:key=value,...]...
+//              files.tsv has one "<audio path><TAB><number of speakers>" per line.
+//
+// Options: --step 0.1  --threshold 0.6  --no-recover  --cpu  --exact
+// A variant separates the speakers again with different settings, reusing the transcription. Keys:
+//   threshold=0.5  step=0.2  recover=false  speakers=auto|ref|N  exact=true
+
+struct SeparationOutput: Codable {
+    var speakers: Int
+    var turns: [SpeakerTurn]
+    var utterances: [Utterance]
+    var voices: [String: [Float]]
+    var crosstalkSeconds: Double
+    var separationSeconds: Double
+    var settings: [String: String]
+}
 
 struct BenchOutput: Codable {
     var audio: String
@@ -21,6 +37,14 @@ struct BenchOutput: Codable {
     var transcriptionSeconds: Double
     var modelLoadSeconds: Double
     var settings: [String: String]
+    var variants: [String: SeparationOutput]
+}
+
+struct Variant {
+    var name: String
+    var options: SpeechOptions
+    /// "auto", "ref" (the count given for the file) or a number.
+    var speakers: String
 }
 
 func fail(_ message: String) -> Never {
@@ -28,15 +52,21 @@ func fail(_ message: String) -> Never {
     exit(2)
 }
 
+let usage = "usage: minutes-bench <audio> --out result.json | --list files.tsv --out-dir DIR  [--speakers N] [--step 0.1] [--threshold 0.6] [--no-recover] [--exact] [--variant NAME:key=value,...]"
+
 var args = Array(CommandLine.arguments.dropFirst())
-guard let audioPath = args.first, !audioPath.hasPrefix("--") else {
-    fail("usage: minutes-bench <audio> --out result.json [--speakers N] [--step 0.1] [--threshold 0.6] [--no-recover]")
+var singleAudio: String? = nil
+if let first = args.first, !first.hasPrefix("--") {
+    singleAudio = first
+    args.removeFirst()
 }
-args.removeFirst()
 
 var outPath: String? = nil
+var outDir: String? = nil
+var listPath: String? = nil
 var expected: Int? = nil
 var options = SpeechOptions()
+var variantSpecs: [String] = []
 // GitHub's build machines have no Neural Engine; Core ML falls back to the CPU either way.
 while !args.isEmpty {
     let flag = args.removeFirst()
@@ -46,65 +76,134 @@ while !args.isEmpty {
     }
     switch flag {
     case "--out": outPath = value()
+    case "--out-dir": outDir = value()
+    case "--list": listPath = value()
     case "--speakers": expected = Int(value())
     case "--step": options.segmentationStepRatio = Double(value()) ?? options.segmentationStepRatio
     case "--threshold": options.clusteringThreshold = Double(value()) ?? options.clusteringThreshold
     case "--no-recover": options.recoverUnassignedSpeech = false
+    case "--exact": options.headCountIsExact = true
     case "--cpu": options.useNeuralEngine = false
-    default: fail("unknown option \(flag)")
+    case "--variant": variantSpecs.append(value())
+    default: fail("unknown option \(flag)\n\(usage)")
     }
 }
 
-let audio = URL(fileURLWithPath: audioPath)
-guard FileManager.default.fileExists(atPath: audio.path) else { fail("no such file: \(audioPath)") }
+func parseVariant(_ spec: String, base: SpeechOptions) -> Variant {
+    let parts = spec.split(separator: ":", maxSplits: 1).map(String.init)
+    guard parts.count == 2, !parts[0].isEmpty else { fail("bad variant '\(spec)'; expected NAME:key=value,...") }
+    var variant = Variant(name: parts[0], options: base, speakers: "auto")
+    for pair in parts[1].split(separator: ",") {
+        let kv = pair.split(separator: "=", maxSplits: 1).map(String.init)
+        guard kv.count == 2 else { fail("bad setting '\(pair)' in variant \(parts[0])") }
+        switch kv[0] {
+        case "threshold": variant.options.clusteringThreshold = Double(kv[1]) ?? base.clusteringThreshold
+        case "step": variant.options.segmentationStepRatio = Double(kv[1]) ?? base.segmentationStepRatio
+        case "recover": variant.options.recoverUnassignedSpeech = kv[1] == "true"
+        case "exact": variant.options.headCountIsExact = kv[1] == "true"
+        case "speakers": variant.speakers = kv[1]
+        default: fail("unknown setting '\(kv[0])' in variant \(parts[0])")
+        }
+    }
+    return variant
+}
+
+let variants = variantSpecs.map { parseVariant($0, base: options) }
+
+// The files to process, each with the number of speakers known for it (if any).
+var jobs: [(audio: URL, speakers: Int?, out: URL?)] = []
+if let singleAudio {
+    jobs.append((URL(fileURLWithPath: singleAudio), expected, outPath.map { URL(fileURLWithPath: $0) }))
+} else if let listPath {
+    guard let outDir else { fail("--list needs --out-dir") }
+    guard let text = try? String(contentsOfFile: listPath, encoding: .utf8) else { fail("can't read \(listPath)") }
+    try? FileManager.default.createDirectory(atPath: outDir, withIntermediateDirectories: true)
+    for line in text.split(separator: "\n") where !line.trimmingCharacters(in: .whitespaces).isEmpty {
+        let fields = line.split(separator: "\t").map(String.init)
+        let audio = URL(fileURLWithPath: fields[0])
+        let out = URL(fileURLWithPath: outDir).appendingPathComponent(audio.deletingPathExtension().lastPathComponent + ".result.json")
+        jobs.append((audio, fields.count > 1 ? Int(fields[1]) : nil, out))
+    }
+} else {
+    fail(usage)
+}
+for job in jobs where !FileManager.default.fileExists(atPath: job.audio.path) { fail("no such file: \(job.audio.path)") }
+
+func describe(_ o: SpeechOptions, speakers: String) -> [String: String] {
+    [
+        "step": String(o.segmentationStepRatio), "threshold": String(o.clusteringThreshold),
+        "recover": String(o.recoverUnassignedSpeech), "speakers": speakers, "exact": String(o.headCountIsExact),
+    ]
+}
 
 let models = SpeechModels(options: options, log: Log())
+let encoder = JSONEncoder()
+encoder.outputFormatting = [.sortedKeys]
+var failures = 0
+
 do {
     let loadStart = Date()
-    try await models.prepareAll { kind, fraction in
-        if fraction == 1 { print("model ready: \(kind.rawValue)") }
-    }
+    try await models.prepareAll { _, _ in }
     let loadSeconds = Date().timeIntervalSince(loadStart)
+    print(String(format: "models ready in %.1fs", loadSeconds))
 
-    let separationStart = Date()
-    let separation = try await FluidSeparator(models: models)
-        .separate(audio: audio, expectedSpeakers: expected) { _ in }
-    let separationSeconds = Date().timeIntervalSince(separationStart)
-    await models.unload(.separation)
+    for job in jobs {
+        do {
+            let transcriptionStart = Date()
+            let words = try await FluidTranscriber(models: models).transcribe(audio: job.audio) { _ in }
+            let transcriptionSeconds = Date().timeIntervalSince(transcriptionStart)
 
-    let transcriptionStart = Date()
-    let words = try await FluidTranscriber(models: models).transcribe(audio: audio) { _ in }
-    let transcriptionSeconds = Date().timeIntervalSince(transcriptionStart)
+            func separate(_ o: SpeechOptions, speakers: Int?, label: String) async throws -> SeparationOutput {
+                let started = Date()
+                let separation = try await FluidSeparator(models: models, options: o)
+                    .separate(audio: job.audio, expectedSpeakers: speakers) { _ in }
+                let seconds = Date().timeIntervalSince(started)
+                return SeparationOutput(
+                    speakers: Set(separation.turns.map { $0.speaker }).count,
+                    turns: separation.turns,
+                    utterances: TranscriptAssembler.assemble(words: words, turns: separation.turns),
+                    voices: separation.voices.mapValues { SpeakerMatcher.normalized($0) },
+                    crosstalkSeconds: TranscriptAssembler.crosstalkSeconds(separation.turns),
+                    separationSeconds: seconds,
+                    settings: describe(o, speakers: label))
+            }
 
-    let utterances = TranscriptAssembler.assemble(words: words, turns: separation.turns)
-    let audioSeconds = max(words.last?.end ?? 0, separation.turns.map { $0.end }.max() ?? 0)
-    let output = BenchOutput(
-        audio: audio.lastPathComponent,
-        audioSeconds: audioSeconds,
-        speakers: Set(separation.turns.map { $0.speaker }).count,
-        turns: separation.turns,
-        words: words,
-        utterances: utterances,
-        voices: separation.voices.mapValues { SpeakerMatcher.normalized($0) },
-        crosstalkSeconds: TranscriptAssembler.crosstalkSeconds(separation.turns),
-        separationSeconds: separationSeconds,
-        transcriptionSeconds: transcriptionSeconds,
-        modelLoadSeconds: loadSeconds,
-        settings: [
-            "step": String(options.segmentationStepRatio), "threshold": String(options.clusteringThreshold),
-            "recover": String(options.recoverUnassignedSpeech), "speakers": expected.map(String.init) ?? "auto",
-        ])
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.sortedKeys]
-    let data = try encoder.encode(output)
-    if let outPath {
-        try data.write(to: URL(fileURLWithPath: outPath))
+            let main = try await separate(options, speakers: expected, label: expected.map(String.init) ?? "auto")
+            var extra: [String: SeparationOutput] = [:]
+            for variant in variants {
+                let count: Int?
+                switch variant.speakers {
+                case "auto": count = nil
+                case "ref": count = job.speakers
+                default: count = Int(variant.speakers)
+                }
+                if variant.speakers == "ref", count == nil { continue }
+                extra[variant.name] = try await separate(variant.options, speakers: count, label: variant.speakers)
+            }
+
+            let audioSeconds = max(words.last?.end ?? 0, main.turns.map { $0.end }.max() ?? 0)
+            let output = BenchOutput(
+                audio: job.audio.lastPathComponent, audioSeconds: audioSeconds, speakers: main.speakers,
+                turns: main.turns, words: words, utterances: main.utterances, voices: main.voices,
+                crosstalkSeconds: main.crosstalkSeconds, separationSeconds: main.separationSeconds,
+                transcriptionSeconds: transcriptionSeconds, modelLoadSeconds: loadSeconds,
+                settings: main.settings, variants: extra)
+            if let out = job.out { try encoder.encode(output).write(to: out) }
+            let others = extra.sorted { $0.key < $1.key }.map { "\($0.key)=\($0.value.speakers)" }.joined(separator: " ")
+            print(String(
+                format: "%@: %.0fs audio, %d speakers%@, %d words, %d utterances, %.1fs crosstalk | separation %.1fs (%.0fx), transcription %.1fs (%.0fx)%@",
+                job.audio.lastPathComponent, audioSeconds, main.speakers,
+                job.speakers.map { " (reference \($0))" } ?? "", words.count, main.utterances.count, main.crosstalkSeconds,
+                main.separationSeconds, audioSeconds / max(main.separationSeconds, 0.001),
+                transcriptionSeconds, audioSeconds / max(transcriptionSeconds, 0.001),
+                others.isEmpty ? "" : " | " + others))
+        } catch {
+            failures += 1
+            print("\(job.audio.lastPathComponent): FAILED: \(MeetingPipeline.describe(error))")
+            if jobs.count == 1 { fail("minutes-bench failed: \(MeetingPipeline.describe(error))") }
+        }
     }
-    print(String(
-        format: "%@: %.0fs audio, %d speakers, %d words, %d utterances, %.1fs crosstalk | separation %.1fs (%.0fx), transcription %.1fs (%.0fx)",
-        audio.lastPathComponent, audioSeconds, output.speakers, words.count, utterances.count, output.crosstalkSeconds,
-        separationSeconds, audioSeconds / max(separationSeconds, 0.001),
-        transcriptionSeconds, audioSeconds / max(transcriptionSeconds, 0.001)))
 } catch {
     fail("minutes-bench failed: \(MeetingPipeline.describe(error))")
 }
+if failures > 0 { fail("\(failures) of \(jobs.count) files failed") }

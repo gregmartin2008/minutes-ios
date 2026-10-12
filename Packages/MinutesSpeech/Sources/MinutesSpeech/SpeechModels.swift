@@ -16,6 +16,8 @@ public struct SpeechOptions: Sendable {
     public var clusteringThreshold = 0.6
     /// Re-examine stretches the first pass could not attribute to anyone.
     public var recoverUnassignedSpeech = true
+    /// How a head count from the person is used: as the most voices to look for, or as the exact number.
+    public var headCountIsExact = false
 
     public init() {}
 
