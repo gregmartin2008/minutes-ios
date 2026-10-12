@@ -136,7 +136,6 @@ final class BackgroundKeeper {
             // Two seconds of silence, looped.
             let p = try AVAudioPlayer(data: WAVWriter.silence(seconds: 2, sampleRate: 16_000))
             p.numberOfLoops = -1
-            p.volume = 0
             p.prepareToPlay()
             p.play()
             player = p

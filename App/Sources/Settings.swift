@@ -68,6 +68,15 @@ final class AppSettings {
         }
     }
 
+    /// Stores the mail password. Returns false if the Keychain refused it.
+    func storeMailPassword(_ value: String) -> Bool {
+        if value.isEmpty {
+            Keychain.delete(Self.passwordKey)
+            return true
+        }
+        return Keychain.set(value, for: Self.passwordKey)
+    }
+
     var mailIsConfigured: Bool { mail.hasAddress && !mailPassword.isEmpty }
 }
 

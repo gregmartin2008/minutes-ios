@@ -531,17 +531,23 @@ final class AppModel: ObservableObject {
     // MARK: Email
 
     /// Saves the mail account. A nil password keeps the one already stored.
-    func saveMail(address: String, recipient: String, password: String?, host: String? = nil, port: Int? = nil) {
+    /// Returns false if the password could not be stored on this iPhone.
+    @discardableResult
+    func saveMail(address: String, recipient: String, password: String?, host: String? = nil, port: Int? = nil) -> Bool {
         var s = mail
         s.address = address.trimmingCharacters(in: .whitespacesAndNewlines)
         s.recipient = recipient.trimmingCharacters(in: .whitespacesAndNewlines)
         if let host, !host.trimmingCharacters(in: .whitespaces).isEmpty { s.host = host.trimmingCharacters(in: .whitespaces) }
         if let port, port > 0 { s.port = port }
         mail = s
-        guard !isDemo else { return }
+        guard !isDemo else { return true }
         AppSettings.shared.mail = s
-        if let password { AppSettings.shared.mailPassword = password.trimmingCharacters(in: .whitespacesAndNewlines) }
+        var stored = true
+        if let password {
+            stored = AppSettings.shared.storeMailPassword(password.trimmingCharacters(in: .whitespacesAndNewlines))
+        }
         mailReady = AppSettings.shared.mailIsConfigured
+        return stored
     }
 
     /// Removes the mail account and its password from this iPhone.

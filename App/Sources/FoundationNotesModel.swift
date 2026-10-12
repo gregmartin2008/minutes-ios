@@ -135,9 +135,9 @@ struct FoundationNotesModel: NotesModel {
             case .unsupportedLanguageOrLocale:
                 throw NotesModelError.other("The language model doesn't support this language.")
             case .decodingFailure, .concurrentRequests, .unsupportedGuide:
-                throw NotesModelError.other(error.localizedDescription)
+                throw NotesModelError.other(Self.plain(error))
             @unknown default:
-                throw NotesModelError.other(error.localizedDescription)
+                throw NotesModelError.other(Self.plain(error))
             }
         } catch let error as NotesModelError {
             throw error
@@ -149,7 +149,16 @@ struct FoundationNotesModel: NotesModel {
             if text.contains("ratelimit") || text.contains("rate limit") { throw NotesModelError.rateLimited }
             if text.contains("context") && (text.contains("exceed") || text.contains("window")) { throw NotesModelError.contextExceeded }
             if text.contains("guardrail") || text.contains("refus") { throw NotesModelError.refused("The model declined this part of the transcript.") }
-            throw NotesModelError.other(error.localizedDescription)
+            throw NotesModelError.other(Self.plain(error))
         }
+    }
+
+    /// A short description of an unexpected model error. The framework's own text for these is a
+    /// bare error number, so the name of the error is used; the full detail goes to the log.
+    private static func plain(_ error: Error) -> String {
+        let full = String(describing: error)
+        Log.shared.error("language model error: \(full)")
+        let name = full.split(whereSeparator: { $0 == "(" || $0 == " " }).first.map(String.init) ?? "unknown"
+        return "Apple's language model returned an error (\(name))"
     }
 }

@@ -18,6 +18,16 @@ public struct SpeechOptions: Sendable {
     public var recoverUnassignedSpeech = true
     /// How a head count from the person is used: as the most voices to look for, or as the exact number.
     public var headCountIsExact = false
+    /// Weights inside the clustering step (how strongly the audio evidence counts against the
+    /// tendency to explain everything with few voices). The defaults are the published ones.
+    public var clusteringFa = 0.07
+    public var clusteringFb = 0.8
+    /// Stretches of one voice shorter than this many seconds are left out when voices are compared.
+    public var minimumVoiceSeconds = 0.0
+    /// Compare voices using only the moments when one person is talking.
+    public var ignoreOverlapWhenComparingVoices = true
+    /// Two voices heard in the same ten-second window are never treated as one person.
+    public var keepSimultaneousVoicesApart = true
 
     public init() {}
 

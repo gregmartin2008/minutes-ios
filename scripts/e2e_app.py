@@ -114,7 +114,8 @@ def main():
     check("speech models downloaded inside the app", bool(status.get("modelsReady")), status.get("error") or "")
     check("the meeting finished processing", status.get("ok") is True, f"{status.get('meetingStatus')} at {status.get('stage')}: {status.get('error')}")
     check("several voices were told apart", status.get("speakers", 0) >= 4, f"{status.get('speakers')} voices")
-    check("crosstalk was marked", status.get("crosstalkUtterances", 0) >= 1, f"{status.get('crosstalkUtterances')} passages")
+    check("overlapping speech was detected", status.get("overlappedUtterances", 0) >= 1,
+          f"{status.get('overlappedUtterances')} passages with overlap, {status.get('crosstalkUtterances')} marked as crosstalk")
     check("the app recorded the email as sent", status.get("emailed") is True)
     check("exactly one email reached the mail server", len(received) == 1, len(received))
 

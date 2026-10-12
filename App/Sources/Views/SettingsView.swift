@@ -67,7 +67,7 @@ struct SettingsView: View {
                 .autocorrectionDisabled()
             SecureField(model.mailReady ? "App password (saved)" : "App password", text: $password)
                 .textContentType(.password)
-            TextField("Send notes to (leave empty for the same address)", text: $recipient)
+            TextField("Send notes to (optional)", text: $recipient)
                 .keyboardType(.emailAddress)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
@@ -108,8 +108,8 @@ struct SettingsView: View {
             Text("Email")
         } footer: {
             Text(model.mailReady
-                ? "Notes and transcripts are sent from this account as soon as a meeting has been processed."
-                : "Minutes sends the notes through your own mail account, so there is no service in between and nothing to pay for.")
+                ? "Notes and transcripts are sent from this account as soon as a meeting has been processed. Leave \"Send notes to\" empty to send them to the same address; separate several addresses with commas."
+                : "Minutes sends the notes through your own mail account, so there is no service in between and nothing to pay for. Leave \"Send notes to\" empty to send them to the same address.")
         }
     }
 
@@ -147,9 +147,15 @@ struct SettingsView: View {
     private func saveAndTest() async {
         testing = true
         testResult = nil
-        model.saveMail(
+        let stored = model.saveMail(
             address: address, recipient: recipient, password: password.isEmpty ? nil : password,
             host: host, port: Int(port.trimmingCharacters(in: .whitespaces)))
+        guard stored else {
+            testing = false
+            testFailed = true
+            testResult = "The password couldn't be saved in this iPhone's Keychain. Restart the iPhone and try again; if it keeps happening, reinstall Minutes."
+            return
+        }
         let problem = await model.sendTestEmail()
         testing = false
         testFailed = problem != nil
