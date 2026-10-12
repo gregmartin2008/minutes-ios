@@ -7,14 +7,18 @@ mkdir -p out build
 if [ "$kind" = sim ]; then
   destination='platform=iOS Simulator,name=iPhone 17 Pro Max'
   configuration=Debug
+  # Signed "to run locally" (no certificate needed), so the simulator build can use the Keychain.
+  signing=(CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO)
 else
   destination='generic/platform=iOS'
   configuration=Release
+  # Left unsigned: the installer (Sideloadly, AltStore) signs it with the owner's Apple ID.
+  signing=(CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=)
 fi
 xcodebuild -project Minutes.xcodeproj -scheme Minutes -configuration "$configuration" \
   -destination "$destination" -derivedDataPath "build/$kind" -clonedSourcePackagesDirPath build/spm \
   -skipPackagePluginValidation -skipMacroValidation \
-  CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+  "${signing[@]}" \
   build > "build/$kind.log" 2>&1
 status=$?
 grep -E "error:|warning: unre|BUILD (SUCCEEDED|FAILED)" "build/$kind.log" | sort -u | head -200 > "out/$kind-build.log"

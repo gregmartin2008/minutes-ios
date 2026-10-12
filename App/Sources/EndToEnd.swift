@@ -23,6 +23,7 @@ enum EndToEnd {
         var speakers = 0
         var utterances = 0
         var crosstalkUtterances = 0
+        var overlappedUtterances = 0
         var words = 0
         var audioSeconds = 0.0
         var emailed = false
@@ -66,7 +67,7 @@ enum EndToEnd {
             settings.recipient = "reader@example.com"
             settings.unencrypted = true
             AppSettings.shared.mail = settings
-            AppSettings.shared.mailPassword = "e2e-password"
+            if !AppSettings.shared.storeMailPassword("e2e-password") { status.error = "keychain refused the password" }
             model.mail = settings
             model.mailReady = AppSettings.shared.mailIsConfigured
         } else {
@@ -111,6 +112,7 @@ enum EndToEnd {
             status.speakers = m.speakerLabels.count
             status.utterances = m.utterances?.count ?? 0
             status.crosstalkUtterances = (m.utterances ?? []).filter { $0.isCrosstalk }.count
+            status.overlappedUtterances = (m.utterances ?? []).filter { !$0.overlapWith.isEmpty }.count
             status.words = m.words?.count ?? 0
             status.audioSeconds = m.duration
             status.emailed = m.emailedAt != nil

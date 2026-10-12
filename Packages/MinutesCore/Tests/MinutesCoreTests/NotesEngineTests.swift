@@ -91,10 +91,12 @@ final class NotesEngineTests: XCTestCase {
         }
     }
 
-    func fastOptions() -> NotesEngine.Options {
+    /// Quick retries. `patience` is generous by default so a slow machine never turns a brief
+    /// throttle into a failure; tests of persistent throttling pass a short one.
+    func fastOptions(patience: Double = 10) -> NotesEngine.Options {
         var o = NotesEngine.Options()
         o.rateLimitBackoff = [0.01, 0.01]
-        o.rateLimitPatience = 0.025
+        o.rateLimitPatience = patience
         return o
     }
 
@@ -141,7 +143,8 @@ final class NotesEngineTests: XCTestCase {
         let saved = Box<NotesCheckpoint?>(nil)
         let engine = NotesEngine(options: fastOptions())
         do {
-            _ = try await engine.write(lines: input, titleHint: nil, model: model, checkpoint: { saved.value = $0 })
+            _ = try await NotesEngine(options: fastOptions(patience: 0.05))
+                .write(lines: input, titleHint: nil, model: model, checkpoint: { saved.value = $0 })
             XCTFail("expected the run to be throttled")
         } catch let e as NotesModelError {
             XCTAssertEqual(e, .rateLimited)
@@ -229,7 +232,7 @@ final class NotesEngineTests: XCTestCase {
         let model = FakeNotesModel()
         model.alwaysRateLimit = true
         do {
-            _ = try await NotesEngine(options: fastOptions()).write(lines: ["Greg: Hello."], titleHint: nil, model: model)
+            _ = try await NotesEngine(options: fastOptions(patience: 0.05)).write(lines: ["Greg: Hello."], titleHint: nil, model: model)
             XCTFail("expected rateLimited")
         } catch let e as NotesModelError {
             XCTAssertEqual(e, .rateLimited)

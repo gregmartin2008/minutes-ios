@@ -10,9 +10,12 @@ import MinutesSpeech
 // Many files:  minutes-bench --list files.tsv --out-dir DIR [options] [--variant NAME:key=value,...]...
 //              files.tsv has one "<audio path><TAB><number of speakers>" per line.
 //
-// Options: --step 0.1  --threshold 0.6  --no-recover  --cpu  --exact
-// A variant separates the speakers again with different settings, reusing the transcription. Keys:
-//   threshold=0.5  step=0.2  recover=false  speakers=auto|ref|N  exact=true
+// Options: --step 0.1  --threshold 0.6  --no-recover  --cpu  --exact  --voices
+// A variant separates the speakers again with different settings, reusing the transcription and,
+// where the settings allow, the voice analysis. Keys:
+//   grouping:  threshold=0.5  fa=0.2  fb=4  speakers=auto|ref|N  exact=true  recover=false  apart=false
+//   analysis:  step=0.2  minseg=1.0  overlap=false
+// --voices also writes <name>.voices.json: every window's voice embeddings, for studying the grouping.
 
 struct SeparationOutput: Codable {
     var speakers: Int
@@ -67,6 +70,7 @@ var listPath: String? = nil
 var expected: Int? = nil
 var options = SpeechOptions()
 var variantSpecs: [String] = []
+var writeVoices = false
 // GitHub's build machines have no Neural Engine; Core ML falls back to the CPU either way.
 while !args.isEmpty {
     let flag = args.removeFirst()
@@ -85,6 +89,7 @@ while !args.isEmpty {
     case "--exact": options.headCountIsExact = true
     case "--cpu": options.useNeuralEngine = false
     case "--variant": variantSpecs.append(value())
+    case "--voices": writeVoices = true
     default: fail("unknown option \(flag)\n\(usage)")
     }
 }
@@ -100,6 +105,11 @@ func parseVariant(_ spec: String, base: SpeechOptions) -> Variant {
         case "threshold": variant.options.clusteringThreshold = Double(kv[1]) ?? base.clusteringThreshold
         case "step": variant.options.segmentationStepRatio = Double(kv[1]) ?? base.segmentationStepRatio
         case "recover": variant.options.recoverUnassignedSpeech = kv[1] == "true"
+        case "fa": variant.options.clusteringFa = Double(kv[1]) ?? base.clusteringFa
+        case "fb": variant.options.clusteringFb = Double(kv[1]) ?? base.clusteringFb
+        case "apart": variant.options.keepSimultaneousVoicesApart = kv[1] == "true"
+        case "minseg": variant.options.minimumVoiceSeconds = Double(kv[1]) ?? base.minimumVoiceSeconds
+        case "overlap": variant.options.ignoreOverlapWhenComparingVoices = kv[1] != "true"
         case "exact": variant.options.headCountIsExact = kv[1] == "true"
         case "speakers": variant.speakers = kv[1]
         default: fail("unknown setting '\(kv[0])' in variant \(parts[0])")
@@ -133,6 +143,8 @@ func describe(_ o: SpeechOptions, speakers: String) -> [String: String] {
     [
         "step": String(o.segmentationStepRatio), "threshold": String(o.clusteringThreshold),
         "recover": String(o.recoverUnassignedSpeech), "speakers": speakers, "exact": String(o.headCountIsExact),
+        "fa": String(o.clusteringFa), "fb": String(o.clusteringFb), "minseg": String(o.minimumVoiceSeconds),
+        "overlap": String(!o.ignoreOverlapWhenComparingVoices), "apart": String(o.keepSimultaneousVoicesApart),
     ]
 }
 
@@ -153,11 +165,29 @@ do {
             let words = try await FluidTranscriber(models: models).transcribe(audio: job.audio) { _ in }
             let transcriptionSeconds = Date().timeIntervalSince(transcriptionStart)
 
-            func separate(_ o: SpeechOptions, speakers: Int?, label: String) async throws -> SeparationOutput {
+            // Voice analysis is the slow part; variants that share its settings share one analysis.
+            var analyses: [String: FluidSeparator.Analysis] = [:]
+            var analysisSeconds: [String: Double] = [:]
+            func analysis(for o: SpeechOptions) async throws -> (FluidSeparator.Analysis, Double) {
+                let key = "\(o.segmentationStepRatio)|\(o.minimumVoiceSeconds)|\(o.ignoreOverlapWhenComparingVoices)"
+                if let found = analyses[key] { return (found, analysisSeconds[key] ?? 0) }
                 let started = Date()
-                let separation = try await FluidSeparator(models: models, options: o)
-                    .separate(audio: job.audio, expectedSpeakers: speakers) { _ in }
-                let seconds = Date().timeIntervalSince(started)
+                let made = try await FluidSeparator(models: models, options: o).analyze(audio: job.audio) { _ in }
+                analyses[key] = made
+                analysisSeconds[key] = Date().timeIntervalSince(started)
+                return (made, analysisSeconds[key] ?? 0)
+            }
+
+            func separate(_ o: SpeechOptions, speakers: Int?, label: String, voicesTo: URL? = nil) async throws -> SeparationOutput {
+                let (prepared, prepareSeconds) = try await analysis(for: o)
+                let count: SpeakerCount
+                if let n = speakers { count = o.headCountIsExact ? .exactly(n) : .atMost(n) } else { count = .automatic }
+                let started = Date()
+                let grouped = try await FluidSeparator(models: models, options: o)
+                    .group(prepared, speakers: count, options: o, includeWindowVoices: voicesTo != nil)
+                let seconds = prepareSeconds + Date().timeIntervalSince(started)
+                if let voicesTo { try JSONEncoder().encode(grouped.windowVoices).write(to: voicesTo) }
+                let separation = grouped.result
                 return SeparationOutput(
                     speakers: Set(separation.turns.map { $0.speaker }).count,
                     turns: separation.turns,
@@ -168,7 +198,8 @@ do {
                     settings: describe(o, speakers: label))
             }
 
-            let main = try await separate(options, speakers: expected, label: expected.map(String.init) ?? "auto")
+            let voicesURL = writeVoices ? job.out.map { URL(fileURLWithPath: $0.path.replacingOccurrences(of: ".result.json", with: ".voices.json")) } : nil
+            let main = try await separate(options, speakers: expected, label: expected.map(String.init) ?? "auto", voicesTo: voicesURL)
             var extra: [String: SeparationOutput] = [:]
             for variant in variants {
                 let count: Int?

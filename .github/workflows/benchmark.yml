@@ -18,7 +18,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [0, 1, 2, 3]
+        shard: [0, 1, 2]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/cache@v4
@@ -38,7 +38,7 @@ jobs:
       - name: Download meetings
         run: |
           source scripts/bench/config.env
-          python3 scripts/bench/fetch_notsofar.py --subset "$SUBSET" --limit "$LIMIT" --shard ${{ matrix.shard }}/4 --out data 2>&1 | tee out/fetch.log
+          python3 scripts/bench/fetch_notsofar.py --subset "$SUBSET" --limit "$LIMIT" --shard ${{ matrix.shard }}/3 --out data 2>&1 | tee out/fetch.log
       - name: Run the pipeline
         run: |
           source scripts/bench/config.env
@@ -47,6 +47,10 @@ jobs:
             | grep -v "^\[Profiling\]" | tee out/bench.log
           cp data/*.ref.json out/results/
           cp scripts/bench/config.env out/
+      - name: Pack the voice embeddings
+        run: |
+          /usr/bin/python3 -m venv /tmp/venv && /tmp/venv/bin/pip -q install numpy
+          /tmp/venv/bin/python scripts/bench/pack_voices.py out/results | tail -3
       - name: Publish results
         if: always()
         run: scripts/ci_publish.sh out ci-bench-${{ matrix.shard }}

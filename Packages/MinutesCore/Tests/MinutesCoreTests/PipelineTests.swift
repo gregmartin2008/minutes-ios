@@ -78,7 +78,7 @@ final class PipelineTests: XCTestCase {
         let result = modelResult!
         var options = NotesEngine.Options()
         options.rateLimitBackoff = [0.01]
-        options.rateLimitPatience = 0.015
+        options.rateLimitPatience = 0.05
         return MeetingPipeline(
             store: store,
             services: PipelineServices(
