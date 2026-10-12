@@ -619,7 +619,7 @@ private struct SpeakersTab: View {
                     Text("Wrong number of voices?")
                         .font(.system(size: 16, weight: .semibold))
                         .foregroundStyle(Theme.ink)
-                    Text("Say how many people spoke and Minutes separates the recording again. It takes a few minutes, clears the names on this meeting, and sends a new email.")
+                    Text("Say how many people spoke and Minutes separates the recording again. It takes a few minutes, clears the names on this meeting, and sends a new email. If the result is worse, separate again and let Minutes decide.")
                         .font(.footnote)
                         .foregroundStyle(Theme.muted)
                         .fixedSize(horizontal: false, vertical: true)
