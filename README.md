@@ -83,42 +83,73 @@ meetings that come with human transcripts, and scored with the tools the researc
 ([MeetEval](https://github.com/fgnt/meeteval) and [pyannote.metrics](https://github.com/pyannote/pyannote-metrics)).
 The scripts are in `scripts/bench`; the numbers below can be reproduced from this repository.
 
-**The main test: 129 meetings, 13 hours, none used to choose any setting.** This is the evaluation
-set of Microsoft's [NOTSOFAR-1](https://arxiv.org/abs/2401.08887) corpus: three to seven people in
-ordinary conference rooms, recorded by a single device on the table, which is how Minutes is used.
-It is a deliberately hard test. People interrupt and talk over each other constantly: two or more
-people are talking during 30% of the speech.
+**Short, crowded meetings: 129 meetings, 13 hours.** This is the evaluation set of Microsoft's
+[NOTSOFAR-1](https://arxiv.org/abs/2401.08887) corpus: three to seven people in ordinary conference
+rooms, recorded by a single device on the table, which is how Minutes is used. Each meeting is
+about six minutes. It is a deliberately hard test. People interrupt and talk over each other
+constantly: two or more people are talking during 30% of the speech.
 
 | | Result |
 |---|---|
 | Words captured when one person is talking | 93% |
 | Words captured while people talk over each other | 51% |
 | Word error overall, ignoring who spoke (tcORC-WER) | 30.0% |
-| Right number of speakers found | 66% of meetings; within one in 96% |
-| Speech time credited to the wrong person or missed (DER, 0.25 s collar) | 18.3% |
-| Word error counting a word given to the wrong person as wrong (tcpWER) | 50.1% |
+| Right number of speakers found | 70% of meetings; within one in 98% |
+| Speech time credited to the wrong person or missed (DER, 0.25 s collar) | 17.3% |
+| Word error counting a word given to the wrong person as wrong (tcpWER) | 48.9% |
 
 For scale, the NOTSOFAR-1 challenge published results for single-device systems on its evaluation
 meetings ([summary paper](https://arxiv.org/abs/2501.17304)): the organizers' reference system
 scored 35.5% tcORC-WER and 41.4% tcpWER, the best research entry 17.7% and 22.2%, and entries ranged
-up to 74.1% tcpWER. Those systems ran on servers; this is the pipeline that runs on the phone. Its wording is better
-than the reference system's and its speaker attribution is worse. The comparison is indicative
-rather than exact: the figures above use one of the table devices per meeting.
+up to 74.1% tcpWER. Those systems ran on servers; this is the pipeline that runs on the phone. Its
+wording is better than the reference system's and its speaker attribution is worse. The comparison
+is indicative rather than exact: the figures above use one of the table devices per meeting.
 
-What the table means in practice:
+**Full-length meetings: 25 meetings, about 18 hours.**
+
+| | ICSI: 9 meetings, 6 to 9 people, 42 to 87 minutes | AMI: 16 meetings, 3 to 4 people, 13 to 48 minutes |
+|---|---|---|
+| Microphone | mix of headset microphones | one far-field table microphone |
+| Word error, ignoring who spoke (tcORC-WER) | 21.1% | 23.2% |
+| Right number of speakers found | 5 of 9; within one in 7 of 9 | 13 of 16; within one in 15 of 16 |
+| Speech time credited to the wrong person or missed (DER) | 20.2% | 12.8% |
+| Word error counting wrong-speaker words as wrong (tcpWER) | 30.4% | 32.5% |
+
+These are the [ICSI](https://groups.inf.ed.ac.uk/ami/icsi/) research-group meetings with the most
+speakers and the standard [AMI](https://groups.inf.ed.ac.uk/ami/corpus/) test set. The ICSI audio is
+cleaner than a phone on a table would capture, so read its column as what the pipeline does with
+many speakers over an hour when the sound is good.
+
+What the tables mean in practice:
 
 - **Wording is reliable when people take turns** and degrades sharply in crosstalk. One microphone
   hears one mixture; the recognizer follows the dominant voice and most of what is said underneath
   is lost. No setting changes this. Minutes marks those passages so they can be checked by ear.
-- **Speaker labels are right most of the time and wrong often enough to check.** By meeting size,
-  tcpWER was 37.6% with four people, 53.2% with five, 55.7% with six and 60.8% with seven (and 64.0%
-  in the 16 three-person meetings, where the count was most often wrong). A meeting
-  with less crosstalk than this corpus will do better; how much better has not been measured.
-- **Counting the speakers** is the step that was changed most as a result of these tests. Left to
-  the separation library alone, the right number of people was found in 53% of these meetings (and
-  in 17% of the 36 development meetings, where it usually folded two or three people into one).
-  Minutes now counts the voices first, which finds the right number in 66% (50% on the development
-  meetings) and brought tcpWER there from 69.3% to about 58%.
+- **Speaker labels are right most of the time and wrong often enough to check.** On the short
+  meetings, tcpWER was 37.0% with four people, 52.9% with five, 54.6% with six, 61.0% with seven,
+  and 56.9% in the three-person meetings. On hour-long meetings with six to nine people it was 30.4%.
+- **More than four people is not a limit**, but the count is less certain as the room fills. In
+  the eight hour-long meetings with seven to nine speakers, Minutes found everyone in five and missed
+  one or two people in the other three. In the eleven short meetings with seven people it found all
+  seven in two and was one short in most of the rest. A person who is missed has their words
+  credited to someone else.
+- **Counting the speakers** is the step these tests changed most. On short meetings the separation
+  library alone found the right number of people in 53% of the evaluation meetings and in 17% of the
+  36 development meetings, where it usually folded two or three people into one. On hour-long
+  meetings it counts well, and forcing a different number on it made things worse (38.1% tcpWER
+  against 30.4% on ICSI, even when the number forced was the true one). Minutes therefore keeps the
+  library's grouping unless its own count of the voices says people were missed, and regroups only
+  then. On the short evaluation meetings this took tcpWER from 51.6% to 48.9%.
+
+The same rule was then checked on the first 6, 12 and 20 minutes of each of the 25 long meetings:
+it stayed within half a point of the library's own grouping at every length, and forcing the true
+number of speakers was worse at every length (for example 42.9% against 31.7% tcpWER on the first
+six minutes of the AMI meetings). For that reason the head count that can be entered while
+recording is used only as an upper limit.
+
+How the settings were chosen: the counting step was tuned on the 36 development meetings only. The
+rule for combining it with the library's grouping was settled after the first evaluation and
+long-meeting runs, so those results are not entirely unseen by that one decision.
 
 **Recognizing people across meetings.** On the 36 NOTSOFAR-1 development meetings (twelve people
 recurring in different rooms), with each person named the first time they appeared, 85 to 88% of
@@ -130,10 +161,8 @@ synthetic voices, is transcribed with 4.6% word error. This runs with every buil
 itself in the iPhone simulator, as a check that nothing has broken.
 
 **An alternative that was tried.** A different kind of speaker-separation model (LS-EEND, which
-tracks up to ten voices directly) scored 73.8% tcpWER on the same 129 meetings, against 50.1% for
+tracks up to ten voices directly) scored 73.8% tcpWER on the same 129 meetings, against 48.9% for
 the approach used, so it was not adopted.
-
-LONG_MEETINGS_SECTION
 
 **What has not been tested.** All of the above is the speech pipeline running on GitHub's Macs with
 the same models and code as the app. On an actual iPhone, as of this writing, nothing has been
