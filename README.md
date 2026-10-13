@@ -54,6 +54,15 @@ Windows program that signs an app with your Apple ID and puts it on your iPhone.
    - Settings > Privacy & Security > Developer Mode > on, then restart when asked.
 6. **Open Minutes.**
 
+If Sideloadly's *Use automatic bundle ID* option is on (its default), it installs the app under an
+identifier with your Apple team's code appended, and iOS then refuses the app's request to keep
+working at full speed after the phone is locked, because that request has to carry the installed
+identifier. The build can be made with that identifier instead: put it in `App/bundle-id.txt`
+(or in a repository variable named `MINUTES_BUNDLE_ID`); Settings > Share diagnostics prints the
+installed identifier on its first line. From then on install with *Use automatic bundle ID* off
+and that identifier typed in. The app keeps its meetings and settings across the change, since
+the identifier is the same one it already has.
+
 Apple lets a free Apple ID sign an app for seven days. After that the app stops opening until it is
 signed again: connect the phone and click *Start* in Sideloadly again, which takes a minute and keeps
 all meetings and settings. Sideloadly can also do it by itself when the phone is on the same Wi-Fi
