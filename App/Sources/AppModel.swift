@@ -220,6 +220,7 @@ final class AppModel: ObservableObject {
         }
         meetings.insert(m, at: 0)
         recording = RecordingStatus(meetingID: m.id, title: m.title)
+        preloadModelsForProcessing()
         if !AppSettings.shared.askedForNotifications {
             AppSettings.shared.askedForNotifications = true
             Task { await Notifier.requestPermission() }
@@ -611,6 +612,25 @@ final class AppModel: ObservableObject {
         }
     }
 
+    // MARK: Models in memory
+
+    /// Loads both speech models now, while the app is in front, and keeps them for the end of the
+    /// meeting. Loading a model takes seconds in the foreground and minutes once the phone is
+    /// locked (iOS gives a background app very little CPU), and after End the phone is usually
+    /// locked within seconds. If iOS runs short of memory meanwhile, the models are let go and
+    /// loaded again later.
+    private func preloadModelsForProcessing() {
+        guard setup.ready, !isDemo else { return }
+        let models = self.models
+        Task.detached(priority: .userInitiated) {
+            do {
+                try await models.preloadAll()
+            } catch {
+                Log.shared.warn("model preload failed: \(error)")
+            }
+        }
+    }
+
     // MARK: App state, for the diagnostics
 
     /// Logs when the app goes to the background and comes back, and when the phone runs hot, so
@@ -622,6 +642,16 @@ final class AppModel: ObservableObject {
         }
         center.addObserver(forName: UIApplication.willEnterForegroundNotification, object: nil, queue: .main) { _ in
             Log.shared.info("app came to the foreground")
+        }
+        center.addObserver(forName: UIApplication.didReceiveMemoryWarningNotification, object: nil, queue: .main) { [weak self] _ in
+            guard let self else { return }
+            if self.runningID == nil {
+                Log.shared.warn("memory warning; releasing the speech models until they are needed")
+                let models = self.models
+                Task { await models.unloadAll() }
+            } else {
+                Log.shared.warn("memory warning while processing")
+            }
         }
         center.addObserver(forName: ProcessInfo.thermalStateDidChangeNotification, object: nil, queue: .main) { _ in
             let state: String

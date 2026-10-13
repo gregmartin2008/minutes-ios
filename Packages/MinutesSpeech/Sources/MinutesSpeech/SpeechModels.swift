@@ -54,6 +54,7 @@ public actor SpeechModels {
     /// A load already under way, so two callers (a preload and the transcribe stage) share one.
     private var asrLoading: Task<AsrManager, Error>?
     private var diarizerModels: OfflineDiarizerModels?
+    private var diarizerLoading: Task<OfflineDiarizerModels, Error>?
     private let log: Log
 
     public init(options: SpeechOptions = SpeechOptions(), log: Log = .shared) {
@@ -113,6 +114,12 @@ public actor SpeechModels {
         _ = try await transcriber()
     }
 
+    /// Loads both models and keeps them in memory until `unload` is called.
+    public func preloadAll() async throws {
+        _ = try await separationModels()
+        _ = try await transcriber()
+    }
+
     /// Runs the transcriber once on a few seconds of silence. The first run of a Core ML model on
     /// a device can take minutes while the system specializes it for the Neural Engine; doing it
     /// here, right after the download, keeps that out of the first real meeting.
@@ -134,14 +141,23 @@ public actor SpeechModels {
 
     func separationModels(progress: (@Sendable (Double, Bool) -> Void)? = nil) async throws -> OfflineDiarizerModels {
         if let diarizerModels { return diarizerModels }
-        let started = Date()
-        let configuration = MLModelConfiguration()
-        configuration.computeUnits = options.computeUnits
-        let models = try await OfflineDiarizerModels.load(
-            configuration: configuration,
-            progressHandler: { p in progress?(p.fractionCompleted, Self.isCompiling(p.phase)) })
+        if let diarizerLoading { return try await diarizerLoading.value }
+        let options = self.options
+        let log = self.log
+        let task = Task<OfflineDiarizerModels, Error> {
+            let started = Date()
+            let configuration = MLModelConfiguration()
+            configuration.computeUnits = options.computeUnits
+            let models = try await OfflineDiarizerModels.load(
+                configuration: configuration,
+                progressHandler: { p in progress?(p.fractionCompleted, Self.isCompiling(p.phase)) })
+            log.info(String(format: "speaker-separation models ready in %.1fs", Date().timeIntervalSince(started)))
+            return models
+        }
+        diarizerLoading = task
+        defer { diarizerLoading = nil }
+        let models = try await task.value
         diarizerModels = models
-        log.info(String(format: "speaker-separation models ready in %.1fs", Date().timeIntervalSince(started)))
         return models
     }
 
@@ -154,6 +170,8 @@ public actor SpeechModels {
             if let asr { await asr.cleanup() }
             asr = nil
         case .separation:
+            diarizerLoading?.cancel()
+            diarizerLoading = nil
             diarizerModels = nil
         }
     }
