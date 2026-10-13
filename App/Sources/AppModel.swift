@@ -89,6 +89,8 @@ final class AppModel: ObservableObject {
         }
 
         Log.shared.info("launch: \(Self.deviceSummary())")
+        Log.shared.info(BackgroundKeeper.shared.status)
+        watchAppState()
         setup.ready = AppSettings.shared.modelsReady && models.transcriptionModelIsDownloaded()
         meetings = store.loadAll()
         profiles = store.loadProfiles()
@@ -336,6 +338,16 @@ final class AppModel: ObservableObject {
             notesModel: { FoundationNotesModel.make() },
             mailer: SMTPMailer(),
             vocabulary: { AppSettings.shared.vocabulary },
+            stageWillStart: { stage in
+                // Load the transcription model while the speakers are being separated, in the
+                // seconds after End is tapped when the app is still in front. Loading it later,
+                // with the phone locked, has taken minutes.
+                if stage == .separateSpeakers {
+                    Task.detached(priority: .userInitiated) {
+                        do { try await models.preloadTranscriber() } catch { Log.shared.warn("transcriber preload failed: \(error)") }
+                    }
+                }
+            },
             stageDidFinish: { stage in
                 // Only one large model in memory at a time.
                 switch stage {
@@ -596,6 +608,31 @@ final class AppModel: ObservableObject {
             }
         } catch {
             return MeetingPipeline.describe(error)
+        }
+    }
+
+    // MARK: App state, for the diagnostics
+
+    /// Logs when the app goes to the background and comes back, and when the phone runs hot, so
+    /// slow stages in the log can be read against what the phone was doing.
+    private func watchAppState() {
+        let center = NotificationCenter.default
+        center.addObserver(forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: .main) { _ in
+            Log.shared.info("app went to the background")
+        }
+        center.addObserver(forName: UIApplication.willEnterForegroundNotification, object: nil, queue: .main) { _ in
+            Log.shared.info("app came to the foreground")
+        }
+        center.addObserver(forName: ProcessInfo.thermalStateDidChangeNotification, object: nil, queue: .main) { _ in
+            let state: String
+            switch ProcessInfo.processInfo.thermalState {
+            case .nominal: state = "normal"
+            case .fair: state = "warm"
+            case .serious: state = "hot"
+            case .critical: state = "critical"
+            @unknown default: state = "unknown"
+            }
+            Log.shared.info("thermal state: \(state)")
         }
     }
 

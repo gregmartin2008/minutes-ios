@@ -46,6 +46,8 @@ public struct PipelineServices: Sendable {
     public var notesOptions: NotesEngine.Options
     /// Names and terms to correct in transcripts, read when a meeting is assembled.
     public var vocabulary: @Sendable () -> Vocabulary
+    /// Called as each stage begins, so the app can start loading what a later stage needs.
+    public var stageWillStart: (@Sendable (Stage) async -> Void)?
     /// Called after each stage so the app can release the models that stage loaded.
     public var stageDidFinish: (@Sendable (Stage) async -> Void)?
 
@@ -55,6 +57,7 @@ public struct PipelineServices: Sendable {
         mailer: MailSending, thresholds: SpeakerMatcher.Thresholds = SpeakerMatcher.Thresholds(),
         notesOptions: NotesEngine.Options = NotesEngine.Options(),
         vocabulary: @escaping @Sendable () -> Vocabulary = { Vocabulary() },
+        stageWillStart: (@Sendable (Stage) async -> Void)? = nil,
         stageDidFinish: (@Sendable (Stage) async -> Void)? = nil
     ) {
         self.separator = separator
@@ -64,6 +67,7 @@ public struct PipelineServices: Sendable {
         self.thresholds = thresholds
         self.notesOptions = notesOptions
         self.vocabulary = vocabulary
+        self.stageWillStart = stageWillStart
         self.stageDidFinish = stageDidFinish
     }
 }
@@ -137,6 +141,7 @@ public final class MeetingPipeline: @unchecked Sendable {
             let stage = m.stage
             let started = Date()
             log.info("meeting \(m.id): starting \(stage.rawValue)")
+            await services.stageWillStart?(stage)
             do {
                 let snapshot = m
                 let report: @Sendable (Double) -> Void = { fraction in

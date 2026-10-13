@@ -40,7 +40,7 @@ targets:
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         UIBackgroundModes: [audio, processing]
         BGTaskSchedulerPermittedIdentifiers:
-          - "$(PRODUCT_BUNDLE_IDENTIFIER).notes"
+          - "$(PRODUCT_BUNDLE_IDENTIFIER).*"
         NSMicrophoneUsageDescription: Minutes records your meetings so it can transcribe them on this iPhone.
         ITSAppUsesNonExemptEncryption: false
     settings:

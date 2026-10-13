@@ -14,9 +14,9 @@ Macs. It contains no keys, passwords, or meeting content.
 iPhone simulator from a recording to the email arriving, and its speech pipeline has been measured
 on 190 recorded meetings (see "How accurate it is"). On an iPhone 18 Pro Max it has processed a
 1 hour 52 minute meeting of nine people, six of them speaking (seven voices found), in 12 minutes,
-of which 7½ were a one-time preparation of the speech model that now happens at download, and a
-25-minute two-person call in 55 seconds, with the notes written by Apple Intelligence and both
-emails delivered.
+7½ of which went to loading the speech model after the phone was put down (it is now loaded in
+the seconds after End is tapped, alongside speaker separation), and a 25-minute two-person call
+in 55 seconds, with the notes written by Apple Intelligence and both emails delivered.
 
 ## What it does
 
