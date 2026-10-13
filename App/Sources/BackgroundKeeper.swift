@@ -29,12 +29,26 @@ final class BackgroundKeeper {
     /// True while a meeting is being processed and this object owns the audio session.
     var isActive: Bool { active }
 
+    /// One line for the diagnostics: whether the continued-processing task could be set up.
+    private(set) var status = "background task: not registered"
+
     /// Call once at launch, before the app finishes launching.
     func register() {
         guard !registered else { return }
         registered = true
+        // The identifier has to begin with the app's bundle identifier, which a re-signing tool may
+        // have changed since the build, so it is worked out here rather than written into Info.plist.
+        // Info.plist permits "<built bundle id>.*", which still covers the changed one.
+        let bundle = Bundle.main.bundleIdentifier ?? "app.minutes.recorder"
+        let id = bundle + ".notes"
         let permitted = Bundle.main.object(forInfoDictionaryKey: "BGTaskSchedulerPermittedIdentifiers") as? [String] ?? []
-        guard let id = permitted.first(where: { !$0.hasSuffix("*") }) ?? permitted.first else { return }
+        let allowed = permitted.contains { entry in
+            entry == id || (entry.hasSuffix("*") && id.hasPrefix(String(entry.dropLast())))
+        }
+        guard allowed else {
+            status = "background task \(id) not permitted by Info.plist (\(permitted.joined(separator: ", ")))"
+            return
+        }
         let ok = BGTaskScheduler.shared.register(forTaskWithIdentifier: id, using: .main) { [weak self] task in
             guard let self, let task = task as? BGContinuedProcessingTask else {
                 task.setTaskCompleted(success: false)
@@ -43,10 +57,11 @@ final class BackgroundKeeper {
             self.adopt(task)
         }
         identifier = ok ? id : nil
-        Log.shared.info("background task \(id) registered: \(ok)")
+        status = "background task \(id) registered: \(ok)"
     }
 
     private func adopt(_ task: BGContinuedProcessingTask) {
+        Log.shared.info("continued-processing task started by iOS")
         self.task = task
         task.progress.totalUnitCount = 1000
         task.progress.completedUnitCount = Int64(lastFraction * 1000)
@@ -80,9 +95,12 @@ final class BackgroundKeeper {
             do {
                 try BGTaskScheduler.shared.submit(request)
                 submitted = true
+                Log.shared.info("continued-processing task submitted")
             } catch {
                 Log.shared.warn("continued-processing task not accepted: \(error.localizedDescription)")
             }
+        } else if identifier == nil {
+            Log.shared.info("continued-processing task unavailable; keeping the app awake with silent audio only")
         }
         startSilentAudio()
     }

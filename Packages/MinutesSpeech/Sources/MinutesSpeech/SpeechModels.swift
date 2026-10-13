@@ -51,6 +51,8 @@ public enum SpeechModelKind: String, Sendable {
 public actor SpeechModels {
     public let options: SpeechOptions
     private var asr: AsrManager?
+    /// A load already under way, so two callers (a preload and the transcribe stage) share one.
+    private var asrLoading: Task<AsrManager, Error>?
     private var diarizerModels: OfflineDiarizerModels?
     private let log: Log
 
@@ -81,20 +83,34 @@ public actor SpeechModels {
 
     func transcriber(progress: (@Sendable (Double, Bool) -> Void)? = nil) async throws -> AsrManager {
         if let asr { return asr }
-        let started = Date()
-        let configuration = MLModelConfiguration()
-        configuration.computeUnits = options.computeUnits
-        let models = try await AsrModels.downloadAndLoad(
-            configuration: configuration, version: .ultra,
-            progressHandler: { p in progress?(p.fractionCompleted, Self.isCompiling(p.phase)) })
-        let loaded = Date()
-        let manager = AsrManager(config: .default)
-        try await manager.loadModels(models)
+        if let asrLoading { return try await asrLoading.value }
+        let options = self.options
+        let log = self.log
+        let task = Task<AsrManager, Error> {
+            let started = Date()
+            let configuration = MLModelConfiguration()
+            configuration.computeUnits = options.computeUnits
+            let models = try await AsrModels.downloadAndLoad(
+                configuration: configuration, version: .ultra,
+                progressHandler: { p in progress?(p.fractionCompleted, Self.isCompiling(p.phase)) })
+            let loaded = Date()
+            let manager = AsrManager(config: .default)
+            try await manager.loadModels(models)
+            log.info(String(
+                format: "transcription model ready in %.1fs (files %.1fs, load %.1fs)",
+                Date().timeIntervalSince(started), loaded.timeIntervalSince(started), Date().timeIntervalSince(loaded)))
+            return manager
+        }
+        asrLoading = task
+        defer { asrLoading = nil }
+        let manager = try await task.value
         asr = manager
-        log.info(String(
-            format: "transcription model ready in %.1fs (files %.1fs, load %.1fs)",
-            Date().timeIntervalSince(started), loaded.timeIntervalSince(started), Date().timeIntervalSince(loaded)))
         return manager
+    }
+
+    /// Starts loading the transcription model so it is ready when the transcribe stage comes.
+    public func preloadTranscriber() async throws {
+        _ = try await transcriber()
     }
 
     /// Runs the transcriber once on a few seconds of silence. The first run of a Core ML model on
@@ -133,6 +149,8 @@ public actor SpeechModels {
     public func unload(_ kind: SpeechModelKind) async {
         switch kind {
         case .transcription:
+            asrLoading?.cancel()
+            asrLoading = nil
             if let asr { await asr.cleanup() }
             asr = nil
         case .separation:
