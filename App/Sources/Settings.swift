@@ -52,6 +52,16 @@ final class AppSettings {
         set { defaults.set(newValue, forKey: "modelsReady") }
     }
 
+    /// Names and terms to correct in transcripts. The built-in finance terms are not stored.
+    var vocabulary: Vocabulary {
+        get {
+            guard let data = defaults.data(forKey: "vocabulary"),
+                  let value = try? JSONDecoder().decode(Vocabulary.self, from: data) else { return Vocabulary() }
+            return value
+        }
+        set { defaults.set(try? JSONEncoder().encode(newValue), forKey: "vocabulary") }
+    }
+
     var askedForNotifications: Bool {
         get { defaults.bool(forKey: "askedForNotifications") }
         set { defaults.set(newValue, forKey: "askedForNotifications") }

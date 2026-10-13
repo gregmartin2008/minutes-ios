@@ -28,6 +28,7 @@ struct SettingsView: View {
                 gmailHelpSection
             }
             speechSection
+            vocabularySection
             voicesSection
             storageSection
             aboutSection
@@ -210,6 +211,26 @@ struct SettingsView: View {
             Text("On this iPhone")
         } footer: {
             Text("Recording, speaker separation, transcription and note writing all run on this iPhone. The only thing that leaves it is the email, sent through your own account.")
+        }
+    }
+
+    // MARK: Vocabulary
+
+    private var vocabularySection: some View {
+        Section {
+            NavigationLink(value: Route.vocabulary) {
+                HStack {
+                    Text("Vocabulary")
+                        .foregroundStyle(Theme.ink)
+                    Spacer()
+                    Text(model.vocabulary.terms.isEmpty ? "None yet" : "\(model.vocabulary.terms.count)")
+                        .foregroundStyle(Theme.muted)
+                }
+            }
+        } header: {
+            Text("Names and terms")
+        } footer: {
+            Text("Company names, people and the terms of your work that come out wrong in transcripts. Minutes corrects them and spells them right in the notes.")
         }
     }
 

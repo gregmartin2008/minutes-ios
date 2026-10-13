@@ -44,6 +44,7 @@ final class AppModel: ObservableObject {
     @Published var mail: MailSettings
     @Published var mailReady: Bool
     @Published var profiles: [VoiceProfile] = []
+    @Published var vocabulary = Vocabulary()
     /// A short message for the home screen: a problem starting, or a confirmation.
     @Published var banner: String?
     /// Meeting to open, set when a recording stops so the detail screen appears.
@@ -91,6 +92,7 @@ final class AppModel: ObservableObject {
         setup.ready = AppSettings.shared.modelsReady && models.transcriptionModelIsDownloaded()
         meetings = store.loadAll()
         profiles = store.loadProfiles()
+        vocabulary = AppSettings.shared.vocabulary
         recoverInterruptedRecordings()
         pruneOldAudio()
         wireRecorder()
@@ -333,6 +335,7 @@ final class AppModel: ObservableObject {
             transcriber: FluidTranscriber(models: models),
             notesModel: { FoundationNotesModel.make() },
             mailer: SMTPMailer(),
+            vocabulary: { AppSettings.shared.vocabulary },
             stageDidFinish: { stage in
                 // Only one large model in memory at a time.
                 switch stage {
@@ -596,6 +599,31 @@ final class AppModel: ObservableObject {
         }
     }
 
+    // MARK: Vocabulary
+
+    /// Adds or updates a term. Applies to meetings processed from now on.
+    func saveTerm(_ term: VocabularyTerm) {
+        var v = vocabulary
+        let cleaned = VocabularyTerm(
+            id: term.id,
+            term: term.term.trimmingCharacters(in: .whitespacesAndNewlines),
+            heardAs: term.heardAs.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty })
+        guard !cleaned.term.isEmpty else { return }
+        if let i = v.terms.firstIndex(where: { $0.id == cleaned.id }) {
+            v.terms[i] = cleaned
+        } else {
+            v.terms.append(cleaned)
+        }
+        v.terms.sort { $0.term.localizedCaseInsensitiveCompare($1.term) == .orderedAscending }
+        vocabulary = v
+        if !isDemo { AppSettings.shared.vocabulary = v }
+    }
+
+    func removeTerm(_ id: UUID) {
+        vocabulary.terms.removeAll { $0.id == id }
+        if !isDemo { AppSettings.shared.vocabulary = vocabulary }
+    }
+
     // MARK: Speech models
 
     func downloadModels() async {
@@ -612,6 +640,13 @@ final class AppModel: ObservableObject {
                     }
                     if self.setup.preparing != preparing { self.setup.preparing = preparing }
                 }
+            }
+            // Run the transcriber once now, so the first meeting isn't the first time the model runs.
+            setup.preparing = true
+            do {
+                try await models.warmUpTranscriber()
+            } catch {
+                Log.shared.warn("transcription warm-up failed: \(error)")
             }
             await models.unloadAll()
             AppSettings.shared.modelsReady = true

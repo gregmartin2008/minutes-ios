@@ -11,13 +11,13 @@ struct SectionNotesSchema {
     var gist: String
     @Guide(description: "Important points made, one sentence each, naming who made them", .maximumCount(6))
     var keyPoints: [String]
-    @Guide(description: "Decisions the group actually made. Empty if none", .maximumCount(4))
+    @Guide(description: "Things the group explicitly agreed to do or settled, stated in the transcript. Not opinions, plans one person mentioned, or things still under discussion. Empty if none", .maximumCount(4))
     var decisions: [String]
-    @Guide(description: "Tasks someone agreed to do, as 'Name: task (deadline)'. Empty if none", .maximumCount(5))
+    @Guide(description: "Tasks a named person agreed to do, as 'Name: task (deadline)'. Empty if none", .maximumCount(5))
     var actionItems: [String]
     @Guide(description: "Questions raised and left unanswered. Empty if none", .maximumCount(4))
     var openQuestions: [String]
-    @Guide(description: "Numbers, prices, percentages, dates and deadlines mentioned, each with what it refers to", .maximumCount(8))
+    @Guide(description: "Numbers, prices, percentages, dates and deadlines, each copied exactly as it appears in the transcript, with what it refers to", .maximumCount(8))
     var figures: [String]
 }
 
@@ -77,8 +77,9 @@ struct FoundationNotesModel: NotesModel {
             model: model,
             instructions: """
                 You take notes on business meetings. You are given part of a transcript; each line is \
-                "Speaker: what they said". Record only what the transcript says. Write speakers' names \
-                exactly as they appear. Leave a list empty when the transcript has nothing for it.
+                "Speaker: what they said". Record only what the transcript says; never add a number, name \
+                or fact that is not in it. Write speakers' names exactly as they appear. Leave a list empty \
+                when the transcript has nothing for it; do not write "no decisions were made".
                 """)
         let prompt = "\(context)\n\nTranscript:\n\(section)"
         let notes = try await run { try await session.respond(to: prompt, generating: SectionNotesSchema.self, options: deterministic).content }
@@ -95,7 +96,7 @@ struct FoundationNotesModel: NotesModel {
         let prompt = """
             These \(kind.title.lowercased()) were collected from different parts of one meeting. Merge items that say \
             the same thing, keep every distinct item, and keep names, numbers and dates exactly as written. \
-            Return at most \(limit) items, most important first.
+            Return at most \(limit) items, most important first, each as plain text without a list marker.
 
             \(list)
             """

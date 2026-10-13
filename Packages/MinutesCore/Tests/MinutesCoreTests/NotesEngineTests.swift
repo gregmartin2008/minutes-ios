@@ -14,6 +14,8 @@ final class FakeNotesModel: NotesModel, @unchecked Sendable {
     var refuseSectionsContaining: String? = nil
     var failConsolidate = false
     var failOverview = false
+    /// Return merged items with list markers, as the on-device model sometimes does.
+    var echoMarkers = false
 
     private let lock = NSLock()
     private(set) var sections: [String] = []
@@ -58,7 +60,8 @@ final class FakeNotesModel: NotesModel, @unchecked Sendable {
         lock.lock()
         consolidations.append((kind, items, limit))
         lock.unlock()
-        return Array(items.prefix(limit))
+        let kept = Array(items.prefix(limit))
+        return echoMarkers ? kept.map { "- " + $0 } : kept
     }
 
     func overview(keyPoints: [String], decisions: [String], gists: [String], titleHint: String?) async throws -> NotesOverview {
@@ -87,7 +90,8 @@ final class NotesEngineTests: XCTestCase {
     func lines(_ n: Int, length: Int = 200) -> [String] {
         (0..<n).map { i in
             let body = String(repeating: "word ", count: length / 5)
-            return "Speaker \(i % 3 + 1): line \(i) \(body)".trimmingCharacters(in: .whitespaces)
+            // The numbers the fake model's figures cite, so the figures survive verification.
+            return "Speaker \(i % 3 + 1): line \(i) at 6.5x with 41% \(body)".trimmingCharacters(in: .whitespaces)
         }
     }
 
@@ -319,5 +323,69 @@ final class NotesEngineTests: XCTestCase {
         XCTAssertEqual(NotesEngine.tidyItem("• Call the bank"), "Call the bank")
         XCTAssertEqual(NotesEngine.tidyItem("No decisions were made."), "")
         XCTAssertEqual(NotesEngine.tidyItem("None of the lenders responded"), "None of the lenders responded")
+    }
+}
+
+final class NotesCleaningTests: XCTestCase {
+
+    func testListMarkersAndFillerSentencesAreStripped() {
+        XCTAssertEqual(NotesEngine.tidyItem("- - The company will cut costs"), "The company will cut costs")
+        XCTAssertEqual(NotesEngine.tidyItem("• Speaker 2: share the deck"), "Speaker 2: share the deck")
+        XCTAssertEqual(NotesEngine.tidyItem("No formal decisions were made regarding AI integration incentives."), "")
+        XCTAssertEqual(NotesEngine.tidyItem("No decisions on backlog timelines were recorded."), "")
+        XCTAssertEqual(NotesEngine.tidyItem("There were no action items."), "")
+        XCTAssertEqual(NotesEngine.tidyItem("None"), "")
+        XCTAssertEqual(NotesEngine.tidyItem("Nobody objected to the plan"), "Nobody objected to the plan")
+        XCTAssertEqual(NotesEngine.tidyItem("No-shows will be charged"), "No-shows will be charged")
+    }
+
+    func testNumbersAreNormalized() {
+        XCTAssertEqual(NotesEngine.numbers("$12,500 per month and 4.80% by Q2 2027."), ["12500", "4.8", "2", "2027"])
+        XCTAssertEqual(NotesEngine.numbers("1.75 million, then 1,750,000"), ["1.75", "1750000"])
+        XCTAssertEqual(NotesEngine.numbers("no numbers here"), [])
+    }
+
+    func testFiguresWithNumbersNobodySaidAreDropped() {
+        let transcript = [
+            "Jeremy: our underwriting was 20 million and 4.9 by the end of next year.",
+            "Mark: we finished September at 175, and the weekly target is 425.",
+            "Jeremy: the LOI is due next week, the 20th.",
+        ]
+        let kept = NotesEngine.verified(figures: [
+            "20 million: revenue target",
+            "4.9 million: EBITDA target",
+            "36 million: price mentioned for Ferguson",      // never said
+            "425: weekly target",
+            "400,005,000: weekly predictability",            // garbled
+            "LOI due next week",                             // no number: kept
+            "20th: LOI due",
+        ], against: transcript)
+        XCTAssertEqual(kept, ["20 million: revenue target", "4.9 million: EBITDA target", "425: weekly target",
+                              "LOI due next week", "20th: LOI due"])
+    }
+
+    func testConsolidatedListsLoseTheirMarkersToo() async throws {
+        let model = FakeNotesModel()
+        model.echoMarkers = true
+        let engine = NotesEngine(options: NotesEngine.Options())
+        let lines = (0..<40).map { "Speaker 1: line \($0) " + String(repeating: "word ", count: 60) }
+        let notes = try await engine.write(lines: lines, titleHint: nil, model: model)
+        for item in notes.keyPoints + notes.decisions + notes.actionItems {
+            XCTAssertFalse(item.hasPrefix("-"), item)
+        }
+    }
+
+    func testSpellingsReachEverySectionAndShrinkTheBudget() async throws {
+        let model = FakeNotesModel()
+        model.context = 1200
+        let engine = NotesEngine(options: NotesEngine.Options())
+        let lines = (0..<12).map { "Speaker 1: line \($0) " + String(repeating: "word ", count: 60) }
+        let notes = try await engine.write(
+            lines: lines, titleHint: nil, model: model, spellings: ["Soterra", "Kestrel"])
+        XCTAssertFalse(notes.keyPoints.isEmpty)
+        XCTAssertGreaterThan(model.contexts.count, 1)
+        for context in model.contexts {
+            XCTAssertTrue(context.contains("Spell these exactly as written: Soterra, Kestrel."), context)
+        }
     }
 }

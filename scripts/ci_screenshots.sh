@@ -72,7 +72,7 @@ shoot() {  # name appearance scenario wait
 }
 
 shoot home light home 15
-for screen in empty recording paused processing waiting failed notes transcript speakers settings; do
+for screen in empty recording paused processing waiting failed notes transcript speakers settings vocabulary; do
   shoot "$screen" light "$screen" 5
 done
 for screen in home recording notes transcript speakers; do

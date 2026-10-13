@@ -12,9 +12,11 @@ Macs. It contains no keys, passwords, or meeting content.
 
 **Status.** The app builds for iPhone and passes its automated tests, including a full run in the
 iPhone simulator from a recording to the email arriving, and its speech pipeline has been measured
-on 190 recorded meetings (see "How accurate it is"). It has not yet been run on a physical iPhone,
-so what depends on the phone itself (the microphone, working while locked, the notes) is built but
-unproven.
+on 190 recorded meetings (see "How accurate it is"). On an iPhone 18 Pro Max it has processed a
+1 hour 52 minute meeting of nine people, six of them speaking (seven voices found), in 12 minutes,
+of which 7½ were a one-time preparation of the speech model that now happens at download, and a
+25-minute two-person call in 55 seconds, with the notes written by Apple Intelligence and both
+emails delivered.
 
 ## What it does
 
@@ -27,7 +29,10 @@ unproven.
   recognized in later meetings.
 - **Transcribes** on the phone, with a time on every passage; tap a time to hear that moment.
 - **Writes notes** with Apple's on-device language model: summary, key points, decisions, action
-  items, open questions, figures and dates.
+  items, open questions, figures and dates. A figure whose numbers were never said is left out.
+- **Learns your vocabulary.** Company names, people and the terms of your work that come out wrong
+  ("EVITA" for EBITDA) are corrected in every transcript and spelled right in the notes. The common
+  finance terms are built in; add your own in Settings > Vocabulary.
 - **Emails** the notes and the transcript, as the body of the message and as two text attachments,
   through your own Gmail account.
 - **Imports** a recording made elsewhere (a voice memo, a call recording) and treats it the same way.
@@ -195,7 +200,9 @@ locked, and not the notes, which need Apple Intelligence and cannot run in a sim
 - **Speaker labels are not perfect**, especially in fast back-and-forth. Check names before
   forwarding a transcript as a record of who said what.
 - **Notes come from a small on-device model.** They are a good first draft. Check figures, names
-  and dates against the transcript.
+  and dates against the transcript, and treat a "decision" as a prompt to confirm, not a record.
+- **Spoken numbers are a weak spot.** "Four hundred, five hundred thousand" can come out as one
+  run-together number. Check any figure that matters against the recording.
 - **iOS can pause the note writing** when the phone is locked. Minutes then emails the transcript
   right away and sends the notes in a second email the next time it is opened.
 - **The seven-day re-signing** described above, unless a paid developer account is used.
