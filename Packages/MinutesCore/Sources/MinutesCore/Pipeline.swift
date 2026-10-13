@@ -44,6 +44,8 @@ public struct PipelineServices: Sendable {
     public var mailer: MailSending
     public var thresholds: SpeakerMatcher.Thresholds
     public var notesOptions: NotesEngine.Options
+    /// Names and terms to correct in transcripts, read when a meeting is assembled.
+    public var vocabulary: @Sendable () -> Vocabulary
     /// Called after each stage so the app can release the models that stage loaded.
     public var stageDidFinish: (@Sendable (Stage) async -> Void)?
 
@@ -52,6 +54,7 @@ public struct PipelineServices: Sendable {
         notesModel: @escaping @Sendable () async -> Result<NotesModel, NotesModelError>,
         mailer: MailSending, thresholds: SpeakerMatcher.Thresholds = SpeakerMatcher.Thresholds(),
         notesOptions: NotesEngine.Options = NotesEngine.Options(),
+        vocabulary: @escaping @Sendable () -> Vocabulary = { Vocabulary() },
         stageDidFinish: (@Sendable (Stage) async -> Void)? = nil
     ) {
         self.separator = separator
@@ -60,6 +63,7 @@ public struct PipelineServices: Sendable {
         self.mailer = mailer
         self.thresholds = thresholds
         self.notesOptions = notesOptions
+        self.vocabulary = vocabulary
         self.stageDidFinish = stageDidFinish
     }
 }
@@ -207,8 +211,10 @@ public final class MeetingPipeline: @unchecked Sendable {
             if m.duration < 1, let last = words.last { m.duration = last.end }
 
         case .assemble:
-            let utterances = TranscriptAssembler.assemble(words: m.words ?? [], turns: m.turns ?? [])
+            var utterances = TranscriptAssembler.assemble(words: m.words ?? [], turns: m.turns ?? [])
             guard !utterances.isEmpty else { throw PipelineError.noSpeech }
+            let corrector = VocabularyCorrector(services.vocabulary())
+            for i in utterances.indices { utterances[i].text = corrector.correct(utterances[i].text) }
             m.utterances = utterances
             applyVoiceMatches(to: &m)
 
@@ -228,6 +234,7 @@ public final class MeetingPipeline: @unchecked Sendable {
                     let engine = NotesEngine(options: services.notesOptions)
                     let notes = try await engine.write(
                         lines: lines, titleHint: m.titleIsAuto ? nil : m.title, model: model,
+                        spellings: services.vocabulary().spellings,
                         resume: m.notesCheckpoint,
                         checkpoint: { checkpoint in
                             saved.set(checkpoint)

@@ -143,11 +143,13 @@ public struct NotesEngine: Sendable {
     /// - Parameters:
     ///   - lines: The transcript as "Name: what they said" lines, in order.
     ///   - titleHint: A title the person typed, if any.
+    ///   - spellings: Names and terms the model should spell exactly as given.
     ///   - resume: Work saved by an earlier, interrupted call for the same transcript.
     ///   - checkpoint: Called after each section with everything done so far, to be saved for `resume`.
     ///   - progress: Called with 0...1 as sections complete.
     public func write(
         lines: [String], titleHint: String?, model: NotesModel,
+        spellings: [String] = [],
         resume: NotesCheckpoint? = nil,
         checkpoint: (@Sendable (NotesCheckpoint) -> Void)? = nil,
         progress: (@Sendable (Double) -> Void)? = nil
@@ -157,15 +159,21 @@ public struct NotesEngine: Sendable {
 
         let fingerprint = Self.fingerprint(cleaned)
         let giveUpAt = Date().addingTimeInterval(options.rateLimitPatience)
+        let spellingNote = Self.spellingNote(spellings)
         var saved: NotesCheckpoint
         if let resume, resume.fingerprint == fingerprint, resume.budgetTokens > 0, resume.charactersPerToken > 0 {
             saved = resume
         } else {
             let context = max(1024, await model.contextSize())
+            let ratio = await calibrate(model: model, sample: cleaned)
+            // The spelling list rides along with every section's request, so it comes out of the budget.
+            let spellingCost = spellingNote.isEmpty ? 0 : Self.estimateTokens(spellingNote, ratio: ratio) + 8
             saved = NotesCheckpoint(
                 fingerprint: fingerprint,
-                budgetTokens: max(options.minimumSectionTokens, context - options.promptOverhead - options.responseReserve),
-                charactersPerToken: await calibrate(model: model, sample: cleaned))
+                budgetTokens: max(
+                    options.minimumSectionTokens,
+                    context - options.promptOverhead - options.responseReserve - spellingCost),
+                charactersPerToken: ratio)
         }
         let ratio = saved.charactersPerToken
         let sectionBudget = saved.budgetTokens
@@ -185,7 +193,7 @@ public struct NotesEngine: Sendable {
             try Task.checkCancellation()
             let results = await extractAdaptive(
                 section: section, index: index, count: sections.count,
-                previousGist: previousGist, model: model, depth: 0, giveUpAt: giveUpAt)
+                previousGist: previousGist, spellingNote: spellingNote, model: model, depth: 0, giveUpAt: giveUpAt)
             var done = NotesCheckpoint.Section(fragments: [], skipped: 0)
             for r in results {
                 switch r {
@@ -224,6 +232,9 @@ public struct NotesEngine: Sendable {
                 budgetTokens: sectionBudget, ratio: ratio, model: model, giveUpAt: giveUpAt)
             progress?(0.8 + 0.15 * Double(i + 1) / Double(NoteKind.allCases.count))
         }
+        // A figure is only worth listing if its numbers were actually said. A small model
+        // sometimes invents or garbles one, and a wrong number in the notes is worse than none.
+        merged[.figures] = Self.verified(figures: merged[.figures] ?? [], against: cleaned)
 
         // Overview: title and summary from the merged notes.
         let gists = fragments.map { $0.gist }.filter { !$0.isEmpty }
@@ -260,11 +271,12 @@ public struct NotesEngine: Sendable {
 
     /// Extracts from one section, halving it and trying again if the model says it does not fit.
     private func extractAdaptive(
-        section: [String], index: Int, count: Int, previousGist: String, model: NotesModel, depth: Int,
-        giveUpAt: Date
+        section: [String], index: Int, count: Int, previousGist: String, spellingNote: String,
+        model: NotesModel, depth: Int, giveUpAt: Date
     ) async -> [Result<NotesFragment, NotesModelError>] {
         var context = count > 1 ? "Part \(index + 1) of \(count) of the meeting." : "The whole meeting."
         if !previousGist.isEmpty { context += " Just before this: \(previousGist)" }
+        if !spellingNote.isEmpty { context += "\n" + spellingNote }
         do {
             let text = section.joined(separator: "\n")
             let where_ = context
@@ -278,12 +290,12 @@ public struct NotesEngine: Sendable {
                 if halves.count == 2 {
                     let a = await extractAdaptive(
                         section: halves[0], index: index, count: count, previousGist: previousGist,
-                        model: model, depth: depth + 1, giveUpAt: giveUpAt)
+                        spellingNote: spellingNote, model: model, depth: depth + 1, giveUpAt: giveUpAt)
                     var gist = previousGist
                     if case .success(let f)? = a.last, !f.gist.isEmpty { gist = f.gist }
                     let b = await extractAdaptive(
                         section: halves[1], index: index, count: count, previousGist: gist,
-                        model: model, depth: depth + 1, giveUpAt: giveUpAt)
+                        spellingNote: spellingNote, model: model, depth: depth + 1, giveUpAt: giveUpAt)
                     return a + b
                 }
             }
@@ -353,7 +365,7 @@ public struct NotesEngine: Sendable {
                     let out = try await withBackoff(until: giveUpAt) {
                         try await model.consolidate(kind: kind, items: batch, limit: limit)
                     }
-                    let cleaned = Self.dedupe(out)
+                    let cleaned = Self.tidy(out)
                     return cleaned.isEmpty ? Array(current.prefix(limit)) : Array(cleaned.prefix(limit))
                 } catch let e as NotesModelError where e == .rateLimited {
                     throw e
@@ -372,7 +384,8 @@ public struct NotesEngine: Sendable {
                     let out = try await withBackoff(until: giveUpAt) {
                         try await model.consolidate(kind: kind, items: half, limit: max(3, limit * 2 / 3))
                     }
-                    next += out.isEmpty ? half : out
+                    let cleaned = Self.tidy(out)
+                    next += cleaned.isEmpty ? half : cleaned
                 } catch let e as NotesModelError where e == .rateLimited {
                     throw e
                 } catch {
@@ -477,8 +490,10 @@ public struct NotesEngine: Sendable {
 
     // MARK: Cleaning
 
+    /// Strips list markers and filler from every item, then removes duplicates.
+    static func tidy(_ items: [String]) -> [String] { dedupe(items.map(tidyItem).filter { !$0.isEmpty }) }
+
     static func clean(_ f: NotesFragment) -> NotesFragment {
-        func tidy(_ items: [String]) -> [String] { dedupe(items.map(tidyItem).filter { !$0.isEmpty }) }
         return NotesFragment(
             gist: f.gist.trimmingCharacters(in: .whitespacesAndNewlines),
             keyPoints: tidy(f.keyPoints), decisions: tidy(f.decisions), actionItems: tidy(f.actionItems),
@@ -498,7 +513,58 @@ public struct NotesEngine: Sendable {
             "none stated", "not applicable", "no open questions", "nothing", "no figures", "none identified",
             "no figures mentioned", "no decisions made", "none discussed", "no action items mentioned",
         ]
-        return fillers.contains(lowered) ? "" : s
+        if fillers.contains(lowered) { return "" }
+        // "No formal decisions were made regarding pricing" is the same filler with a subject attached.
+        let fillerStarts = [
+            "no decision", "no formal decision", "no final decision", "no specific decision", "no action item",
+            "no specific action", "no open question", "no figure", "no number", "no date", "none were",
+            "nothing was decided", "no clear decision", "no explicit decision", "there were no ", "there was no ",
+        ]
+        if fillerStarts.contains(where: { lowered.hasPrefix($0) }) { return "" }
+        return s
+    }
+
+    /// One line telling the model how to spell the person's names and terms, or empty.
+    static func spellingNote(_ spellings: [String]) -> String {
+        let terms = spellings.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
+        guard !terms.isEmpty else { return "" }
+        return "Spell these exactly as written: " + terms.prefix(40).joined(separator: ", ") + "."
+    }
+
+    /// Keeps only the figures whose numbers all appear in the transcript.
+    static func verified(figures: [String], against lines: [String]) -> [String] {
+        let said = Set(lines.flatMap(numbers))
+        return figures.filter { item in
+            let found = numbers(item)
+            return found.isEmpty || found.allSatisfy { said.contains($0) }
+        }
+    }
+
+    /// Numbers in a text, normalized: "$12,500" is "12500", "4.8%" is "4.8", "1,750,000" is "1750000".
+    static func numbers(_ text: String) -> [String] {
+        var out: [String] = []
+        var current = ""
+        func flush() {
+            var n = current.replacingOccurrences(of: ",", with: "")
+            while n.hasSuffix(".") { n.removeLast() }
+            if n.hasPrefix(".") { n = "0" + n }
+            if let v = Double(n) {
+                // "4.80" and "4.8" are the same number; "1,750" and "1750" too.
+                out.append(v == v.rounded() && abs(v) < 1e15 ? String(Int64(v)) : String(v))
+            }
+            current = ""
+        }
+        for ch in text {
+            if ch.isNumber && ch.isASCII {
+                current.append(ch)
+            } else if (ch == "," || ch == ".") && !current.isEmpty {
+                current.append(ch)
+            } else if !current.isEmpty {
+                flush()
+            }
+        }
+        if !current.isEmpty { flush() }
+        return out
     }
 
     static func tidyTitle(_ raw: String) -> String {

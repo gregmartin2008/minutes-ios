@@ -25,6 +25,7 @@ struct MinutesApp: App {
 enum Route: Hashable {
     case meeting(String)
     case settings
+    case vocabulary
 }
 
 struct RootView: View {
@@ -38,6 +39,7 @@ struct RootView: View {
                     switch route {
                     case .meeting(let id): MeetingDetailView(id: id)
                     case .settings: SettingsView()
+                    case .vocabulary: VocabularyView()
                     }
                 }
         }

@@ -87,11 +87,33 @@ public actor SpeechModels {
         let models = try await AsrModels.downloadAndLoad(
             configuration: configuration, version: .ultra,
             progressHandler: { p in progress?(p.fractionCompleted, Self.isCompiling(p.phase)) })
+        let loaded = Date()
         let manager = AsrManager(config: .default)
         try await manager.loadModels(models)
         asr = manager
-        log.info(String(format: "transcription model ready in %.1fs", Date().timeIntervalSince(started)))
+        log.info(String(
+            format: "transcription model ready in %.1fs (files %.1fs, load %.1fs)",
+            Date().timeIntervalSince(started), loaded.timeIntervalSince(started), Date().timeIntervalSince(loaded)))
         return manager
+    }
+
+    /// Runs the transcriber once on a few seconds of silence. The first run of a Core ML model on
+    /// a device can take minutes while the system specializes it for the Neural Engine; doing it
+    /// here, right after the download, keeps that out of the first real meeting.
+    public func warmUpTranscriber() async throws {
+        let manager = try await transcriber()
+        let started = Date()
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("warmup-\(UUID().uuidString).wav")
+        try WAVWriter.silence(seconds: 4).write(to: url)
+        defer { try? FileManager.default.removeItem(at: url) }
+        var state = TdtDecoderState.make(decoderLayers: await manager.decoderLayerCount)
+        do {
+            _ = try await manager.transcribe(url, decoderState: &state)
+        } catch let error as ASRError {
+            // Silence may be rejected as having nothing to transcribe; the model still ran.
+            if case .invalidAudioData = error {} else { throw error }
+        }
+        log.info(String(format: "transcription model warmed up in %.1fs", Date().timeIntervalSince(started)))
     }
 
     func separationModels(progress: (@Sendable (Double, Bool) -> Void)? = nil) async throws -> OfflineDiarizerModels {
