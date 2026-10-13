@@ -19,7 +19,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from score_meeting import edit_distance, norm_words
 
 DEVICE = "iPhone 17 Pro Max"
-BUNDLE = "app.minutes.recorder"
+BUNDLE = os.environ.get("MINUTES_BUNDLE_ID") or "app.minutes.recorder"
 APP = "build/sim/Build/Products/Debug-iphonesimulator/Minutes.app"
 received = []
 

@@ -11,6 +11,8 @@ concurrency:
   cancel-in-progress: true
 env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  # Repository variable, optional: the bundle identifier to build the app with (see scripts/ci_xcodebuild.sh).
+  MINUTES_BUNDLE_ID: ${{ vars.MINUTES_BUNDLE_ID }}
 jobs:
   core:
     name: Core logic and mail

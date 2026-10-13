@@ -4,6 +4,10 @@
 set -uo pipefail
 kind="$1"
 mkdir -p out build
+# The bundle identifier the app is built with. A re-signing tool that changes it breaks the
+# continued-processing task (its identifier must begin with the installed bundle id), so the
+# owner can set MINUTES_BUNDLE_ID to the id their tool uses and install with that id instead.
+bundle_id="${MINUTES_BUNDLE_ID:-app.minutes.recorder}"
 if [ "$kind" = sim ]; then
   destination='platform=iOS Simulator,name=iPhone 17 Pro Max'
   configuration=Debug
@@ -18,7 +22,7 @@ fi
 xcodebuild -project Minutes.xcodeproj -scheme Minutes -configuration "$configuration" \
   -destination "$destination" -derivedDataPath "build/$kind" -clonedSourcePackagesDirPath build/spm \
   -skipPackagePluginValidation -skipMacroValidation \
-  "${signing[@]}" \
+  "${signing[@]}" PRODUCT_BUNDLE_IDENTIFIER="$bundle_id" \
   build > "build/$kind.log" 2>&1
 status=$?
 grep -E "error:|warning: unre|BUILD (SUCCEEDED|FAILED)" "build/$kind.log" | sort -u | head -200 > "out/$kind-build.log"
