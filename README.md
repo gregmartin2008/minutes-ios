@@ -164,8 +164,9 @@ their later appearances were named correctly, under 1% were given a wrong name, 
 left as "Speaker N" for the user to name.
 
 **A clean recording.** A scripted six-voice test meeting with brief talk-overs, built from
-synthetic voices, is transcribed with 4.6% word error. This runs with every build, through the app
-itself in the iPhone simulator, as a check that nothing has broken.
+synthetic voices, is transcribed with 4.6% word error, and five of the six voices are told apart.
+This runs with every build, through the app itself in the iPhone simulator, as a check that
+nothing has broken.
 
 **An alternative that was tried.** A different kind of speaker-separation model (LS-EEND, which
 tracks up to ten voices directly) scored 73.8% tcpWER on the same 129 meetings, against 48.9% for
