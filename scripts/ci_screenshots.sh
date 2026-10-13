@@ -5,7 +5,8 @@
 set -uo pipefail
 app="build/sim/Build/Products/Debug-iphonesimulator/Minutes.app"
 device="iPhone 17 Pro Max"
-bundle="${MINUTES_BUNDLE_ID:-app.minutes.recorder}"
+bundle="${MINUTES_BUNDLE_ID:-$(tr -d "[:space:]" < App/bundle-id.txt)}"
+bundle="${bundle:-app.minutes.recorder}"
 mkdir -p out/shots
 log=out/shots.log
 : > "$log"

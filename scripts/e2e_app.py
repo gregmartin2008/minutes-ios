@@ -19,7 +19,16 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from score_meeting import edit_distance, norm_words
 
 DEVICE = "iPhone 17 Pro Max"
-BUNDLE = os.environ.get("MINUTES_BUNDLE_ID") or "app.minutes.recorder"
+def _bundle_id():
+    if os.environ.get("MINUTES_BUNDLE_ID"):
+        return os.environ["MINUTES_BUNDLE_ID"]
+    try:
+        with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "App", "bundle-id.txt")) as f:
+            return f.read().strip() or "app.minutes.recorder"
+    except OSError:
+        return "app.minutes.recorder"
+
+BUNDLE = _bundle_id()
 APP = "build/sim/Build/Products/Debug-iphonesimulator/Minutes.app"
 received = []
 
