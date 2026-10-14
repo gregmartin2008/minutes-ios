@@ -295,11 +295,11 @@ public struct NotesEngine: Sendable {
     /// Extracts from one section, halving it and trying again if the model says it does not fit.
     private func extractAdaptive(
         section: [String], index: Int, count: Int, previousGist: String, spellingNote: String,
-        model: NotesModel, depth: Int, giveUpAt: Date
+        model: NotesModel, depth: Int, giveUpAt: Date, context given: String? = nil
     ) async -> [Result<NotesFragment, NotesModelError>] {
-        var context = count > 1 ? "Part \(index + 1) of \(count) of the meeting." : "The whole meeting."
-        if !previousGist.isEmpty { context += " Just before this: \(previousGist)" }
-        if !spellingNote.isEmpty { context += "\n" + spellingNote }
+        var context = given ?? (count > 1 ? "Part \(index + 1) of \(count) of the meeting." : "The whole meeting.")
+        if given == nil, !previousGist.isEmpty { context += " Just before this: \(previousGist)" }
+        if given == nil, !spellingNote.isEmpty { context += "\n" + spellingNote }
         do {
             let text = section.joined(separator: "\n")
             let where_ = context
@@ -308,17 +308,25 @@ public struct NotesEngine: Sendable {
             }
             return [.success(Self.clean(fragment))]
         } catch let e as NotesModelError {
-            if e == .contextExceeded, depth < 4 {
+            // Too big: halve. Refused: halve too, since the model's filter usually objects to one
+            // passage, and the rest of the section can still be extracted around it.
+            let halveable: Bool
+            switch e {
+            case .contextExceeded: halveable = depth < 4
+            case .refused: halveable = depth < 3 && section.count >= 2
+            default: halveable = false
+            }
+            if halveable {
                 let halves = Self.halve(section)
                 if halves.count == 2 {
                     let a = await extractAdaptive(
                         section: halves[0], index: index, count: count, previousGist: previousGist,
-                        spellingNote: spellingNote, model: model, depth: depth + 1, giveUpAt: giveUpAt)
+                        spellingNote: spellingNote, model: model, depth: depth + 1, giveUpAt: giveUpAt, context: given)
                     var gist = previousGist
                     if case .success(let f)? = a.last, !f.gist.isEmpty { gist = f.gist }
                     let b = await extractAdaptive(
                         section: halves[1], index: index, count: count, previousGist: gist,
-                        spellingNote: spellingNote, model: model, depth: depth + 1, giveUpAt: giveUpAt)
+                        spellingNote: spellingNote, model: model, depth: depth + 1, giveUpAt: giveUpAt, context: given)
                     return a + b
                 }
             }
@@ -333,12 +341,38 @@ public struct NotesEngine: Sendable {
     /// One extraction, with the engine's throttling patience and cleaning, for sections handled
     /// outside `write` (the live note-taker). The figures are checked against the section itself.
     func extractOnce(section: [String], context: String, model: NotesModel) async throws -> NotesFragment {
-        let text = section.joined(separator: "\n")
         let giveUpAt = Date().addingTimeInterval(options.rateLimitPatience)
-        let raw = try await withBackoff(until: giveUpAt) { try await model.extract(section: text, context: context) }
-        var f = Self.clean(raw)
-        f.figures = Self.verified(figures: f.figures, against: section)
-        return f
+        let results = await extractAdaptive(
+            section: section, index: 0, count: 1, previousGist: "", spellingNote: "",
+            model: model, depth: 0, giveUpAt: giveUpAt, context: context)
+        var fragments: [NotesFragment] = []
+        var firstError: NotesModelError?
+        for r in results {
+            switch r {
+            case .success(let f): fragments.append(f)
+            case .failure(let e):
+                if e == .rateLimited { throw e }
+                if case .unavailable = e { throw e }
+                if case .other(let why) = e, why == Self.cancelledMarker { throw CancellationError() }
+                if firstError == nil { firstError = e }
+            }
+        }
+        guard !fragments.isEmpty else { throw firstError ?? NotesModelError.other("The language model returned nothing.") }
+        var merged = Self.merge(fragments)
+        merged.figures = Self.verified(figures: merged.figures, against: section)
+        return merged
+    }
+
+    /// One fragment from several (the halves of a section): lists joined, gists joined.
+    static func merge(_ fragments: [NotesFragment]) -> NotesFragment {
+        guard fragments.count > 1 else { return fragments.first ?? NotesFragment() }
+        return NotesFragment(
+            gist: fragments.map { $0.gist }.filter { !$0.isEmpty }.joined(separator: " "),
+            keyPoints: dedupe(fragments.flatMap { $0.keyPoints }),
+            decisions: dedupe(fragments.flatMap { $0.decisions }),
+            actionItems: dedupe(fragments.flatMap { $0.actionItems }),
+            openQuestions: dedupe(fragments.flatMap { $0.openQuestions }),
+            figures: dedupe(fragments.flatMap { $0.figures }))
     }
 
     static let cancelledMarker = "Cancelled."

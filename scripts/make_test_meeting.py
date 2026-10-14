@@ -34,6 +34,7 @@ SCRIPT = [
     ("A", 0.5, "Then we should offer an employment agreement and see how he responds."),
     ("F", 0.4, "That works for the bank. They prefer continuity in management for the first year at least."),
     ("B", 0.5, "Last thing from me. The quality of earnings report arrives next Wednesday."),
+    ("D", 0.4, "And Soterra should confirm with Kestrel that the lowboy order book stays open through the signing."),
     ("A", 0.4, "Great. We will meet again after that report comes in. Thank you all."),
 ]
 

@@ -99,6 +99,7 @@ final class AppModel: ObservableObject {
         meetings = store.loadAll()
         profiles = store.loadProfiles()
         vocabulary = AppSettings.shared.vocabulary
+        warmModels()
         recoverInterruptedRecordings()
         pruneOldAudio()
         wireRecorder()
@@ -164,6 +165,7 @@ final class AppModel: ObservableObject {
         resumeWaiting(onlyEmail: false)
         finishPendingNotes()
         kick()
+        warmModels()
     }
 
     /// Notes that iOS wouldn't let the app write earlier are tried again now that it is open.
@@ -316,6 +318,37 @@ final class AppModel: ObservableObject {
         }
     }
 
+    /// The names and terms the recognizer listens for: the vocabulary, with the spellings it has
+    /// been heard as, and the names of the people whose voices Minutes knows.
+    func boostTerms() -> [BoostTerm] {
+        var out: [BoostTerm] = []
+        var seen = Set<String>()
+        func add(_ text: String, aliases: [String] = []) {
+            let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard t.count >= 3, seen.insert(t.lowercased()).inserted else { return }
+            out.append(BoostTerm(text: t, aliases: aliases.filter { !$0.isEmpty }))
+        }
+        for term in AppSettings.shared.vocabulary.terms { add(term.term, aliases: term.heardAs) }
+        for profile in profiles {
+            add(profile.name)
+            // Surnames on their own, since people are usually referred to by one name.
+            let parts = profile.name.split(separator: " ").map(String.init)
+            if parts.count >= 2 { for part in parts where part.count >= 4 { add(part) } }
+        }
+        return out
+    }
+
+    /// Loads the speech models ahead of a recording, so the first minutes of a meeting are not
+    /// spent loading. Loading the transcription model has taken five to eight minutes on this
+    /// phone whenever iOS had dropped its compiled copy, and seconds otherwise.
+    func warmModels() {
+        guard setup.ready, !isDemo, live == nil, runningID == nil else { return }
+        let models = self.models
+        Task.detached(priority: .utility) {
+            do { try await models.preloadAll() } catch { Log.shared.warn("model warm-up failed: \(error)") }
+        }
+    }
+
     /// Starts transcribing and analyzing the meeting as it is recorded.
     private func startLiveWork(for id: String) {
         guard setup.ready, !isDemo else { return }
@@ -324,7 +357,8 @@ final class AppModel: ObservableObject {
         case .success(let model): notesModel = model
         case .failure: notesModel = nil
         }
-        let live = LiveMeeting(meetingID: id, models: models, vocabulary: AppSettings.shared.vocabulary, notesModel: notesModel)
+        let live = LiveMeeting(
+            meetingID: id, models: models, vocabulary: AppSettings.shared.vocabulary, boost: boostTerms(), notesModel: notesModel)
         self.live = live
         recorder.onSamples = { samples in live.add(samples) }
         live.start()
@@ -424,7 +458,7 @@ final class AppModel: ObservableObject {
         let models = self.models
         return PipelineServices(
             separator: FluidSeparator(models: models),
-            transcriber: FluidTranscriber(models: models),
+            transcriber: FluidTranscriber(models: models, boost: boostTerms()),
             notesModel: { FoundationNotesModel.make() },
             mailer: SMTPMailer(),
             vocabulary: { AppSettings.shared.vocabulary },
@@ -438,14 +472,7 @@ final class AppModel: ObservableObject {
                     }
                 }
             },
-            stageDidFinish: { stage in
-                // Only one large model in memory at a time.
-                switch stage {
-                case .separateSpeakers: await models.unload(.separation)
-                case .transcribe: await models.unload(.transcription)
-                default: break
-                }
-            })
+            stageDidFinish: { _ in })
     }
 
     /// Starts working through meetings that are ready to process, one at a time.
@@ -496,7 +523,7 @@ final class AppModel: ObservableObject {
             UIApplication.shared.isIdleTimerDisabled = false
         }
         if recording == nil { recorder.release() }
-        if !isDemo, live == nil { await models.unloadAll() }
+        // The models stay loaded for the next meeting; a memory warning releases them.
     }
 
     /// Applies a progress report from the pipeline, ignoring any that arrive after the run has ended.
@@ -776,6 +803,7 @@ final class AppModel: ObservableObject {
                     switch kind {
                     case .transcription: self.setup.transcription = max(self.setup.transcription, fraction)
                     case .separation: self.setup.separation = max(self.setup.separation, fraction)
+                    case .vocabulary: break
                     }
                     if self.setup.preparing != preparing { self.setup.preparing = preparing }
                 }
@@ -787,7 +815,6 @@ final class AppModel: ObservableObject {
             } catch {
                 Log.shared.warn("transcription warm-up failed: \(error)")
             }
-            await models.unloadAll()
             AppSettings.shared.modelsReady = true
             setup.ready = true
             Log.shared.info("speech models downloaded")

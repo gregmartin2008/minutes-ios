@@ -468,3 +468,29 @@ final class LiveNoteTakerTests: XCTestCase {
         XCTAssertTrue(later)
     }
 }
+
+final class RefusalTests: XCTestCase {
+
+    func testARefusedSectionIsHalvedAndTheRestIsKept() async throws {
+        let model = FakeNotesModel()
+        model.refuseSectionsContaining = "line 7 "
+        let engine = NotesEngine(options: NotesEngine.Options())
+        let lines = (0..<12).map { "Speaker 1: line \($0) " + String(repeating: "word ", count: 30) }
+        let notes = try await engine.write(lines: lines, titleHint: nil, model: model)
+        // The halves without line 7 were extracted; only the smallest piece holding it was lost.
+        XCTAssertGreaterThanOrEqual(notes.totalSections - notes.skippedSections, 2)
+        XCTAssertEqual(notes.skippedSections, 1)
+        XCTAssertTrue(model.sections.contains { $0.contains("line 0 ") })
+        XCTAssertTrue(model.sections.contains { $0.contains("line 11 ") })
+    }
+
+    func testLiveExtractionSurvivesARefusedPassage() async throws {
+        let model = FakeNotesModel()
+        model.refuseSectionsContaining = "line 3 "
+        let engine = NotesEngine(options: NotesEngine.Options())
+        let lines = (0..<8).map { "Speaker 1: line \($0) " + String(repeating: "word ", count: 30) }
+        let fragment = try await engine.extractOnce(section: lines, context: "test", model: model)
+        XCTAssertFalse(fragment.keyPoints.isEmpty)
+        XCTAssertTrue(model.sections.contains { $0.contains("line 7 ") })
+    }
+}

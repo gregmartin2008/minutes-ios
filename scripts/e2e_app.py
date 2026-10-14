@@ -157,6 +157,8 @@ def main():
             check("emailed transcript matches what was said", wer <= 0.15, f"word error {wer * 100:.1f}% over {len(ref_words)} words")
             names = {m.group(1) for m in (re.match(r"^(Speaker \d+) \[", l.strip()) for l in transcript.splitlines()) if m}
             check("transcript names each voice", len(names) >= 4, sorted(names))
+            heard = [t for t in ("Soterra", "Kestrel") if t in transcript]
+            check("the vocabulary terms were written as given", len(heard) == 2, heard)
 
     if live:
         check("after the recording ended, the email was sent within a minute", 0 < status.get("secondsAfterEnd", 0) <= 60,

@@ -4,33 +4,52 @@ import Foundation
 import MinutesCore
 
 /// Speech-to-text with word timings, using the Parakeet model on the Neural Engine.
+///
+/// The recording is transcribed in pieces of about a minute, cut at quiet moments, the same way
+/// a meeting is transcribed while it is being recorded, with the person's names and terms
+/// listened for in each piece.
 public struct FluidTranscriber: Transcribing {
     let models: SpeechModels
+    let boost: [BoostTerm]
 
-    public init(models: SpeechModels) {
+    public init(models: SpeechModels, boost: [BoostTerm] = []) {
         self.models = models
+        self.boost = boost
     }
 
     public func transcribe(audio: URL, progress: @escaping @Sendable (Double) -> Void) async throws -> [Word] {
         let asr = try await models.transcriber()
+        let booster = await models.booster(for: boost)
+        let pieces = PieceTranscriber(asr: asr, booster: booster, log: .shared)
+        let options = LiveAnalyzer.Options()
+        let rate = 16_000
+        let (source, _) = try AudioSourceFactory().makeDiskBackedSource(from: audio, targetSampleRate: rate)
+        defer { source.cleanup() }
+        let total = source.sampleCount
+        guard total >= ASRConstants.minimumRequiredSamples(forSampleRate: rate) else { throw PipelineError.noSpeech }
 
-        // Long recordings report progress through a stream; forward it while the work runs.
-        let stream = await asr.transcriptionProgressStream
-        let watcher = Task {
-            do { for try await fraction in stream { progress(fraction) } } catch {}
+        let target = Int(options.transcribeTargetSeconds * Double(rate))
+        let search = Int(options.transcribeCutSearchSeconds * Double(rate))
+        let window = max(1, Int(options.transcribeCutWindowSeconds * Double(rate)))
+        var words: [Word] = []
+        var position = 0
+        while position < total {
+            try Task.checkCancellation()
+            let remaining = total - position
+            var count = min(remaining, target)
+            var buffer = [Float](repeating: 0, count: count)
+            try buffer.withUnsafeMutableBufferPointer { try source.copySamples(into: $0.baseAddress!, offset: position, count: count) }
+            if remaining > target {
+                let cut = LiveAnalyzer.quietestCut(in: buffer, from: max(0, target - search), to: target, window: window)
+                buffer.removeSubrange(cut...)
+                count = cut
+            }
+            words += try await pieces.transcribe(buffer, offset: Double(position) / Double(rate))
+            position += count
+            progress(Double(position) / Double(total))
         }
-        defer { watcher.cancel() }
-
-        var state = TdtDecoderState.make(decoderLayers: await asr.decoderLayerCount)
-        let result: ASRResult
-        do {
-            result = try await asr.transcribe(audio, decoderState: &state)
-        } catch let error as ASRError {
-            if case .invalidAudioData = error { throw PipelineError.noSpeech }
-            throw error
-        }
-        progress(1)
-        return Self.words(from: result)
+        guard !words.isEmpty else { throw PipelineError.noSpeech }
+        return words
     }
 
     /// Groups the model's sub-word tokens into words, keeping each word's start and end time.
