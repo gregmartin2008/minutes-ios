@@ -168,6 +168,9 @@ enum DemoData {
         func separate(audio: URL, expectedSpeakers: Int?, exactly: Bool, progress: @escaping @Sendable (Double) -> Void) async throws -> SeparationResult {
             SeparationResult(turns: [], voices: [:])
         }
+        func separate(analysis: SeparationAnalysis, audio: URL, expectedSpeakers: Int?, exactly: Bool) async throws -> SeparationResult {
+            SeparationResult(turns: [], voices: [:])
+        }
     }
 
     struct Transcriber: Transcribing {

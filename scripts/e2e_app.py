@@ -60,7 +60,11 @@ def simctl(*args, timeout=240, check=False):
 
 def main():
     wav, ref_path, out = sys.argv[1], sys.argv[2], sys.argv[3]
-    os.makedirs(os.path.join(out, "e2e"), exist_ok=True)
+    # "live": feed the recording through the app as if it were being recorded, with the work
+    # done as the audio arrives; otherwise the recording is imported and processed afterward.
+    live = len(sys.argv) > 4 and sys.argv[4] == "live"
+    results = "e2e-live" if live else "e2e"
+    os.makedirs(os.path.join(out, results), exist_ok=True)
     os.makedirs(os.path.join(out, "shots"), exist_ok=True)
     started = time.time()
     stamp = lambda: f"[{time.time() - started:5.0f}s]"
@@ -86,7 +90,8 @@ def main():
     shutil.copy(wav, os.path.join(documents, "e2e.wav"))
     simctl("ui", DEVICE, "appearance", "light")
     simctl("terminate", DEVICE, BUNDLE)
-    print(stamp(), "launching:", simctl("launch", DEVICE, BUNDLE, "-e2e", "e2e.wav", "-e2e-mail", f"127.0.0.1:{port}", check=True), flush=True)
+    args = ["-e2e", "e2e.wav", "-e2e-mail", f"127.0.0.1:{port}"] + (["-e2e-live"] if live else [])
+    print(stamp(), "launching:", simctl("launch", DEVICE, BUNDLE, *args, check=True), flush=True)
 
     status, last = {}, None
     deadline = time.time() + 25 * 60
@@ -104,15 +109,15 @@ def main():
         if status.get("finished"):
             break
     time.sleep(3)   # let the screen settle on the finished meeting
-    simctl("io", DEVICE, "screenshot", os.path.join(out, "shots", "e2e.png"), timeout=60)
-    subprocess.run(["sips", "-Z", "1434", os.path.join(out, "shots", "e2e.png")], capture_output=True)
+    simctl("io", DEVICE, "screenshot", os.path.join(out, "shots", results + ".png"), timeout=60)
+    subprocess.run(["sips", "-Z", "1434", os.path.join(out, "shots", results + ".png")], capture_output=True)
     controller.stop()
 
     for name in ("e2e-status.json", "e2e-transcript.txt", "e2e-diagnostics.txt"):
         if os.path.exists(os.path.join(documents, name)):
-            shutil.copy(os.path.join(documents, name), os.path.join(out, "e2e", name))
+            shutil.copy(os.path.join(documents, name), os.path.join(out, results, name))
     for i, (_, _, raw) in enumerate(received):
-        open(os.path.join(out, "e2e", f"received-{i + 1}.eml"), "wb").write(raw)
+        open(os.path.join(out, results, f"received-{i + 1}.eml"), "wb").write(raw)
 
     checks = []
     def check(name, ok, detail=""):
@@ -153,9 +158,14 @@ def main():
             names = {m.group(1) for m in (re.match(r"^(Speaker \d+) \[", l.strip()) for l in transcript.splitlines()) if m}
             check("transcript names each voice", len(names) >= 4, sorted(names))
 
+    if live:
+        check("after the recording ended, the email was sent within a minute", 0 < status.get("secondsAfterEnd", 0) <= 60,
+              f"{status.get('secondsAfterEnd', 0):.1f}s from end to done")
+
     timings = status.get("timings") or {}
     print("\napp timings:", ", ".join(f"{k} {v:.1f}s" for k, v in sorted(timings.items())),
-          f"| audio {status.get('audioSeconds', 0):.0f}s | whole run {status.get('seconds', 0):.0f}s")
+          f"| audio {status.get('audioSeconds', 0):.0f}s | whole run {status.get('seconds', 0):.0f}s"
+          + (f" | after end {status.get('secondsAfterEnd', 0):.1f}s" if live else ""))
     if status.get("notesError"):
         print("notes:", status["notesError"])
     passed = sum(1 for c in checks if c)

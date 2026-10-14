@@ -31,6 +31,8 @@ enum EndToEnd {
         var notesError: String?
         var timings: [String: Double] = [:]
         var seconds = 0.0
+        /// Live path: seconds from the end of the simulated recording to the meeting being done.
+        var secondsAfterEnd = 0.0
     }
 
     static var audioName: String? { value(after: "-e2e") }
@@ -85,9 +87,13 @@ enum EndToEnd {
             return
         }
 
-        status.phase = "importing"
+        let liveMode = ProcessInfo.processInfo.arguments.contains("-e2e-live")
+        status.phase = liveMode ? "recording (simulated)" : "importing"
         write(status)
-        if let problem = await model.importAudio(from: documents.appendingPathComponent(name), title: "") {
+        let problem = liveMode
+            ? await model.simulateLiveMeeting(from: documents.appendingPathComponent(name), title: "")
+            : await model.importAudio(from: documents.appendingPathComponent(name), title: "")
+        if let problem {
             status.error = problem
             status.finished = true
             write(status)
@@ -101,6 +107,7 @@ enum EndToEnd {
         }
 
         status.phase = "processing"
+        let ended = Date()
         while true {
             guard let m = model.meeting(id) else {
                 status.error = "meeting disappeared"
@@ -123,6 +130,7 @@ enum EndToEnd {
             if m.status == .done || m.status == .failed || m.status == .waiting {
                 status.ok = m.status == .done
                 status.error = m.error ?? m.waitingReason
+                status.secondsAfterEnd = Date().timeIntervalSince(ended) + model.debugLiveFinishSeconds
                 break
             }
             write(status)

@@ -37,6 +37,9 @@ final class Recorder: NSObject {
     var onTick: ((Double, Float) -> Void)?
     /// Called on the main queue whenever the state changes.
     var onStateChange: ((State) -> Void)?
+    /// Called on the recorder's own queue, in order, with each block of 16 kHz mono samples as it
+    /// is written. For work that keeps up with the recording.
+    var onSamples: (([Float]) -> Void)?
 
     private(set) var state: State = .idle
     private(set) var gaps: [RecordingGap] = []
@@ -68,6 +71,12 @@ final class Recorder: NSObject {
     func start(writingTo url: URL) throws {
         guard state == .idle else { return }
         guard AVAudioApplication.shared.recordPermission != .denied else { throw RecorderError.microphoneDenied }
+        if holding {
+            // The previous meeting is still being processed; take the engine back for the new one.
+            holding = false
+            removeTap()
+            engine.stop()
+        }
         try configureSession()
         writer = try WAVWriter(url: url, sampleRate: 16_000, channels: 1, appendIfExists: true)
         gaps = []
@@ -97,24 +106,51 @@ final class Recorder: NSObject {
     }
 
     /// Ends the recording and returns how many seconds of audio were written.
+    ///
+    /// With `holdingSession`, the microphone stays open (nothing more is written) until `release`
+    /// is called. iOS treats the app as still recording, and so lets it keep working at full speed
+    /// with the phone locked: the only way it allows that. The caller releases it as soon as the
+    /// meeting has been processed.
     @discardableResult
-    func stop() -> Double {
+    func stop(holdingSession: Bool = false) -> Double {
         guard state != .idle else { return 0 }
         closeGapIfOpen()
-        removeTap()
-        engine.stop()
-        unobserve()
         var total = 0.0
         fileQueue.sync {
             total = writer?.seconds ?? 0
             try? writer?.finish()
             writer = nil
         }
+        if holdingSession && engine.isRunning {
+            holding = true
+            unobserve()
+            setState(.idle)
+            Log.shared.info(String(format: "recording stopped at %.1fs with %d gaps; microphone held for processing", total, gaps.count))
+            return total
+        }
+        removeTap()
+        engine.stop()
+        unobserve()
         converter = nil
         setState(.idle)
         try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
         Log.shared.info(String(format: "recording stopped at %.1fs with %d gaps", total, gaps.count))
         return total
+    }
+
+    /// True between a `stop(holdingSession: true)` and `release()`.
+    private(set) var holding = false
+
+    /// Lets go of the microphone held by `stop(holdingSession: true)`.
+    func release() {
+        guard holding else { return }
+        holding = false
+        guard state == .idle else { return }   // a new recording has taken the engine over
+        removeTap()
+        engine.stop()
+        converter = nil
+        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        Log.shared.info("microphone released")
     }
 
     // MARK: Audio session and engine
@@ -190,6 +226,7 @@ final class Recorder: NSObject {
 
         fileQueue.async { [weak self] in
             guard let self, let writer = self.writer else { return }
+            self.onSamples?(samples)
             do {
                 try writer.append(samples)
             } catch {

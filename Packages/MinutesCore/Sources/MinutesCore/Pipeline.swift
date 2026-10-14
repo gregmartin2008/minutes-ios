@@ -20,6 +20,12 @@ public protocol SpeakerSeparating: Sendable {
     func separate(
         audio: URL, expectedSpeakers: Int?, exactly: Bool, progress: @escaping @Sendable (Double) -> Void
     ) async throws -> SeparationResult
+
+    /// Groups voices that were analyzed while the meeting was recorded. `audio` is the whole
+    /// recording, for the parts of grouping that look at the sound again.
+    func separate(
+        analysis: SeparationAnalysis, audio: URL, expectedSpeakers: Int?, exactly: Bool
+    ) async throws -> SeparationResult
 }
 
 public protocol Transcribing: Sendable {
@@ -46,8 +52,10 @@ public struct PipelineServices: Sendable {
     public var notesOptions: NotesEngine.Options
     /// Names and terms to correct in transcripts, read when a meeting is assembled.
     public var vocabulary: @Sendable () -> Vocabulary
+    /// Work done while the meeting was being recorded, by meeting id, if any.
+    public var liveWork: @Sendable (String) -> LiveWork?
     /// Called as each stage begins, so the app can start loading what a later stage needs.
-    public var stageWillStart: (@Sendable (Stage) async -> Void)?
+    public var stageWillStart: (@Sendable (Stage, String) async -> Void)?
     /// Called after each stage so the app can release the models that stage loaded.
     public var stageDidFinish: (@Sendable (Stage) async -> Void)?
 
@@ -57,7 +65,8 @@ public struct PipelineServices: Sendable {
         mailer: MailSending, thresholds: SpeakerMatcher.Thresholds = SpeakerMatcher.Thresholds(),
         notesOptions: NotesEngine.Options = NotesEngine.Options(),
         vocabulary: @escaping @Sendable () -> Vocabulary = { Vocabulary() },
-        stageWillStart: (@Sendable (Stage) async -> Void)? = nil,
+        liveWork: @escaping @Sendable (String) -> LiveWork? = { _ in nil },
+        stageWillStart: (@Sendable (Stage, String) async -> Void)? = nil,
         stageDidFinish: (@Sendable (Stage) async -> Void)? = nil
     ) {
         self.separator = separator
@@ -67,6 +76,7 @@ public struct PipelineServices: Sendable {
         self.thresholds = thresholds
         self.notesOptions = notesOptions
         self.vocabulary = vocabulary
+        self.liveWork = liveWork
         self.stageWillStart = stageWillStart
         self.stageDidFinish = stageDidFinish
     }
@@ -141,7 +151,7 @@ public final class MeetingPipeline: @unchecked Sendable {
             let stage = m.stage
             let started = Date()
             log.info("meeting \(m.id): starting \(stage.rawValue)")
-            await services.stageWillStart?(stage)
+            await services.stageWillStart?(stage, m.id)
             do {
                 let snapshot = m
                 let report: @Sendable (Double) -> Void = { fraction in
@@ -195,9 +205,17 @@ public final class MeetingPipeline: @unchecked Sendable {
         case .separateSpeakers:
             let audio = try audioURL(for: m)
             do {
-                let result = try await services.separator.separate(
-                    audio: audio, expectedSpeakers: m.expectedSpeakers,
-                    exactly: m.expectedSpeakersIsExact == true, progress: progress)
+                let result: SeparationResult
+                if let analysis = services.liveWork(m.id)?.separation {
+                    log.info("meeting \(m.id): grouping voices analyzed during the recording")
+                    result = try await services.separator.separate(
+                        analysis: analysis, audio: audio, expectedSpeakers: m.expectedSpeakers,
+                        exactly: m.expectedSpeakersIsExact == true)
+                } else {
+                    result = try await services.separator.separate(
+                        audio: audio, expectedSpeakers: m.expectedSpeakers,
+                        exactly: m.expectedSpeakersIsExact == true, progress: progress)
+                }
                 m.turns = result.turns
                 m.voiceEmbeddings = result.voices.mapValues { SpeakerMatcher.normalized($0) }
             } catch let e as PipelineError where e == .noSpeech {
@@ -209,6 +227,12 @@ public final class MeetingPipeline: @unchecked Sendable {
         case .transcribe:
             // Already transcribed (the speakers are being separated again): keep the words.
             if let existing = m.words, !existing.isEmpty { break }
+            if let live = services.liveWork(m.id), !live.words.isEmpty {
+                log.info("meeting \(m.id): using the \(live.words.count) words transcribed during the recording")
+                m.words = live.words
+                if m.duration < 1, let last = live.words.last { m.duration = last.end }
+                break
+            }
             let audio = try audioURL(for: m)
             let words = try await services.transcriber.transcribe(audio: audio, progress: progress)
             guard !words.isEmpty else { throw PipelineError.noSpeech }
@@ -224,7 +248,19 @@ public final class MeetingPipeline: @unchecked Sendable {
             applyVoiceMatches(to: &m)
 
         case .writeNotes:
-            let lines = Render.modelLines(m)
+            // Sections extracted during the recording cover the meeting up to their last `end`;
+            // only what came after is extracted now.
+            var lines = Render.modelLines(m)
+            var leading: [NotesFragment] = []
+            if let live = services.liveWork(m.id), !live.noteSections.isEmpty, let last = live.noteSections.last {
+                let snapshot = m
+                leading = LiveWork.resolveNames(in: live.noteSections, finalTurns: m.turns ?? []) { snapshot.displayName(for: $0) }
+                // Paragraph boundaries differ between the live and the final assembly, so a
+                // paragraph straddling the seam is taken whole rather than lost.
+                let rest = (m.utterances ?? []).filter { $0.end > last.end }
+                lines = rest.map { "\(m.displayName(for: $0.speaker)): \($0.text)" }
+                log.info("meeting \(m.id): \(leading.count) note sections from the recording, \(lines.count) lines left to extract")
+            }
             switch await services.notesModel() {
             case .failure(let reason):
                 m.notes = nil
@@ -240,6 +276,7 @@ public final class MeetingPipeline: @unchecked Sendable {
                     let notes = try await engine.write(
                         lines: lines, titleHint: m.titleIsAuto ? nil : m.title, model: model,
                         spellings: services.vocabulary().spellings,
+                        leading: leading,
                         resume: m.notesCheckpoint,
                         checkpoint: { checkpoint in
                             saved.set(checkpoint)

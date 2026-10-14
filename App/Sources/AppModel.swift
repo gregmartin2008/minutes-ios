@@ -54,6 +54,10 @@ final class AppModel: ObservableObject {
     let models: SpeechModels
     let isDemo: Bool
     private let recorder = Recorder()
+    /// Work on the meeting being recorded, done as the audio arrives.
+    private var live: LiveMeeting?
+    /// Finished live work, waiting for the pipeline.
+    private let liveWork = LiveWorkBox()
     private var runner: Task<Void, Never>?
     private var runningID: String?
     /// Changes the person made to a meeting while it was being processed. The pipeline works on its
@@ -220,7 +224,7 @@ final class AppModel: ObservableObject {
         }
         meetings.insert(m, at: 0)
         recording = RecordingStatus(meetingID: m.id, title: m.title)
-        preloadModelsForProcessing()
+        startLiveWork(for: m.id)
         if !AppSettings.shared.askedForNotifications {
             AppSettings.shared.askedForNotifications = true
             Task { await Notifier.requestPermission() }
@@ -278,11 +282,16 @@ final class AppModel: ObservableObject {
             return
         }
         let failed = recorder.storageFailed
-        let seconds = recorder.stop()
+        // The microphone stays open until the meeting has been processed: iOS lets a recording
+        // app work at full speed with the phone locked, and nothing else.
+        let seconds = recorder.stop(holdingSession: true)
+        recorder.onSamples = nil
         recording = nil
-        BackgroundKeeper.shared.resumeAudioAfterRecording()
+        let live = self.live
+        self.live = nil
 
         guard seconds >= 2 else {
+            recorder.release()
             store.delete(id: m.id)
             meetings.removeAll { $0.id == m.id }
             banner = "Nothing was recorded."
@@ -295,7 +304,30 @@ final class AppModel: ObservableObject {
         if failed { m.remarks.append("Part of this recording couldn't be saved because the iPhone ran out of storage.") }
         save(m)
         openMeetingID = m.id
-        kick()
+        if let live {
+            let id = m.id
+            Task { [weak self] in
+                let work = await live.finish()
+                self?.liveWork.set(work, for: id)
+                self?.kick()
+            }
+        } else {
+            kick()
+        }
+    }
+
+    /// Starts transcribing and analyzing the meeting as it is recorded.
+    private func startLiveWork(for id: String) {
+        guard setup.ready, !isDemo else { return }
+        let notesModel: NotesModel?
+        switch FoundationNotesModel.make() {
+        case .success(let model): notesModel = model
+        case .failure: notesModel = nil
+        }
+        let live = LiveMeeting(meetingID: id, models: models, vocabulary: AppSettings.shared.vocabulary, notesModel: notesModel)
+        self.live = live
+        recorder.onSamples = { samples in live.add(samples) }
+        live.start()
     }
 
     /// Brings in a recording made elsewhere and processes it like a meeting recorded here.
@@ -328,6 +360,59 @@ final class AppModel: ObservableObject {
         return nil
     }
 
+    #if DEBUG
+    /// How long the last simulated meeting's live work took to finish after its audio ended.
+    var debugLiveFinishSeconds = 0.0
+
+    /// Runs a recording through the live path as if it were being recorded now: the samples are
+    /// fed to the live analysis in order, as fast as it takes them, with notes drafted along the
+    /// way, and the meeting is then processed from that work. For the automated check.
+    func simulateLiveMeeting(from source: URL, title: String) async -> String? {
+        let now = Date()
+        var m = Meeting(title: title.isEmpty ? Render.defaultTitle(for: now) : title, titleIsAuto: title.isEmpty, createdAt: now)
+        let destination = store.audioURL(for: m.id)
+        let samples: [Float]
+        do {
+            try store.save(m)
+            m.duration = try AudioImporter.convert(source, to: destination)
+            samples = try WAVWriter.readSamples(url: destination).samples
+        } catch {
+            store.delete(id: m.id)
+            return MeetingPipeline.describe(error)
+        }
+        meetings.insert(m, at: 0)
+        startLiveWork(for: m.id)
+        guard let live else { return "live work did not start (models not ready?)" }
+        let block = 8_000   // half a second
+        var i = 0
+        var fedSeconds = 0.0
+        var nextTick = 120.0
+        while i < samples.count {
+            let end = min(samples.count, i + block)
+            live.add(Array(samples[i..<end]))
+            i = end
+            fedSeconds = Double(i) / 16_000
+            if fedSeconds >= nextTick {
+                nextTick += 120
+                await live.tick(force: false)
+            }
+            await Task.yield()
+        }
+        m.status = .processing
+        m.stage = .separateSpeakers
+        save(m)
+        self.live = nil
+        let ended = Date()
+        let work = await live.finish()
+        debugLiveFinishSeconds = Date().timeIntervalSince(ended)
+        liveWork.set(work, for: m.id)
+        Log.shared.info(String(format: "simulated live meeting %@: %.0fs fed, %d words, %d note sections", m.id, fedSeconds, work.words.count, work.noteSections.count))
+        openMeetingID = m.id
+        kick()
+        return nil
+    }
+    #endif
+
     // MARK: Processing
 
     private func services() -> PipelineServices {
@@ -339,11 +424,11 @@ final class AppModel: ObservableObject {
             notesModel: { FoundationNotesModel.make() },
             mailer: SMTPMailer(),
             vocabulary: { AppSettings.shared.vocabulary },
-            stageWillStart: { stage in
-                // Load the transcription model while the speakers are being separated, in the
-                // seconds after End is tapped when the app is still in front. Loading it later,
-                // with the phone locked, has taken minutes.
-                if stage == .separateSpeakers {
+            liveWork: { [liveWork] id in liveWork.get(id) },
+            stageWillStart: { [liveWork] stage, id in
+                // For an imported recording, load the transcription model while the speakers are
+                // being separated. A recorded meeting was transcribed as it went.
+                if stage == .separateSpeakers, liveWork.get(id)?.words.isEmpty ?? true {
                     Task.detached(priority: .userInitiated) {
                         do { try await models.preloadTranscriber() } catch { Log.shared.warn("transcriber preload failed: \(error)") }
                     }
@@ -376,7 +461,7 @@ final class AppModel: ObservableObject {
         while !Task.isCancelled,
               let next = meetings.filter({ $0.status == .processing }).min(by: { $0.createdAt < $1.createdAt }) {
             if !began {
-                BackgroundKeeper.shared.begin(title: "Minutes is writing your notes")
+                BackgroundKeeper.shared.begin(title: "Minutes is writing your notes", audioHeld: recorder.holding)
                 // With Minutes left open, keep the screen on: iOS gives foreground work full speed.
                 UIApplication.shared.isIdleTimerDisabled = true
                 began = true
@@ -400,12 +485,14 @@ final class AppModel: ObservableObject {
             save(result)
             if result.status != .done { allSucceeded = false }
             announce(result)
+            liveWork.remove(result.id)
         }
         if began {
             BackgroundKeeper.shared.end(success: allSucceeded)
             UIApplication.shared.isIdleTimerDisabled = false
         }
-        if !isDemo { await models.unloadAll() }
+        if recording == nil { recorder.release() }
+        if !isDemo, live == nil { await models.unloadAll() }
     }
 
     /// Applies a progress report from the pipeline, ignoring any that arrive after the run has ended.
@@ -612,25 +699,6 @@ final class AppModel: ObservableObject {
         }
     }
 
-    // MARK: Models in memory
-
-    /// Loads both speech models now, while the app is in front, and keeps them for the end of the
-    /// meeting. Loading a model takes seconds in the foreground and minutes once the phone is
-    /// locked (iOS gives a background app very little CPU), and after End the phone is usually
-    /// locked within seconds. If iOS runs short of memory meanwhile, the models are let go and
-    /// loaded again later.
-    private func preloadModelsForProcessing() {
-        guard setup.ready, !isDemo else { return }
-        let models = self.models
-        Task.detached(priority: .userInitiated) {
-            do {
-                try await models.preloadAll()
-            } catch {
-                Log.shared.warn("model preload failed: \(error)")
-            }
-        }
-    }
-
     // MARK: App state, for the diagnostics
 
     /// Logs when the app goes to the background and comes back, and when the phone runs hot, so
@@ -645,7 +713,7 @@ final class AppModel: ObservableObject {
         }
         center.addObserver(forName: UIApplication.didReceiveMemoryWarningNotification, object: nil, queue: .main) { [weak self] _ in
             guard let self else { return }
-            if self.runningID == nil {
+            if self.runningID == nil, self.live == nil {
                 Log.shared.warn("memory warning; releasing the speech models until they are needed")
                 let models = self.models
                 Task { await models.unloadAll() }
