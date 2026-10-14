@@ -118,10 +118,14 @@ public actor SpeechModels {
         guard !usable.isEmpty else { return nil }
         do {
             let models = try await vocabularyModels()
-            let context = CustomVocabularyContext(terms: usable.map {
-                CustomVocabularyTerm(text: $0.text, aliases: $0.aliases.isEmpty ? nil : $0.aliases)
-            })
-            let session = try await VocabularyBoostingSession(vocabulary: context, ctcModels: models)
+            // Cautious settings: a word is replaced only when it already resembles the term in
+            // spelling and the audio agrees. The library's acoustic-only "rescue" pass, which may
+            // replace any word the spotter fires near, turned "measure" into a name in testing.
+            let context = CustomVocabularyContext(
+                terms: usable.map { CustomVocabularyTerm(text: $0.text, aliases: $0.aliases.isEmpty ? nil : $0.aliases) },
+                minSimilarity: 0.6)
+            let config = VocabularyRescorer.Config(shortTermCbwTaperPivot: 5, spotterRescueEnabled: false)
+            let session = try await VocabularyBoostingSession(vocabulary: context, ctcModels: models, config: config)
             log.info("listening for \(usable.count) vocabulary terms")
             return session
         } catch {
