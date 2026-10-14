@@ -44,6 +44,19 @@ public struct SpeechOptions: Sendable {
 public enum SpeechModelKind: String, Sendable {
     case transcription
     case separation
+    /// The small model that listens for the person's own names and terms (see `BoostTerm`).
+    case vocabulary
+}
+
+/// A name or term the recognizer should listen for, so that it is written as given rather than
+/// as whatever common words sound like it.
+public struct BoostTerm: Sendable, Equatable {
+    public var text: String
+    public var aliases: [String]
+    public init(text: String, aliases: [String] = []) {
+        self.text = text
+        self.aliases = aliases
+    }
 }
 
 /// Owns the Core ML models: downloads them on first use, loads them when a stage needs them,
@@ -55,6 +68,7 @@ public actor SpeechModels {
     private var asrLoading: Task<AsrManager, Error>?
     private var diarizerModels: OfflineDiarizerModels?
     private var diarizerLoading: Task<OfflineDiarizerModels, Error>?
+    private var ctc: CtcModels?
     private let log: Log
 
     public init(options: SpeechOptions = SpeechOptions(), log: Log = .shared) {
@@ -67,7 +81,11 @@ public actor SpeechModels {
         AsrModels.modelsExist(at: AsrModels.defaultCacheDirectory(for: .ultra), version: .ultra)
     }
 
-    /// Downloads and compiles both models. Safe to call again; it returns quickly once they are present.
+    public nonisolated func vocabularyModelIsDownloaded() -> Bool {
+        CtcModels.modelsExist(at: CtcModels.defaultCacheDirectory(for: .ctc110m))
+    }
+
+    /// Downloads and compiles the models. Safe to call again; it returns quickly once they are present.
     /// `progress` receives the model being prepared, a fraction from 0 to 1, and whether the download
     /// is over and the model is now being compiled for this device (which has no meaningful fraction).
     public func prepareAll(progress: @escaping @Sendable (SpeechModelKind, Double, Bool) -> Void) async throws {
@@ -75,6 +93,41 @@ public actor SpeechModels {
         progress(.transcription, 1, false)
         _ = try await separationModels { progress(.separation, $0, $1) }
         progress(.separation, 1, false)
+        // The vocabulary model is small and optional: transcription works without it.
+        do {
+            _ = try await vocabularyModels()
+        } catch {
+            log.warn("vocabulary model not available: \(error)")
+        }
+        progress(.vocabulary, 1, false)
+    }
+
+    func vocabularyModels() async throws -> CtcModels {
+        if let ctc { return ctc }
+        let started = Date()
+        let models = try await CtcModels.downloadAndLoad(variant: .ctc110m)
+        ctc = models
+        log.info(String(format: "vocabulary model ready in %.1fs", Date().timeIntervalSince(started)))
+        return models
+    }
+
+    /// A session that listens for `terms` in the audio and corrects the transcript where it hears
+    /// one, or nil when there are no usable terms or the vocabulary model is not available.
+    public func booster(for terms: [BoostTerm]) async -> VocabularyBoostingSession? {
+        let usable = terms.filter { $0.text.trimmingCharacters(in: .whitespaces).count >= 3 }
+        guard !usable.isEmpty else { return nil }
+        do {
+            let models = try await vocabularyModels()
+            let context = CustomVocabularyContext(terms: usable.map {
+                CustomVocabularyTerm(text: $0.text, aliases: $0.aliases.isEmpty ? nil : $0.aliases)
+            })
+            let session = try await VocabularyBoostingSession(vocabulary: context, ctcModels: models)
+            log.info("listening for \(usable.count) vocabulary terms")
+            return session
+        } catch {
+            log.warn("vocabulary boosting unavailable: \(error)")
+            return nil
+        }
     }
 
     private static func isCompiling(_ phase: DownloadPhase) -> Bool {
@@ -114,10 +167,12 @@ public actor SpeechModels {
         _ = try await transcriber()
     }
 
-    /// Loads both models and keeps them in memory until `unload` is called.
+    /// Loads the models and keeps them in memory until `unload` is called. The vocabulary model
+    /// is fetched if it is missing (it was added after the first builds), and skipped if it can't be.
     public func preloadAll() async throws {
         _ = try await separationModels()
         _ = try await transcriber()
+        do { _ = try await vocabularyModels() } catch { log.warn("vocabulary model not available: \(error)") }
     }
 
     /// Runs the transcriber once on a few seconds of silence. The first run of a Core ML model on
@@ -173,11 +228,14 @@ public actor SpeechModels {
             diarizerLoading?.cancel()
             diarizerLoading = nil
             diarizerModels = nil
+        case .vocabulary:
+            ctc = nil
         }
     }
 
     public func unloadAll() async {
         await unload(.transcription)
         await unload(.separation)
+        await unload(.vocabulary)
     }
 }

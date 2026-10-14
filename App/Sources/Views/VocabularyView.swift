@@ -41,7 +41,7 @@ struct VocabularyView: View {
             } header: {
                 Text("Your terms")
             } footer: {
-                Text("A term's misheard spellings are replaced in every transcript from now on, and the notes use the spelling you give. Earlier meetings are not changed.")
+                Text("From now on the recognizer listens for these terms and the names of the people Minutes knows, misheard spellings are replaced in the transcript, and the notes use the spelling you give. Earlier meetings are not changed.")
             }
 
             Section {

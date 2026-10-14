@@ -298,7 +298,8 @@ final class PipelineTests: XCTestCase {
     }
 
     func testNotesFailureStillEmailsTheTranscript() async throws {
-        model.refuseSectionsContaining = "Hold"
+        // Every line is refused, so halving the section finds nothing the model will take.
+        model.refuseSectionsContaining = "Speaker"
         let m = try newMeeting()
         let out = await pipeline().run(m) { _, _ in }
         XCTAssertEqual(out.status, .done)

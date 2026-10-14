@@ -38,8 +38,10 @@ public actor LiveAnalyzer {
 
     private let models: SpeechModels
     private let options: Options
+    private let boost: [BoostTerm]
     private let sampleRate = 16_000
     private let log: Log
+    private var pieceTranscriber: PieceTranscriber?
 
     private var asrBuffer: [Float] = []
     private var asrStartSample = 0
@@ -57,16 +59,26 @@ public actor LiveAnalyzer {
     private var transcriptionErrors = 0
     private var separationErrors = 0
 
-    public init(models: SpeechModels, options: Options = Options(), log: Log = .shared) {
+    public init(models: SpeechModels, boost: [BoostTerm] = [], options: Options = Options(), log: Log = .shared) {
         self.models = models
+        self.boost = boost
         self.options = options
         self.log = log
     }
 
-    /// Loads both models. Call before the recording starts so nothing is loaded mid-meeting.
+    /// Loads the models. Call before the recording starts so nothing is loaded mid-meeting.
     public func start() async throws {
         _ = try await models.separationModels()
-        _ = try await models.transcriber()
+        _ = try await transcriberForPieces()
+    }
+
+    private func transcriberForPieces() async throws -> PieceTranscriber {
+        if let pieceTranscriber { return pieceTranscriber }
+        let asr = try await models.transcriber()
+        let booster = await models.booster(for: boost)
+        let t = PieceTranscriber(asr: asr, booster: booster, log: log)
+        pieceTranscriber = t
+        return t
     }
 
     /// Hands over the next samples (16 kHz mono). Safe to call from any thread; the order of
@@ -193,17 +205,8 @@ public actor LiveAnalyzer {
     private func transcribe(_ samples: [Float], startSample: Int) async {
         let offset = Double(startSample) / Double(sampleRate)
         do {
-            let asr = try await models.transcriber()
-            var state = TdtDecoderState.make(decoderLayers: await asr.decoderLayerCount)
-            let result = try await asr.transcribe(samples, decoderState: &state)
-            let piece = FluidTranscriber.words(from: result).map {
-                Word(text: $0.text, start: $0.start + offset, end: $0.end + offset, confidence: $0.confidence)
-            }
-            words += piece
-        } catch let error as ASRError {
-            if case .invalidAudioData = error { return }   // silence or too short: nothing to say
-            transcriptionErrors += 1
-            log.error(String(format: "live transcription failed at %.0fs: %@", offset, String(describing: error)))
+            let transcriber = try await transcriberForPieces()
+            words += try await transcriber.transcribe(samples, offset: offset)
         } catch {
             transcriptionErrors += 1
             log.error(String(format: "live transcription failed at %.0fs: %@", offset, String(describing: error)))

@@ -16,9 +16,9 @@ final class LiveMeeting {
     /// Seconds of transcript between note extractions.
     private let notesCadence = 180.0
 
-    init(meetingID: String, models: SpeechModels, vocabulary: Vocabulary, notesModel: NotesModel?) {
+    init(meetingID: String, models: SpeechModels, vocabulary: Vocabulary, boost: [BoostTerm], notesModel: NotesModel?) {
         self.meetingID = meetingID
-        self.analyzer = LiveAnalyzer(models: models)
+        self.analyzer = LiveAnalyzer(models: models, boost: boost)
         self.vocabulary = VocabularyCorrector(vocabulary)
         self.notes = notesModel.map { LiveNoteTaker(model: $0, spellings: vocabulary.spellings) }
     }

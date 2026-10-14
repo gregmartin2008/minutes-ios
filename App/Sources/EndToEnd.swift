@@ -76,6 +76,12 @@ enum EndToEnd {
             model.removeMail()
         }
 
+        // Names the recognizer is unlikely to know, to check that it listens for the vocabulary.
+        var vocabulary = Vocabulary()
+        vocabulary.terms = [VocabularyTerm(term: "Meridyan", heardAs: ["Meridian"]), VocabularyTerm(term: "Kestrel")]
+        AppSettings.shared.vocabulary = vocabulary
+        model.vocabulary = vocabulary
+
         status.phase = "downloading models"
         write(status)
         await model.downloadModels()
