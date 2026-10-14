@@ -203,6 +203,37 @@ public struct FluidSeparator: SpeakerSeparating {
         return (regrouped.result, counted)
     }
 
+    /// Voice analysis done piece by piece during the recording (see `LiveAnalyzer`).
+    public final class PieceAnalysis: SeparationAnalysis, @unchecked Sendable {
+        let pieces: [(prepared: PreparedDiarization, startSeconds: Double)]
+        let options: SpeechOptions
+
+        init(pieces: [(prepared: PreparedDiarization, startSeconds: Double)], options: SpeechOptions) {
+            self.pieces = pieces
+            self.options = options
+        }
+    }
+
+    public func separate(
+        analysis: SeparationAnalysis, audio: URL, expectedSpeakers: Int?, exactly: Bool
+    ) async throws -> SeparationResult {
+        guard let live = analysis as? PieceAnalysis else {
+            throw PipelineError.audioMissing
+        }
+        let options = overrides ?? live.options
+        let config = Self.configuration(options: options, speakers: .automatic)
+        let (source, _) = try AudioSourceFactory().makeDiskBackedSource(from: audio, targetSampleRate: config.segmentation.sampleRate)
+        let joined: PreparedDiarization
+        do {
+            joined = try PreparedDiarization.joined(live.pieces, audioSource: source)
+        } catch {
+            source.cleanup()
+            throw error
+        }
+        let whole = Analysis(prepared: joined, source: source, options: options)
+        return try await group(whole, headCount: expectedSpeakers, exactly: exactly).result
+    }
+
     public func separate(
         audio: URL, expectedSpeakers: Int?, exactly: Bool, progress: @escaping @Sendable (Double) -> Void
     ) async throws -> SeparationResult {

@@ -144,18 +144,28 @@ public struct NotesEngine: Sendable {
     ///   - lines: The transcript as "Name: what they said" lines, in order.
     ///   - titleHint: A title the person typed, if any.
     ///   - spellings: Names and terms the model should spell exactly as given.
+    ///   - leading: Fragments already extracted (while the meeting was being recorded) from the part
+    ///     of the transcript that comes before `lines`. `lines` may then be empty.
     ///   - resume: Work saved by an earlier, interrupted call for the same transcript.
     ///   - checkpoint: Called after each section with everything done so far, to be saved for `resume`.
     ///   - progress: Called with 0...1 as sections complete.
     public func write(
         lines: [String], titleHint: String?, model: NotesModel,
         spellings: [String] = [],
+        leading: [NotesFragment] = [],
         resume: NotesCheckpoint? = nil,
         checkpoint: (@Sendable (NotesCheckpoint) -> Void)? = nil,
         progress: (@Sendable (Double) -> Void)? = nil
     ) async throws -> MeetingNotes {
         let cleaned = lines.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
-        guard !cleaned.isEmpty else { throw NotesModelError.other("The transcript is empty.") }
+        guard !cleaned.isEmpty || !leading.isEmpty else { throw NotesModelError.other("The transcript is empty.") }
+        if cleaned.isEmpty {
+            return try await finish(
+                fragments: leading, skipped: 0, lines: [], titleHint: titleHint, model: model,
+                budgetTokens: max(options.minimumSectionTokens, (await model.contextSize()) - options.promptOverhead - options.responseReserve),
+                ratio: options.charactersPerToken, giveUpAt: Date().addingTimeInterval(options.rateLimitPatience),
+                progress: progress)
+        }
 
         let fingerprint = Self.fingerprint(cleaned)
         let giveUpAt = Date().addingTimeInterval(options.rateLimitPatience)
@@ -181,9 +191,8 @@ public struct NotesEngine: Sendable {
         if saved.sections.count > sections.count { saved.sections = [] }
 
         // Map: extract from each section, carrying a one-line gist forward for continuity.
-        var fragments: [NotesFragment] = saved.sections.flatMap { $0.fragments }
+        var fragments: [NotesFragment] = leading + saved.sections.flatMap { $0.fragments }
         var skipped = saved.sections.reduce(0) { $0 + $1.skipped }
-        var total = fragments.count + skipped
         var firstError: NotesModelError? = nil
         var previousGist = fragments.last(where: { !$0.gist.isEmpty })?.gist ?? ""
         if !saved.sections.isEmpty {
@@ -212,7 +221,6 @@ public struct NotesEngine: Sendable {
             }
             fragments += done.fragments
             skipped += done.skipped
-            total += done.fragments.count + done.skipped
             saved.sections.append(done)
             checkpoint?(saved)
             progress?(0.8 * Double(index + 1) / Double(sections.count))
@@ -220,7 +228,20 @@ public struct NotesEngine: Sendable {
         guard !fragments.isEmpty else {
             throw firstError ?? NotesModelError.other("The language model returned nothing.")
         }
+        return try await finish(
+            fragments: fragments, skipped: skipped, lines: cleaned, titleHint: titleHint, model: model,
+            budgetTokens: sectionBudget, ratio: ratio, giveUpAt: giveUpAt, progress: progress)
+    }
 
+    /// The reduce half of the work: merges the sections' lists and writes the title and summary.
+    /// `lines` is whatever part of the transcript is at hand, used to check the figures; the
+    /// figures from sections extracted live are checked against their own sections already.
+    private func finish(
+        fragments: [NotesFragment], skipped: Int, lines: [String], titleHint: String?, model: NotesModel,
+        budgetTokens sectionBudget: Int, ratio: Double, giveUpAt: Date,
+        progress: (@Sendable (Double) -> Void)?
+    ) async throws -> MeetingNotes {
+        let total = fragments.count + skipped
         // Reduce: merge each list across sections.
         var merged: [NoteKind: [String]] = [:]
         for (i, kind) in NoteKind.allCases.enumerated() {
@@ -234,7 +255,9 @@ public struct NotesEngine: Sendable {
         }
         // A figure is only worth listing if its numbers were actually said. A small model
         // sometimes invents or garbles one, and a wrong number in the notes is worse than none.
-        merged[.figures] = Self.verified(figures: merged[.figures] ?? [], against: cleaned)
+        if !lines.isEmpty {
+            merged[.figures] = Self.verified(figures: merged[.figures] ?? [], against: lines)
+        }
 
         // Overview: title and summary from the merged notes.
         let gists = fragments.map { $0.gist }.filter { !$0.isEmpty }
@@ -305,6 +328,17 @@ public struct NotesEngine: Sendable {
         } catch {
             return [.failure(.other(String(describing: error)))]
         }
+    }
+
+    /// One extraction, with the engine's throttling patience and cleaning, for sections handled
+    /// outside `write` (the live note-taker). The figures are checked against the section itself.
+    func extractOnce(section: [String], context: String, model: NotesModel) async throws -> NotesFragment {
+        let text = section.joined(separator: "\n")
+        let giveUpAt = Date().addingTimeInterval(options.rateLimitPatience)
+        let raw = try await withBackoff(until: giveUpAt) { try await model.extract(section: text, context: context) }
+        var f = Self.clean(raw)
+        f.figures = Self.verified(figures: f.figures, against: section)
+        return f
     }
 
     static let cancelledMarker = "Cancelled."

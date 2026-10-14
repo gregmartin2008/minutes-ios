@@ -1,128 +1,55 @@
 import AVFoundation
-import BackgroundTasks
 import Foundation
 import MinutesCore
 import UIKit
 
 /// Keeps Minutes working on a meeting after the person locks the phone or switches apps.
 ///
-/// Two mechanisms, used together:
-/// 1. A continued-processing task (iOS 26), the system's own way to finish work that the person
-///    started in the foreground. iOS shows its progress and lets the person cancel it.
-/// 2. A silent audio session, which keeps the app running where the first is unavailable
-///    (for example when a re-signing tool has changed the app's identifier).
+/// The recorder holds the microphone open while a meeting it recorded is processed, which is
+/// what gets a locked phone's full attention (see `Recorder.stop(holdingSession:)`). For work
+/// with no microphone to hold (an imported recording, notes finished later), a silent audio
+/// session keeps the app running, more slowly. iOS 26's continued-processing task was tried and
+/// dropped: it put pop-ups in front of the person and gave no more speed.
 final class BackgroundKeeper {
     static let shared = BackgroundKeeper()
 
-    private var identifier: String?
-    private var registered = false
-    private var task: BGContinuedProcessingTask?
-    private var submitted = false
     private var player: AVAudioPlayer?
     private var backgroundToken: UIBackgroundTaskIdentifier = .invalid
     private var active = false
-    private var lastTitle = ""
-    private var lastSubtitle = ""
-    private var lastFraction = 0.0
+    private var audioHeld = false
     private var interruptionObserver: NSObjectProtocol?
 
     /// True while a meeting is being processed and this object owns the audio session.
     var isActive: Bool { active }
 
-    /// One line for the diagnostics: whether the continued-processing task could be set up.
-    private(set) var status = "background task: not registered"
+    /// One line for the diagnostics.
+    var status: String { "background: the microphone is held while a recorded meeting is processed" }
 
-    /// Call once at launch, before the app finishes launching.
-    func register() {
-        guard !registered else { return }
-        registered = true
-        // The identifier has to begin with the app's bundle identifier, which a re-signing tool may
-        // have changed since the build, so it is worked out here rather than written into Info.plist.
-        // Info.plist permits "<built bundle id>.*", which still covers the changed one.
-        let bundle = Bundle.main.bundleIdentifier ?? "app.minutes.recorder"
-        let id = bundle + ".notes"
-        let permitted = Bundle.main.object(forInfoDictionaryKey: "BGTaskSchedulerPermittedIdentifiers") as? [String] ?? []
-        let allowed = permitted.contains { entry in
-            entry == id || (entry.hasSuffix("*") && id.hasPrefix(String(entry.dropLast())))
-        }
-        guard allowed else {
-            status = "background task \(id) not permitted by Info.plist (\(permitted.joined(separator: ", ")))"
-            return
-        }
-        let ok = BGTaskScheduler.shared.register(forTaskWithIdentifier: id, using: .main) { [weak self] task in
-            guard let self, let task = task as? BGContinuedProcessingTask else {
-                task.setTaskCompleted(success: false)
-                return
-            }
-            self.adopt(task)
-        }
-        identifier = ok ? id : nil
-        status = "background task \(id) registered: \(ok)"
-    }
+    /// Call once at launch.
+    func register() {}
 
-    private func adopt(_ task: BGContinuedProcessingTask) {
-        Log.shared.info("continued-processing task started by iOS")
-        self.task = task
-        task.progress.totalUnitCount = 1000
-        task.progress.completedUnitCount = Int64(lastFraction * 1000)
-        task.expirationHandler = { [weak self] in
-            // The person cancelled it or iOS reclaimed it. The work itself is resumable, so just let go.
-            Log.shared.warn("background task expired")
-            DispatchQueue.main.async { self?.task = nil }
-        }
-        if !lastTitle.isEmpty { task.updateTitle(lastTitle, subtitle: lastSubtitle) }
-        if !active {
-            task.setTaskCompleted(success: true)
-            self.task = nil
-        }
-    }
-
-    /// Call when processing starts, while the app is in the foreground.
-    func begin(title: String) {
+    /// Call when processing starts. `audioHeld` says the recorder is keeping the microphone open,
+    /// so no silent audio is needed (and starting it would take the session away).
+    func begin(title: String, audioHeld: Bool = false) {
         active = true
-        lastTitle = title
-        lastSubtitle = "Starting"
-        lastFraction = 0
-
+        self.audioHeld = audioHeld
         if backgroundToken == .invalid {
             backgroundToken = UIApplication.shared.beginBackgroundTask(withName: "minutes.processing") { [weak self] in
                 self?.endToken()
             }
         }
-        if let identifier, task == nil, !submitted {
-            let request = BGContinuedProcessingTaskRequest(identifier: identifier, title: title, subtitle: "Starting")
-            request.strategy = .fail
-            do {
-                try BGTaskScheduler.shared.submit(request)
-                submitted = true
-                Log.shared.info("continued-processing task submitted")
-            } catch {
-                Log.shared.warn("continued-processing task not accepted: \(error.localizedDescription)")
-            }
-        } else if identifier == nil {
-            Log.shared.info("continued-processing task unavailable; keeping the app awake with silent audio only")
+        if audioHeld {
+            Log.shared.info("processing with the microphone held")
+        } else {
+            startSilentAudio()
         }
-        startSilentAudio()
     }
 
-    func update(fraction: Double, title: String, subtitle: String) {
-        guard active else { return }
-        lastFraction = fraction
-        lastTitle = title
-        lastSubtitle = subtitle
-        guard let task else { return }
-        task.progress.completedUnitCount = Int64(max(0, min(1, fraction)) * 1000)
-        task.updateTitle(title, subtitle: subtitle)
-    }
+    func update(fraction: Double, title: String, subtitle: String) {}
 
     func end(success: Bool) {
         active = false
-        if let task {
-            task.progress.completedUnitCount = success ? 1000 : task.progress.completedUnitCount
-            task.setTaskCompleted(success: success)
-        }
-        task = nil
-        submitted = false
+        audioHeld = false
         stopSilentAudio()
         endToken()
     }
@@ -133,7 +60,7 @@ final class BackgroundKeeper {
     }
 
     func resumeAudioAfterRecording() {
-        if active { startSilentAudio() }
+        if active, !audioHeld { startSilentAudio() }
     }
 
     private func endToken() {

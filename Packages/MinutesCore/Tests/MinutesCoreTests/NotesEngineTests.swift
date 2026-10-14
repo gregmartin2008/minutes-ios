@@ -389,3 +389,82 @@ final class NotesCleaningTests: XCTestCase {
         }
     }
 }
+
+final class LiveNoteTakerTests: XCTestCase {
+
+    /// 30 paragraphs of 20 seconds each, alternating two provisional labels.
+    func meeting(seconds: Double) -> (utterances: [Utterance], turns: [SpeakerTurn]) {
+        var utterances: [Utterance] = []
+        var turns: [SpeakerTurn] = []
+        var t = 0.0
+        var i = 0
+        while t < seconds {
+            let speaker = i % 2 == 0 ? "A" : "B"
+            let text = "Paragraph \(i) " + String(repeating: "word ", count: 50)
+            utterances.append(Utterance(id: i, speaker: speaker, start: t, end: t + 19, text: text))
+            turns.append(SpeakerTurn(speaker: speaker, start: t, end: t + 19))
+            t += 20
+            i += 1
+        }
+        return (utterances, turns)
+    }
+
+    func testNothingIsExtractedUntilEnoughHasSettled() async {
+        let model = FakeNotesModel()
+        let taker = LiveNoteTaker(model: model, spellings: [])
+        let m = meeting(seconds: 100)
+        let took = await taker.offer(utterances: m.utterances, turns: m.turns, latest: 100)
+        XCTAssertFalse(took)
+        XCTAssertEqual(model.sections.count, 0)
+    }
+
+    func testSettledStretchesBecomeSectionsWithProvisionalNames() async {
+        let model = FakeNotesModel()
+        model.context = 2000
+        let taker = LiveNoteTaker(model: model, spellings: ["Soterra"])
+        let m = meeting(seconds: 600)
+        let took = await taker.offer(utterances: m.utterances, turns: m.turns, latest: 600)
+        XCTAssertTrue(took)
+        let sections = await taker.done
+        XCTAssertGreaterThan(sections.count, 0)
+        XCTAssertEqual(sections.first?.start, 0)
+        // The last 20 seconds were not settled yet.
+        XCTAssertLessThanOrEqual(sections.last!.end, 580)
+        XCTAssertTrue(model.sections[0].hasPrefix("Voice 1: Paragraph 0"), model.sections[0])
+        XCTAssertTrue(model.sections[0].contains("\nVoice 2: Paragraph 1"), model.sections[0])
+        XCTAssertTrue(model.contexts[0].contains("Spell these exactly as written: Soterra."))
+        XCTAssertEqual(Set(sections.flatMap { $0.turns.map { $0.speaker } }), ["Voice 1", "Voice 2"])
+
+        // Offering the same material again extracts nothing more.
+        let count = model.sections.count
+        let again = await taker.offer(utterances: m.utterances, turns: m.turns, latest: 600)
+        XCTAssertFalse(again)
+        XCTAssertEqual(model.sections.count, count)
+
+        // At the end, `force` takes the remainder.
+        let forced = await taker.offer(utterances: m.utterances, turns: m.turns, latest: 600, force: true)
+        XCTAssertTrue(forced)
+        let all = await taker.done
+        XCTAssertEqual(all.last?.end, 599)
+    }
+
+    func testThrottlingLeavesTheStretchForLater() async {
+        let model = FakeNotesModel()
+        model.context = 2000
+        model.alwaysRateLimit = true
+        var o = LiveNoteTaker.Options()
+        o.rateLimitBackoff = [0.01]
+        o.rateLimitPatience = 0.05
+        let taker = LiveNoteTaker(model: model, spellings: [], options: o)
+        let m = meeting(seconds: 600)
+        let took = await taker.offer(utterances: m.utterances, turns: m.turns, latest: 600)
+        XCTAssertFalse(took)
+        let none = await taker.done
+        let problem = await taker.lastError
+        XCTAssertEqual(none.count, 0)
+        XCTAssertNotNil(problem)
+        model.alwaysRateLimit = false
+        let later = await taker.offer(utterances: m.utterances, turns: m.turns, latest: 600)
+        XCTAssertTrue(later)
+    }
+}

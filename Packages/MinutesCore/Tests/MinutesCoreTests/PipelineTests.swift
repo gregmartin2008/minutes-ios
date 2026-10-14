@@ -15,7 +15,17 @@ final class FakeSeparator: SpeakerSeparating, @unchecked Sendable {
         if let e = error { throw e }
         return result
     }
+    var analysisCalls = 0
+    func separate(analysis: SeparationAnalysis, audio: URL, expectedSpeakers: Int?, exactly: Bool) async throws -> SeparationResult {
+        analysisCalls += 1
+        seenExpected = expectedSpeakers
+        seenExactly = exactly
+        if let e = error { throw e }
+        return result
+    }
 }
+
+struct FakeAnalysis: SeparationAnalysis {}
 
 final class FakeTranscriber: Transcribing, @unchecked Sendable {
     var words: [Word] = []
@@ -376,5 +386,74 @@ final class PipelineTests: XCTestCase {
         }
         XCTAssertEqual(MeetingPipeline.overallProgress(stage: .finished, fraction: 0), 1)
         XCTAssertEqual(MeetingPipeline.overallProgress(stage: .separateSpeakers, fraction: 0), 0)
+    }
+}
+
+final class LiveWorkTests: XCTestCase {
+
+    func testProvisionalNamesAreResolvedToFinalSpeakers() {
+        // "Voice 1" talked 0-10 and 20-30; "Voice 2" talked 10-20. Final grouping: S7 covers 0-10
+        // and 20-30, S3 covers 10-20.
+        let section = LiveNoteSection(
+            start: 0, end: 30,
+            fragment: NotesFragment(
+                gist: "Voice 1 opened.", keyPoints: ["Voice 2: the backlog is 1.8 million"],
+                decisions: [], actionItems: ["Voice 1: send the deck to Voice 2"], openQuestions: [], figures: ["Voice 10: nothing"]),
+            turns: [
+                SpeakerTurn(speaker: "Voice 1", start: 0, end: 10), SpeakerTurn(speaker: "Voice 2", start: 10, end: 20),
+                SpeakerTurn(speaker: "Voice 1", start: 20, end: 30),
+            ])
+        let final = [
+            SpeakerTurn(speaker: "S7", start: 0, end: 9), SpeakerTurn(speaker: "S3", start: 9, end: 21),
+            SpeakerTurn(speaker: "S7", start: 21, end: 30),
+        ]
+        let names = ["S7": "Jeremy", "S3": "Mark"]
+        let out = LiveWork.resolveNames(in: [section], finalTurns: final) { names[$0] ?? $0 }
+        XCTAssertEqual(out[0].gist, "Jeremy opened.")
+        XCTAssertEqual(out[0].keyPoints, ["Mark: the backlog is 1.8 million"])
+        XCTAssertEqual(out[0].actionItems, ["Jeremy: send the deck to Mark"])
+        XCTAssertEqual(out[0].figures, ["Voice 10: nothing"], "an unknown provisional name is left alone")
+    }
+
+    func testPipelineUsesLiveWorkAndExtractsOnlyTheTail() async throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("minutes-live-\(UUID().uuidString)")
+        let store = try MeetingStore(root: dir)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        var m = Meeting(title: "Live", titleIsAuto: true, createdAt: Date())
+        m.status = .processing
+        m.stage = .separateSpeakers
+        m.duration = 120
+        try store.save(m)
+        try WAVWriter.silence(seconds: 2).write(to: store.audioURL(for: m.id))
+
+        let separator = FakeSeparator()
+        separator.result = SeparationResult(turns: [SpeakerTurn(speaker: "S1", start: 0, end: 120)], voices: ["S1": [1, 0]])
+        let transcriber = FakeTranscriber()
+        let model = FakeNotesModel()
+        // Two paragraphs: a pause after word 19 separates them, so the second starts after 60 s.
+        let words = (0..<40).map { i -> Word in
+            let start = Double(i) * 3 + (i >= 20 ? 5 : 0)
+            return Word(text: "word\(i)", start: start, end: start + 2)
+        }
+        let live = LiveWork(
+            words: words, separation: FakeAnalysis(),
+            noteSections: [LiveNoteSection(
+                start: 0, end: 60,
+                fragment: NotesFragment(gist: "First half.", keyPoints: ["Voice 1: a point"], decisions: [], actionItems: [], openQuestions: [], figures: []),
+                turns: [SpeakerTurn(speaker: "Voice 1", start: 0, end: 60)])])
+        let services = PipelineServices(
+            separator: separator, transcriber: transcriber, notesModel: { .success(model) }, mailer: FakeMailer(),
+            liveWork: { _ in live })
+        let result = await MeetingPipeline(store: store, services: services).run(m) { _, _ in }
+        XCTAssertEqual(result.status, .done)
+        XCTAssertEqual(separator.analysisCalls, 1)
+        XCTAssertEqual(separator.calls, 0)
+        XCTAssertEqual(transcriber.calls, 0, "the words came from the recording")
+        XCTAssertEqual(result.words?.count, 40)
+        // Only the part after the live section (words starting at 60 s or later) went to the model.
+        XCTAssertEqual(model.sections.count, 1)
+        XCTAssertFalse(model.sections.first?.contains("word0 ") ?? true, model.sections.first ?? "")
+        XCTAssertTrue(model.sections.first?.contains("word20") ?? false, model.sections.first ?? "")
+        XCTAssertEqual(result.notes?.keyPoints.first, "Speaker 1: a point")
     }
 }

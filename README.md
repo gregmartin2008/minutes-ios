@@ -10,13 +10,14 @@ or AI service, there is no account, and there is nothing to pay for, however muc
 This repository holds the app's source and the automation that builds and tests it on GitHub's
 Macs. It contains no keys, passwords, or meeting content.
 
-**Status.** The app builds for iPhone and passes its automated tests, including a full run in the
-iPhone simulator from a recording to the email arriving, and its speech pipeline has been measured
-on 190 recorded meetings (see "How accurate it is"). On an iPhone 18 Pro Max it has processed a
-1 hour 52 minute meeting of nine people, six of them speaking (seven voices found), in 12 minutes,
-7½ of which went to loading the speech model after the phone was put down (it is now loaded in
-the seconds after End is tapped, alongside speaker separation), and a 25-minute two-person call
-in 55 seconds, with the notes written by Apple Intelligence and both emails delivered.
+**Status.** The app builds for iPhone and passes its automated tests, including two full runs in
+the iPhone simulator from a recording to the email arriving (one imported, one fed through the
+app as if it were being recorded), and its speech pipeline has been measured on 190 recorded
+meetings (see "How accurate it is"). On an iPhone 18 Pro Max it has recorded and processed five
+real meetings, up to 1 hour 52 minutes and seven voices, with the notes written by Apple
+Intelligence and every email delivered. Those runs showed that a phone locked after the meeting
+gets almost no processor time, so the work was moved into the meeting itself (see "Using it");
+the first version of that is in this build and has not yet been timed on the phone.
 
 ## What it does
 
@@ -87,10 +88,14 @@ it, Minutes still emails the full transcript and says why there are no notes.
 - **Record meeting** starts immediately. The whole screen is red while it records, so the state is
   readable from across the table. You can name the meeting and say how many people are in the room
   while it records; both are optional.
-- **End meeting** asks once for confirmation, then processes the recording. Leave Minutes open and
-  it finishes fastest (the screen stays on until the email is sent); it is built to keep working
-  with the phone locked as well.
-- The email arrives when processing finishes.
+- **While it records**, Minutes transcribes the meeting, analyzes the voices and drafts the notes a
+  few minutes behind live. This is the only time iOS lets an app work at full speed with the phone
+  locked, so the work is done then.
+- **End meeting** asks once for confirmation. What remains is the last minute of audio, the final
+  grouping of the voices, the merging of the notes, and the email, which together are meant to take
+  under a minute. The microphone indicator stays on until the email has gone, because keeping the
+  microphone open is what keeps the phone's attention; nothing is recorded after End.
+- The email arrives when that finishes. Leaving Minutes open on the screen is no longer needed.
 - In the **Speakers** tab, name the voices. Minutes updates the transcript and notes, remembers
   the voices, and can send the corrected email (menu > *Email again*).
 
@@ -212,7 +217,7 @@ locked, and not the notes, which need Apple Intelligence and cannot run in a sim
   and dates against the transcript, and treat a "decision" as a prompt to confirm, not a record.
 - **Spoken numbers are a weak spot.** "Four hundred, five hundred thousand" can come out as one
   run-together number. Check any figure that matters against the recording.
-- **iOS can pause the note writing** when the phone is locked. Minutes then emails the transcript
+- **iOS can refuse the note writing** when the phone is locked. Minutes then emails the transcript
   right away and sends the notes in a second email the next time it is opened.
 - **The seven-day re-signing** described above, unless a paid developer account is used.
 
@@ -223,8 +228,10 @@ locked, and not the notes, which need Apple Intelligence and cannot run in a sim
   its tests. Runs on Linux and macOS.
 - `Packages/MinutesSpeech`: transcription (NVIDIA Parakeet, the Ultra build) and speaker separation
   (the pyannote community-1 pipeline), both running as Core ML models through
-  [FluidAudio](https://github.com/FluidInference/FluidAudio), plus `minutes-bench`, which runs the
-  same code on recorded meetings for measurement.
+  [FluidAudio](https://github.com/FluidInference/FluidAudio), the live analysis that runs during a
+  recording, and `minutes-bench`, which runs the same code on recorded meetings for measurement.
+- `Packages/FluidAudio`: a copy of FluidAudio 0.17.7 with one added file, so that the voice
+  analysis can be done in pieces during the meeting and joined at the end (`UPSTREAM.md` there).
 - `App`: the iPhone app (SwiftUI).
 - `scripts` and `.github/workflows`: the build. Every change is compiled on GitHub's Macs, the unit
   tests run, the mail code is checked against a real mail server, the whole app is run in the iPhone

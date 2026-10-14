@@ -12,7 +12,7 @@ let package = Package(
     ],
     dependencies: [
         .package(path: "../MinutesCore"),
-        .package(url: "https://github.com/FluidInference/FluidAudio.git", exact: "0.17.7"),
+        .package(path: "../FluidAudio"),
     ],
     targets: [
         .target(

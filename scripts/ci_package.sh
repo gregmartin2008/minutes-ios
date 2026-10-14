@@ -13,7 +13,7 @@ cp -R "$app" build/ipa/Payload/
   echo "commit: ${GITHUB_SHA:-local}"
   echo "architectures: $(lipo -archs "$app/Minutes")"
   /usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" -c "Print :MinimumOSVersion" -c "Print :UIBackgroundModes" \
-    -c "Print :BGTaskSchedulerPermittedIdentifiers" -c "Print :NSMicrophoneUsageDescription" "$app/Info.plist"
+    -c "Print :NSMicrophoneUsageDescription" "$app/Info.plist"
 } | tee out/ipa.txt
 
 if [ "${1:-}" = "--release" ]; then
