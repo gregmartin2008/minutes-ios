@@ -383,7 +383,10 @@ final class AppModel: ObservableObject {
         meetings.insert(m, at: 0)
         startLiveWork(for: m.id)
         guard let live else { return "live work did not start (models not ready?)" }
+        // Fed at the pace of a real recording, so what is measured afterward is what would be
+        // left after a real meeting, not the analysis of a whole recording delivered at once.
         let block = 8_000   // half a second
+        let startedFeeding = Date()
         var i = 0
         var fedSeconds = 0.0
         var nextTick = 120.0
@@ -396,7 +399,8 @@ final class AppModel: ObservableObject {
                 nextTick += 120
                 await live.tick(force: false)
             }
-            await Task.yield()
+            let ahead = fedSeconds - Date().timeIntervalSince(startedFeeding)
+            if ahead > 0 { try? await Task.sleep(nanoseconds: UInt64(ahead * 1_000_000_000)) }
         }
         m.status = .processing
         m.stage = .separateSpeakers
