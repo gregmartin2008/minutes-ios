@@ -58,6 +58,10 @@ final class AppModel: ObservableObject {
     private var live: LiveMeeting?
     /// Finished live work, waiting for the pipeline.
     private let liveWork = LiveWorkBox()
+    /// Meetings whose live work is still being finished. The pipeline must not start on one of
+    /// them: it would find no live work and redo the whole meeting from the recording.
+    private var liveFinishing = Set<String>()
+    private var lastMemoryWarningLog = Date.distantPast
     private var runner: Task<Void, Never>?
     private var runningID: String?
     /// Changes the person made to a meeting while it was being processed. The pipeline works on its
@@ -308,14 +312,23 @@ final class AppModel: ObservableObject {
         openMeetingID = m.id
         if let live {
             let id = m.id
+            liveFinishing.insert(id)
+            Log.shared.info("meeting \(id): finishing the live work (\(MemoryUse.summary))")
             Task { [weak self] in
                 let work = await live.finish()
                 self?.liveWork.set(work, for: id)
+                self?.liveFinishing.remove(id)
                 self?.kick()
             }
         } else {
             kick()
         }
+    }
+
+    /// Meetings the pipeline may start on now, oldest first.
+    private var queued: [Meeting] {
+        meetings.filter { $0.status == .processing && !liveFinishing.contains($0.id) }
+            .sorted { $0.createdAt < $1.createdAt }
     }
 
     /// The names and terms the recognizer listens for: the vocabulary, with the spellings it has
@@ -329,13 +342,9 @@ final class AppModel: ObservableObject {
             guard t.count >= 3, seen.insert(t.lowercased()).inserted else { return }
             out.append(BoostTerm(text: t, aliases: aliases.filter { !$0.isEmpty }))
         }
+        // Only the typed terms. Listening for the names of known voices as well replaced common
+        // words with them in a long meeting ("market" became "Mark", "margin" became "Martin").
         for term in AppSettings.shared.vocabulary.terms { add(term.term, aliases: term.heardAs) }
-        for profile in profiles {
-            add(profile.name)
-            // Surnames on their own, since people are usually referred to by one name.
-            let parts = profile.name.split(separator: " ").map(String.init)
-            if parts.count >= 2 { for part in parts where part.count >= 4 { add(part) } }
-        }
         return out
     }
 
@@ -479,7 +488,7 @@ final class AppModel: ObservableObject {
 
     /// Starts working through meetings that are ready to process, one at a time.
     func kick() {
-        guard runner == nil, meetings.contains(where: { $0.status == .processing }) else { return }
+        guard runner == nil, !queued.isEmpty else { return }
         runner = Task { [weak self] in
             await self?.drain()
             self?.runner = nil
@@ -491,8 +500,7 @@ final class AppModel: ObservableObject {
     private func drain() async {
         var allSucceeded = true
         var began = false
-        while !Task.isCancelled,
-              let next = meetings.filter({ $0.status == .processing }).min(by: { $0.createdAt < $1.createdAt }) {
+        while !Task.isCancelled, let next = queued.first {
             if !began {
                 BackgroundKeeper.shared.begin(title: "Minutes is writing your notes", audioHeld: recorder.holding)
                 // With Minutes left open, keep the screen on: iOS gives foreground work full speed.
@@ -750,8 +758,9 @@ final class AppModel: ObservableObject {
                 Log.shared.warn("memory warning; releasing the speech models until they are needed")
                 let models = self.models
                 Task { await models.unloadAll() }
-            } else {
-                Log.shared.warn("memory warning while processing")
+            } else if Date().timeIntervalSince(self.lastMemoryWarningLog) >= 30 {
+                self.lastMemoryWarningLog = Date()
+                Log.shared.warn("memory warning while processing (\(MemoryUse.summary))")
             }
         }
         center.addObserver(forName: ProcessInfo.thermalStateDidChangeNotification, object: nil, queue: .main) { _ in

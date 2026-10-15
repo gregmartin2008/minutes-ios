@@ -15,7 +15,7 @@ struct VocabularyView: View {
                     .onChange(of: listens) { _, on in AppSettings.shared.listensForVocabulary = on }
                     .listRowBackground(Theme.paper)
             } footer: {
-                Text("A second, small model listens for the terms and the names of known voices and corrects the transcript where it hears one. Turn it off if transcripts get worse; the typed spelling corrections below work either way.")
+                Text("A second model listens for the terms in the audio and corrects the transcript where it hears one. It runs on the processor for every minute of a meeting, which made the phone hot in a long meeting, so it is off unless you turn it on. The spelling corrections below work either way.")
             }
             Section {
                 if model.vocabulary.terms.isEmpty {

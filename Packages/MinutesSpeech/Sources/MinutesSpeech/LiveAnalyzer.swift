@@ -132,8 +132,9 @@ public actor LiveAnalyzer {
         await work(flush: true)
         let analysis = pieces.isEmpty ? nil : FluidSeparator.PieceAnalysis(pieces: pieces, options: models.options)
         log.info(String(
-            format: "live analysis finished: %d words, %d voice pieces, %.0fs received, errors %d/%d",
-            words.count, pieces.count, Double(receivedSamples) / Double(sampleRate), transcriptionErrors, separationErrors))
+            format: "live analysis finished: %d words, %d voice pieces, %.0fs received, errors %d/%d, %@",
+            words.count, pieces.count, Double(receivedSamples) / Double(sampleRate), transcriptionErrors, separationErrors,
+            MemoryUse.summary))
         return (words, analysis)
     }
 
@@ -244,7 +245,8 @@ public actor LiveAnalyzer {
             let manager = OfflineDiarizerManager(config: config)
             manager.initialize(models: loaded)
             let prepared = try await manager.prepare(audio: samples)
-            pieces.append((keepWindows.map { prepared.keepingWindows($0) } ?? prepared, offset))
+            // keepingWindows also drops the piece's audio, which is not needed again.
+            pieces.append((prepared.keepingWindows(keepWindows ?? Int.max), offset))
         } catch let error as OfflineDiarizationError {
             if case .noSpeechDetected = error { return }
             separationErrors += 1
