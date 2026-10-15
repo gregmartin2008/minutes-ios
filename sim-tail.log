@@ -1,0 +1,40 @@
+    /Applications/Xcode_26.6.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/appintentsnltrainingprocessor --infoplist-path /Users/runner/work/minutes-ios/minutes-ios/build/sim/Build/Products/Debug-iphonesimulator/Minutes.app/Info.plist --temp-dir-path /Users/runner/work/minutes-i
+2026-10-15 17:23:45.779 appintentsnltrainingprocessor[3538:14406] Parsing options for appintentsnltrainingprocessor
+2026-10-15 17:23:45.780 appintentsnltrainingprocessor[3538:14406] Starting AppIntents SSU YAML Generation
+2026-10-15 17:23:45.789 appintentsnltrainingprocessor[3538:14406] No AppShortcuts found - Skipping.
+
+CodeSign /Users/runner/work/minutes-ios/minutes-ios/build/sim/Build/Products/Debug-iphonesimulator/Minutes.app/Minutes.debug.dylib (in target 'Minutes' from project 'Minutes')
+    cd /Users/runner/work/minutes-ios/minutes-ios
+    
+    Signing Identity:     "Sign to Run Locally"
+    
+    /usr/bin/codesign --force --sign - --timestamp\=none --generate-entitlement-der /Users/runner/work/minutes-ios/minutes-ios/build/sim/Build/Products/Debug-iphonesimulator/Minutes.app/Minutes.debug.dylib
+
+CodeSign /Users/runner/work/minutes-ios/minutes-ios/build/sim/Build/Products/Debug-iphonesimulator/Minutes.app/__preview.dylib (in target 'Minutes' from project 'Minutes')
+    cd /Users/runner/work/minutes-ios/minutes-ios
+    
+    Signing Identity:     "Sign to Run Locally"
+    
+    /usr/bin/codesign --force --sign - --timestamp\=none --generate-entitlement-der /Users/runner/work/minutes-ios/minutes-ios/build/sim/Build/Products/Debug-iphonesimulator/Minutes.app/__preview.dylib
+
+CodeSign /Users/runner/work/minutes-ios/minutes-ios/build/sim/Build/Products/Debug-iphonesimulator/Minutes.app (in target 'Minutes' from project 'Minutes')
+    cd /Users/runner/work/minutes-ios/minutes-ios
+    
+    Signing Identity:     "Sign to Run Locally"
+    
+    /usr/bin/codesign --force --sign - --timestamp\=none --generate-entitlement-der /Users/runner/work/minutes-ios/minutes-ios/build/sim/Build/Products/Debug-iphonesimulator/Minutes.app
+
+RegisterExecutionPolicyException /Users/runner/work/minutes-ios/minutes-ios/build/sim/Build/Products/Debug-iphonesimulator/Minutes.app (in target 'Minutes' from project 'Minutes')
+    cd /Users/runner/work/minutes-ios/minutes-ios
+    builtin-RegisterExecutionPolicyException /Users/runner/work/minutes-ios/minutes-ios/build/sim/Build/Products/Debug-iphonesimulator/Minutes.app
+
+Validate /Users/runner/work/minutes-ios/minutes-ios/build/sim/Build/Products/Debug-iphonesimulator/Minutes.app (in target 'Minutes' from project 'Minutes')
+    cd /Users/runner/work/minutes-ios/minutes-ios
+    builtin-validationUtility /Users/runner/work/minutes-ios/minutes-ios/build/sim/Build/Products/Debug-iphonesimulator/Minutes.app -shallow-bundle -infoplist-subpath Info.plist
+
+Touch /Users/runner/work/minutes-ios/minutes-ios/build/sim/Build/Products/Debug-iphonesimulator/Minutes.app (in target 'Minutes' from project 'Minutes')
+    cd /Users/runner/work/minutes-ios/minutes-ios
+    /usr/bin/touch -c /Users/runner/work/minutes-ios/minutes-ios/build/sim/Build/Products/Debug-iphonesimulator/Minutes.app
+
+** BUILD SUCCEEDED **
+

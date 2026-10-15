@@ -1,0 +1,27 @@
+{
+  "audioSeconds" : 115.6095625,
+  "crosstalkUtterances" : 0,
+  "emailed" : true,
+  "finished" : true,
+  "meetingStatus" : "done",
+  "modelsReady" : true,
+  "notes" : false,
+  "notesError" : "Apple's language model couldn't write the notes: it reported an error Minutes doesn't recognize.",
+  "ok" : true,
+  "overlappedUtterances" : 7,
+  "phase" : "finished",
+  "seconds" : 115.56842803955078,
+  "secondsAfterEnd" : 68.34718298912048,
+  "speakers" : 5,
+  "stage" : "finished",
+  "timings" : {
+    "assemble" : 0.020866036415100098,
+    "email" : 0.21892201900482178,
+    "separateSpeakers" : 42.18972992897034,
+    "transcribe" : 20.678358912467957,
+    "writeNotes" : 3.0022919178009033
+  },
+  "title" : "Meeting, Oct 15 at 5:38 PM",
+  "utterances" : 20,
+  "words" : 333
+}
