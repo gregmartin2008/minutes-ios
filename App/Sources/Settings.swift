@@ -63,10 +63,9 @@ final class AppSettings {
     }
 
     /// Whether the recognizer listens for the vocabulary and known names in the audio (a second,
-    /// small model). Off by default: loading that model brought the app down on an iPhone 18 Pro
-    /// Max, and until that is understood the typed spelling corrections do the work on their own.
+    /// small model, run on the CPU). On by default; the switch is there in case it misbehaves.
     var listensForVocabulary: Bool {
-        get { defaults.bool(forKey: "listensForVocabulary") }
+        get { defaults.object(forKey: "listensForVocabulary") as? Bool ?? true }
         set { defaults.set(newValue, forKey: "listensForVocabulary") }
     }
 
