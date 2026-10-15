@@ -100,7 +100,8 @@ public actor SpeechModels {
         if let ctc { return ctc }
         let started = Date()
         log.info("loading the vocabulary model")
-        let models = try await CtcModels.downloadAndLoad(variant: .ctc110m)
+        // On the CPU: compiling this model for the Neural Engine crashed inside Core ML on iOS 27.
+        let models = try await CtcModels.downloadAndLoad(variant: .ctc110m, computeUnits: .cpuOnly)
         ctc = models
         log.info(String(format: "vocabulary model ready in %.1fs", Date().timeIntervalSince(started)))
         return models

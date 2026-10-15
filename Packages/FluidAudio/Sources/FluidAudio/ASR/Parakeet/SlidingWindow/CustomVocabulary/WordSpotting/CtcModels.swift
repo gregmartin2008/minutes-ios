@@ -144,12 +144,16 @@ extension CtcModels {
     /// - Returns: Loaded `CtcModels` instance.
     public static func load(
         from directory: URL,
-        variant: CtcModelVariant = .ctc110m
+        variant: CtcModelVariant = .ctc110m,
+        computeUnits: MLComputeUnits? = nil
     ) async throws -> CtcModels {
         logger.info("Loading CTC models (\(variant.displayName)) from: \(directory.path)")
 
         let parentDirectory = directory.deletingLastPathComponent()
-        let config = defaultConfiguration()
+        // Added for Minutes: a caller may choose the compute units. Compiling this model for the
+        // Neural Engine crashed inside Core ML on iOS 27 (iPhone 18 Pro Max), so Minutes runs it
+        // on the CPU, which the model is small enough for.
+        let config = computeUnits.map { MLModelConfigurationUtils.defaultConfiguration(computeUnits: $0) } ?? defaultConfiguration()
 
         // ModelHub expects the base directory (without the repo folder) and
         // resolves the repo's folderName internally.
@@ -240,10 +244,11 @@ extension CtcModels {
     /// - Returns: Loaded `CtcModels` instance.
     public static func downloadAndLoad(
         to directory: URL? = nil,
-        variant: CtcModelVariant = .ctc110m
+        variant: CtcModelVariant = .ctc110m,
+        computeUnits: MLComputeUnits? = nil
     ) async throws -> CtcModels {
         let targetDir = try await download(to: directory, variant: variant)
-        return try await load(from: targetDir, variant: variant)
+        return try await load(from: targetDir, variant: variant, computeUnits: computeUnits)
     }
 
     /// Default CoreML configuration for CTC inference.
