@@ -62,6 +62,14 @@ final class AppSettings {
         set { defaults.set(try? JSONEncoder().encode(newValue), forKey: "vocabulary") }
     }
 
+    /// Whether the recognizer listens for the vocabulary and known names in the audio (a second,
+    /// small model). Off by default: loading that model brought the app down on an iPhone 18 Pro
+    /// Max, and until that is understood the typed spelling corrections do the work on their own.
+    var listensForVocabulary: Bool {
+        get { defaults.bool(forKey: "listensForVocabulary") }
+        set { defaults.set(newValue, forKey: "listensForVocabulary") }
+    }
+
     var askedForNotifications: Bool {
         get { defaults.bool(forKey: "askedForNotifications") }
         set { defaults.set(newValue, forKey: "askedForNotifications") }

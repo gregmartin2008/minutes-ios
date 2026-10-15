@@ -93,18 +93,13 @@ public actor SpeechModels {
         progress(.transcription, 1, false)
         _ = try await separationModels { progress(.separation, $0, $1) }
         progress(.separation, 1, false)
-        // The vocabulary model is small and optional: transcription works without it.
-        do {
-            _ = try await vocabularyModels()
-        } catch {
-            log.warn("vocabulary model not available: \(error)")
-        }
         progress(.vocabulary, 1, false)
     }
 
     func vocabularyModels() async throws -> CtcModels {
         if let ctc { return ctc }
         let started = Date()
+        log.info("loading the vocabulary model")
         let models = try await CtcModels.downloadAndLoad(variant: .ctc110m)
         ctc = models
         log.info(String(format: "vocabulary model ready in %.1fs", Date().timeIntervalSince(started)))
@@ -173,9 +168,10 @@ public actor SpeechModels {
 
     /// Loads the models and keeps them in memory until `unload` is called. The vocabulary model
     /// is fetched if it is missing (it was added after the first builds), and skipped if it can't be.
-    public func preloadAll() async throws {
+    public func preloadAll(includingVocabulary: Bool = false) async throws {
         _ = try await separationModels()
         _ = try await transcriber()
+        guard includingVocabulary else { return }
         do { _ = try await vocabularyModels() } catch { log.warn("vocabulary model not available: \(error)") }
     }
 

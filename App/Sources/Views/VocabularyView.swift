@@ -6,9 +6,17 @@ struct VocabularyView: View {
     @EnvironmentObject private var model: AppModel
     @State private var editing: VocabularyTerm?
     @State private var adding = false
+    @State private var listens = AppSettings.shared.listensForVocabulary
 
     var body: some View {
         List {
+            Section {
+                Toggle("Listen for these terms in the audio", isOn: $listens)
+                    .onChange(of: listens) { _, on in AppSettings.shared.listensForVocabulary = on }
+                    .listRowBackground(Theme.paper)
+            } footer: {
+                Text("Experimental. A second, small model listens for the terms and known names and corrects the transcript where it hears one. Off by default: loading it has crashed the app on some iPhones. The typed spelling corrections below work either way.")
+            }
             Section {
                 if model.vocabulary.terms.isEmpty {
                     Text("No terms yet. Add the names of your firm, your companies and the people you meet with, and the spellings Minutes has used for them.")
@@ -41,7 +49,7 @@ struct VocabularyView: View {
             } header: {
                 Text("Your terms")
             } footer: {
-                Text("From now on the recognizer listens for these terms and the names of the people Minutes knows, misheard spellings are replaced in the transcript, and the notes use the spelling you give. Earlier meetings are not changed.")
+                Text("A term's misheard spellings are replaced in every transcript from now on, and the notes use the spelling you give. Earlier meetings are not changed.")
             }
 
             Section {
