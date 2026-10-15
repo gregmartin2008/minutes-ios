@@ -321,6 +321,7 @@ final class AppModel: ObservableObject {
     /// The names and terms the recognizer listens for: the vocabulary, with the spellings it has
     /// been heard as, and the names of the people whose voices Minutes knows.
     func boostTerms() -> [BoostTerm] {
+        guard AppSettings.shared.listensForVocabulary else { return [] }
         var out: [BoostTerm] = []
         var seen = Set<String>()
         func add(_ text: String, aliases: [String] = []) {
@@ -344,8 +345,9 @@ final class AppModel: ObservableObject {
     func warmModels() {
         guard setup.ready, !isDemo, live == nil, runningID == nil else { return }
         let models = self.models
+        let listening = AppSettings.shared.listensForVocabulary
         Task.detached(priority: .utility) {
-            do { try await models.preloadAll() } catch { Log.shared.warn("model warm-up failed: \(error)") }
+            do { try await models.preloadAll(includingVocabulary: listening) } catch { Log.shared.warn("model warm-up failed: \(error)") }
         }
     }
 
