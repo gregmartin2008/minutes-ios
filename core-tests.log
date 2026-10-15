@@ -1,0 +1,979 @@
+Building for debugging...
+[0/7] /Users/runner/work/minutes-ios/minutes-ios/Packages/MinutesCore/.build/arm64-apple-macosx/debug/MinutesCorePackageTests.derived/runner.swift
+[1/7] Write sources
+[4/7] Write swift-version-7974D3F7F03D5E95.txt
+[6/19] Compiling MinutesCore NotesEngine.swift
+[7/19] Compiling MinutesCore Pipeline.swift
+[8/19] Compiling MinutesCore Render.swift
+[9/19] Compiling MinutesCore SMTPClient.swift
+[10/19] Compiling MinutesCore SpeakerCounter.swift
+[11/24] Emitting module MinutesCore
+[12/24] Compiling MinutesCore EmailMessage.swift
+[13/24] Compiling MinutesCore LiveWork.swift
+[14/24] Compiling MinutesCore MemoryUse.swift
+[15/24] Compiling MinutesCore Models.swift
+[16/24] Compiling MinutesCore Naming.swift
+[17/24] Compiling MinutesCore NetworkTransport.swift
+[18/24] Compiling MinutesCore SpeakerMatcher.swift
+[19/24] Compiling MinutesCore Storage.swift
+[20/24] Compiling MinutesCore TranscriptAssembler.swift
+[21/24] Compiling MinutesCore Vocabulary.swift
+[22/24] Compiling MinutesCore WAVFile.swift
+[23/34] Compiling MinutesCoreTests RenderTests.swift
+[24/34] Compiling MinutesCoreTests SMTPIntegrationTests.swift
+[25/34] Compiling MinutesCoreTests SMTPTests.swift
+[26/34] Compiling MinutesCoreTests SpeakerCounterTests.swift
+[27/38] Compiling MinutesCoreTests EmailTests.swift
+/Users/runner/work/minutes-ios/minutes-ios/Packages/MinutesCore/Tests/MinutesCoreTests/NotesEngineTests.swift:42:14: warning: instance method 'lock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 40 |         if section.count > rejectSectionsLongerThan { throw NotesModelError.contextExceeded }
+ 41 |         if let needle = refuseSectionsContaining, section.contains(needle) { throw NotesModelError.refused("unsafe") }
+ 42 |         lock.lock()
+    |              `- warning: instance method 'lock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 43 |         sections.append(section)
+ 44 |         contexts.append(context)
+
+Foundation.NSLock.lock:2:11: note: 'lock()' declared here
+1 | class NSLock {
+2 | open func lock()}
+  |           `- note: 'lock()' declared here
+3 | 
+
+/Users/runner/work/minutes-ios/minutes-ios/Packages/MinutesCore/Tests/MinutesCoreTests/NotesEngineTests.swift:46:14: warning: instance method 'unlock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 44 |         contexts.append(context)
+ 45 |         let n = sections.count
+ 46 |         lock.unlock()
+    |              `- warning: instance method 'unlock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 47 |         let first = section.split(separator: "\n").first.map(String.init) ?? ""
+ 48 |         return NotesFragment(
+
+Foundation.NSLock.unlock:2:11: note: 'unlock()' declared here
+1 | class NSLock {
+2 | open func unlock()}
+  |           `- note: 'unlock()' declared here
+3 | 
+
+/Users/runner/work/minutes-ios/minutes-ios/Packages/MinutesCore/Tests/MinutesCoreTests/NotesEngineTests.swift:60:14: warning: instance method 'lock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 58 |         try gate()
+ 59 |         if failConsolidate { throw NotesModelError.other("boom") }
+ 60 |         lock.lock()
+    |              `- warning: instance method 'lock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 61 |         consolidations.append((kind, items, limit))
+ 62 |         lock.unlock()
+
+Foundation.NSLock.lock:2:11: note: 'lock()' declared here
+1 | class NSLock {
+2 | open func lock()}
+  |           `- note: 'lock()' declared here
+3 | 
+
+/Users/runner/work/minutes-ios/minutes-ios/Packages/MinutesCore/Tests/MinutesCoreTests/NotesEngineTests.swift:62:14: warning: instance method 'unlock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 60 |         lock.lock()
+ 61 |         consolidations.append((kind, items, limit))
+ 62 |         lock.unlock()
+    |              `- warning: instance method 'unlock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 63 |         let kept = Array(items.prefix(limit))
+ 64 |         return echoMarkers ? kept.map { "- " + $0 } : kept
+
+Foundation.NSLock.unlock:2:11: note: 'unlock()' declared here
+1 | class NSLock {
+2 | open func unlock()}
+  |           `- note: 'unlock()' declared here
+3 | 
+
+/Users/runner/work/minutes-ios/minutes-ios/Packages/MinutesCore/Tests/MinutesCoreTests/NotesEngineTests.swift:69:14: warning: instance method 'lock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 67 |     func overview(keyPoints: [String], decisions: [String], gists: [String], titleHint: String?) async throws -> NotesOverview {
+ 68 |         try gate()
+ 69 |         lock.lock()
+    |              `- warning: instance method 'lock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 70 |         overviewCalls += 1
+ 71 |         lock.unlock()
+
+Foundation.NSLock.lock:2:11: note: 'lock()' declared here
+1 | class NSLock {
+2 | open func lock()}
+  |           `- note: 'lock()' declared here
+3 | 
+
+/Users/runner/work/minutes-ios/minutes-ios/Packages/MinutesCore/Tests/MinutesCoreTests/NotesEngineTests.swift:71:14: warning: instance method 'unlock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 69 |         lock.lock()
+ 70 |         overviewCalls += 1
+ 71 |         lock.unlock()
+    |              `- warning: instance method 'unlock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 72 |         if failOverview { throw NotesModelError.other("boom") }
+ 73 |         return NotesOverview(title: "\"Add-on diligence review.\"", summary: "A summary of \(keyPoints.count) points.")
+
+Foundation.NSLock.unlock:2:11: note: 'unlock()' declared here
+1 | class NSLock {
+2 | open func unlock()}
+  |           `- note: 'unlock()' declared here
+3 | 
+[28/38] Compiling MinutesCoreTests NamingTests.swift
+/Users/runner/work/minutes-ios/minutes-ios/Packages/MinutesCore/Tests/MinutesCoreTests/NotesEngineTests.swift:42:14: warning: instance method 'lock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 40 |         if section.count > rejectSectionsLongerThan { throw NotesModelError.contextExceeded }
+ 41 |         if let needle = refuseSectionsContaining, section.contains(needle) { throw NotesModelError.refused("unsafe") }
+ 42 |         lock.lock()
+    |              `- warning: instance method 'lock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 43 |         sections.append(section)
+ 44 |         contexts.append(context)
+
+Foundation.NSLock.lock:2:11: note: 'lock()' declared here
+1 | class NSLock {
+2 | open func lock()}
+  |           `- note: 'lock()' declared here
+3 | 
+
+/Users/runner/work/minutes-ios/minutes-ios/Packages/MinutesCore/Tests/MinutesCoreTests/NotesEngineTests.swift:46:14: warning: instance method 'unlock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 44 |         contexts.append(context)
+ 45 |         let n = sections.count
+ 46 |         lock.unlock()
+    |              `- warning: instance method 'unlock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 47 |         let first = section.split(separator: "\n").first.map(String.init) ?? ""
+ 48 |         return NotesFragment(
+
+Foundation.NSLock.unlock:2:11: note: 'unlock()' declared here
+1 | class NSLock {
+2 | open func unlock()}
+  |           `- note: 'unlock()' declared here
+3 | 
+
+/Users/runner/work/minutes-ios/minutes-ios/Packages/MinutesCore/Tests/MinutesCoreTests/NotesEngineTests.swift:60:14: warning: instance method 'lock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 58 |         try gate()
+ 59 |         if failConsolidate { throw NotesModelError.other("boom") }
+ 60 |         lock.lock()
+    |              `- warning: instance method 'lock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 61 |         consolidations.append((kind, items, limit))
+ 62 |         lock.unlock()
+
+Foundation.NSLock.lock:2:11: note: 'lock()' declared here
+1 | class NSLock {
+2 | open func lock()}
+  |           `- note: 'lock()' declared here
+3 | 
+
+/Users/runner/work/minutes-ios/minutes-ios/Packages/MinutesCore/Tests/MinutesCoreTests/NotesEngineTests.swift:62:14: warning: instance method 'unlock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 60 |         lock.lock()
+ 61 |         consolidations.append((kind, items, limit))
+ 62 |         lock.unlock()
+    |              `- warning: instance method 'unlock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 63 |         let kept = Array(items.prefix(limit))
+ 64 |         return echoMarkers ? kept.map { "- " + $0 } : kept
+
+Foundation.NSLock.unlock:2:11: note: 'unlock()' declared here
+1 | class NSLock {
+2 | open func unlock()}
+  |           `- note: 'unlock()' declared here
+3 | 
+
+/Users/runner/work/minutes-ios/minutes-ios/Packages/MinutesCore/Tests/MinutesCoreTests/NotesEngineTests.swift:69:14: warning: instance method 'lock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 67 |     func overview(keyPoints: [String], decisions: [String], gists: [String], titleHint: String?) async throws -> NotesOverview {
+ 68 |         try gate()
+ 69 |         lock.lock()
+    |              `- warning: instance method 'lock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 70 |         overviewCalls += 1
+ 71 |         lock.unlock()
+
+Foundation.NSLock.lock:2:11: note: 'lock()' declared here
+1 | class NSLock {
+2 | open func lock()}
+  |           `- note: 'lock()' declared here
+3 | 
+
+/Users/runner/work/minutes-ios/minutes-ios/Packages/MinutesCore/Tests/MinutesCoreTests/NotesEngineTests.swift:71:14: warning: instance method 'unlock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 69 |         lock.lock()
+ 70 |         overviewCalls += 1
+ 71 |         lock.unlock()
+    |              `- warning: instance method 'unlock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 72 |         if failOverview { throw NotesModelError.other("boom") }
+ 73 |         return NotesOverview(title: "\"Add-on diligence review.\"", summary: "A summary of \(keyPoints.count) points.")
+
+Foundation.NSLock.unlock:2:11: note: 'unlock()' declared here
+1 | class NSLock {
+2 | open func unlock()}
+  |           `- note: 'unlock()' declared here
+3 | 
+[29/38] Compiling MinutesCoreTests NetworkTransportTests.swift
+/Users/runner/work/minutes-ios/minutes-ios/Packages/MinutesCore/Tests/MinutesCoreTests/NotesEngineTests.swift:42:14: warning: instance method 'lock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 40 |         if section.count > rejectSectionsLongerThan { throw NotesModelError.contextExceeded }
+ 41 |         if let needle = refuseSectionsContaining, section.contains(needle) { throw NotesModelError.refused("unsafe") }
+ 42 |         lock.lock()
+    |              `- warning: instance method 'lock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 43 |         sections.append(section)
+ 44 |         contexts.append(context)
+
+Foundation.NSLock.lock:2:11: note: 'lock()' declared here
+1 | class NSLock {
+2 | open func lock()}
+  |           `- note: 'lock()' declared here
+3 | 
+
+/Users/runner/work/minutes-ios/minutes-ios/Packages/MinutesCore/Tests/MinutesCoreTests/NotesEngineTests.swift:46:14: warning: instance method 'unlock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 44 |         contexts.append(context)
+ 45 |         let n = sections.count
+ 46 |         lock.unlock()
+    |              `- warning: instance method 'unlock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 47 |         let first = section.split(separator: "\n").first.map(String.init) ?? ""
+ 48 |         return NotesFragment(
+
+Foundation.NSLock.unlock:2:11: note: 'unlock()' declared here
+1 | class NSLock {
+2 | open func unlock()}
+  |           `- note: 'unlock()' declared here
+3 | 
+
+/Users/runner/work/minutes-ios/minutes-ios/Packages/MinutesCore/Tests/MinutesCoreTests/NotesEngineTests.swift:60:14: warning: instance method 'lock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 58 |         try gate()
+ 59 |         if failConsolidate { throw NotesModelError.other("boom") }
+ 60 |         lock.lock()
+    |              `- warning: instance method 'lock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 61 |         consolidations.append((kind, items, limit))
+ 62 |         lock.unlock()
+
+Foundation.NSLock.lock:2:11: note: 'lock()' declared here
+1 | class NSLock {
+2 | open func lock()}
+  |           `- note: 'lock()' declared here
+3 | 
+
+/Users/runner/work/minutes-ios/minutes-ios/Packages/MinutesCore/Tests/MinutesCoreTests/NotesEngineTests.swift:62:14: warning: instance method 'unlock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 60 |         lock.lock()
+ 61 |         consolidations.append((kind, items, limit))
+ 62 |         lock.unlock()
+    |              `- warning: instance method 'unlock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 63 |         let kept = Array(items.prefix(limit))
+ 64 |         return echoMarkers ? kept.map { "- " + $0 } : kept
+
+Foundation.NSLock.unlock:2:11: note: 'unlock()' declared here
+1 | class NSLock {
+2 | open func unlock()}
+  |           `- note: 'unlock()' declared here
+3 | 
+
+/Users/runner/work/minutes-ios/minutes-ios/Packages/MinutesCore/Tests/MinutesCoreTests/NotesEngineTests.swift:69:14: warning: instance method 'lock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 67 |     func overview(keyPoints: [String], decisions: [String], gists: [String], titleHint: String?) async throws -> NotesOverview {
+ 68 |         try gate()
+ 69 |         lock.lock()
+    |              `- warning: instance method 'lock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 70 |         overviewCalls += 1
+ 71 |         lock.unlock()
+
+Foundation.NSLock.lock:2:11: note: 'lock()' declared here
+1 | class NSLock {
+2 | open func lock()}
+  |           `- note: 'lock()' declared here
+3 | 
+
+/Users/runner/work/minutes-ios/minutes-ios/Packages/MinutesCore/Tests/MinutesCoreTests/NotesEngineTests.swift:71:14: warning: instance method 'unlock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 69 |         lock.lock()
+ 70 |         overviewCalls += 1
+ 71 |         lock.unlock()
+    |              `- warning: instance method 'unlock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 72 |         if failOverview { throw NotesModelError.other("boom") }
+ 73 |         return NotesOverview(title: "\"Add-on diligence review.\"", summary: "A summary of \(keyPoints.count) points.")
+
+Foundation.NSLock.unlock:2:11: note: 'unlock()' declared here
+1 | class NSLock {
+2 | open func unlock()}
+  |           `- note: 'unlock()' declared here
+3 | 
+[30/38] Compiling MinutesCoreTests NotesEngineTests.swift
+/Users/runner/work/minutes-ios/minutes-ios/Packages/MinutesCore/Tests/MinutesCoreTests/NotesEngineTests.swift:42:14: warning: instance method 'lock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 40 |         if section.count > rejectSectionsLongerThan { throw NotesModelError.contextExceeded }
+ 41 |         if let needle = refuseSectionsContaining, section.contains(needle) { throw NotesModelError.refused("unsafe") }
+ 42 |         lock.lock()
+    |              `- warning: instance method 'lock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 43 |         sections.append(section)
+ 44 |         contexts.append(context)
+
+Foundation.NSLock.lock:2:11: note: 'lock()' declared here
+1 | class NSLock {
+2 | open func lock()}
+  |           `- note: 'lock()' declared here
+3 | 
+
+/Users/runner/work/minutes-ios/minutes-ios/Packages/MinutesCore/Tests/MinutesCoreTests/NotesEngineTests.swift:46:14: warning: instance method 'unlock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 44 |         contexts.append(context)
+ 45 |         let n = sections.count
+ 46 |         lock.unlock()
+    |              `- warning: instance method 'unlock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 47 |         let first = section.split(separator: "\n").first.map(String.init) ?? ""
+ 48 |         return NotesFragment(
+
+Foundation.NSLock.unlock:2:11: note: 'unlock()' declared here
+1 | class NSLock {
+2 | open func unlock()}
+  |           `- note: 'unlock()' declared here
+3 | 
+
+/Users/runner/work/minutes-ios/minutes-ios/Packages/MinutesCore/Tests/MinutesCoreTests/NotesEngineTests.swift:60:14: warning: instance method 'lock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 58 |         try gate()
+ 59 |         if failConsolidate { throw NotesModelError.other("boom") }
+ 60 |         lock.lock()
+    |              `- warning: instance method 'lock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 61 |         consolidations.append((kind, items, limit))
+ 62 |         lock.unlock()
+
+Foundation.NSLock.lock:2:11: note: 'lock()' declared here
+1 | class NSLock {
+2 | open func lock()}
+  |           `- note: 'lock()' declared here
+3 | 
+
+/Users/runner/work/minutes-ios/minutes-ios/Packages/MinutesCore/Tests/MinutesCoreTests/NotesEngineTests.swift:62:14: warning: instance method 'unlock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 60 |         lock.lock()
+ 61 |         consolidations.append((kind, items, limit))
+ 62 |         lock.unlock()
+    |              `- warning: instance method 'unlock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 63 |         let kept = Array(items.prefix(limit))
+ 64 |         return echoMarkers ? kept.map { "- " + $0 } : kept
+
+Foundation.NSLock.unlock:2:11: note: 'unlock()' declared here
+1 | class NSLock {
+2 | open func unlock()}
+  |           `- note: 'unlock()' declared here
+3 | 
+
+/Users/runner/work/minutes-ios/minutes-ios/Packages/MinutesCore/Tests/MinutesCoreTests/NotesEngineTests.swift:69:14: warning: instance method 'lock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 67 |     func overview(keyPoints: [String], decisions: [String], gists: [String], titleHint: String?) async throws -> NotesOverview {
+ 68 |         try gate()
+ 69 |         lock.lock()
+    |              `- warning: instance method 'lock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 70 |         overviewCalls += 1
+ 71 |         lock.unlock()
+
+Foundation.NSLock.lock:2:11: note: 'lock()' declared here
+1 | class NSLock {
+2 | open func lock()}
+  |           `- note: 'lock()' declared here
+3 | 
+
+/Users/runner/work/minutes-ios/minutes-ios/Packages/MinutesCore/Tests/MinutesCoreTests/NotesEngineTests.swift:71:14: warning: instance method 'unlock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 69 |         lock.lock()
+ 70 |         overviewCalls += 1
+ 71 |         lock.unlock()
+    |              `- warning: instance method 'unlock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 72 |         if failOverview { throw NotesModelError.other("boom") }
+ 73 |         return NotesOverview(title: "\"Add-on diligence review.\"", summary: "A summary of \(keyPoints.count) points.")
+
+Foundation.NSLock.unlock:2:11: note: 'unlock()' declared here
+1 | class NSLock {
+2 | open func unlock()}
+  |           `- note: 'unlock()' declared here
+3 | 
+[31/38] Compiling MinutesCoreTests PipelineTests.swift
+/Users/runner/work/minutes-ios/minutes-ios/Packages/MinutesCore/Tests/MinutesCoreTests/NotesEngineTests.swift:42:14: warning: instance method 'lock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 40 |         if section.count > rejectSectionsLongerThan { throw NotesModelError.contextExceeded }
+ 41 |         if let needle = refuseSectionsContaining, section.contains(needle) { throw NotesModelError.refused("unsafe") }
+ 42 |         lock.lock()
+    |              `- warning: instance method 'lock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 43 |         sections.append(section)
+ 44 |         contexts.append(context)
+
+Foundation.NSLock.lock:2:11: note: 'lock()' declared here
+1 | class NSLock {
+2 | open func lock()}
+  |           `- note: 'lock()' declared here
+3 | 
+
+/Users/runner/work/minutes-ios/minutes-ios/Packages/MinutesCore/Tests/MinutesCoreTests/NotesEngineTests.swift:46:14: warning: instance method 'unlock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 44 |         contexts.append(context)
+ 45 |         let n = sections.count
+ 46 |         lock.unlock()
+    |              `- warning: instance method 'unlock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 47 |         let first = section.split(separator: "\n").first.map(String.init) ?? ""
+ 48 |         return NotesFragment(
+
+Foundation.NSLock.unlock:2:11: note: 'unlock()' declared here
+1 | class NSLock {
+2 | open func unlock()}
+  |           `- note: 'unlock()' declared here
+3 | 
+
+/Users/runner/work/minutes-ios/minutes-ios/Packages/MinutesCore/Tests/MinutesCoreTests/NotesEngineTests.swift:60:14: warning: instance method 'lock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 58 |         try gate()
+ 59 |         if failConsolidate { throw NotesModelError.other("boom") }
+ 60 |         lock.lock()
+    |              `- warning: instance method 'lock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 61 |         consolidations.append((kind, items, limit))
+ 62 |         lock.unlock()
+
+Foundation.NSLock.lock:2:11: note: 'lock()' declared here
+1 | class NSLock {
+2 | open func lock()}
+  |           `- note: 'lock()' declared here
+3 | 
+
+/Users/runner/work/minutes-ios/minutes-ios/Packages/MinutesCore/Tests/MinutesCoreTests/NotesEngineTests.swift:62:14: warning: instance method 'unlock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 60 |         lock.lock()
+ 61 |         consolidations.append((kind, items, limit))
+ 62 |         lock.unlock()
+    |              `- warning: instance method 'unlock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 63 |         let kept = Array(items.prefix(limit))
+ 64 |         return echoMarkers ? kept.map { "- " + $0 } : kept
+
+Foundation.NSLock.unlock:2:11: note: 'unlock()' declared here
+1 | class NSLock {
+2 | open func unlock()}
+  |           `- note: 'unlock()' declared here
+3 | 
+
+/Users/runner/work/minutes-ios/minutes-ios/Packages/MinutesCore/Tests/MinutesCoreTests/NotesEngineTests.swift:69:14: warning: instance method 'lock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 67 |     func overview(keyPoints: [String], decisions: [String], gists: [String], titleHint: String?) async throws -> NotesOverview {
+ 68 |         try gate()
+ 69 |         lock.lock()
+    |              `- warning: instance method 'lock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 70 |         overviewCalls += 1
+ 71 |         lock.unlock()
+
+Foundation.NSLock.lock:2:11: note: 'lock()' declared here
+1 | class NSLock {
+2 | open func lock()}
+  |           `- note: 'lock()' declared here
+3 | 
+
+/Users/runner/work/minutes-ios/minutes-ios/Packages/MinutesCore/Tests/MinutesCoreTests/NotesEngineTests.swift:71:14: warning: instance method 'unlock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 69 |         lock.lock()
+ 70 |         overviewCalls += 1
+ 71 |         lock.unlock()
+    |              `- warning: instance method 'unlock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 72 |         if failOverview { throw NotesModelError.other("boom") }
+ 73 |         return NotesOverview(title: "\"Add-on diligence review.\"", summary: "A summary of \(keyPoints.count) points.")
+
+Foundation.NSLock.unlock:2:11: note: 'unlock()' declared here
+1 | class NSLock {
+2 | open func unlock()}
+  |           `- note: 'unlock()' declared here
+3 | 
+[32/38] Emitting module MinutesCoreTests
+[33/38] Compiling MinutesCoreTests SpeakerMatcherTests.swift
+[34/38] Compiling MinutesCoreTests TranscriptAssemblerTests.swift
+[35/38] Compiling MinutesCoreTests VocabularyTests.swift
+[36/38] Compiling MinutesCoreTests WAVAndStoreTests.swift
+[37/40] Emitting module MinutesCorePackageTests
+[38/40] Compiling MinutesCorePackageTests runner.swift
+[38/40] Write Objects.LinkFileList
+[39/40] Linking MinutesCorePackageTests
+Build complete! (41.46s)
+Test Suite 'All tests' started at 2026-10-15 17:23:03.766.
+Test Suite 'MinutesCorePackageTests.xctest' started at 2026-10-15 17:23:03.771.
+Test Suite 'EmailTests' started at 2026-10-15 17:23:03.771.
+Test Case '-[MinutesCoreTests.EmailTests testBase64LinesWrapAt76]' started.
+Test Case '-[MinutesCoreTests.EmailTests testBase64LinesWrapAt76]' passed (0.003 seconds).
+Test Case '-[MinutesCoreTests.EmailTests testDateHeader]' started.
+Test Case '-[MinutesCoreTests.EmailTests testDateHeader]' passed (0.001 seconds).
+Test Case '-[MinutesCoreTests.EmailTests testDotStuffing]' started.
+Test Case '-[MinutesCoreTests.EmailTests testDotStuffing]' passed (0.003 seconds).
+Test Case '-[MinutesCoreTests.EmailTests testHeaderInjectionIsNeutralized]' started.
+Test Case '-[MinutesCoreTests.EmailTests testHeaderInjectionIsNeutralized]' passed (0.002 seconds).
+Test Case '-[MinutesCoreTests.EmailTests testLongAccentedFilenameIsSplitWithoutBreakingEscapes]' started.
+Test Case '-[MinutesCoreTests.EmailTests testLongAccentedFilenameIsSplitWithoutBreakingEscapes]' passed (0.004 seconds).
+Test Case '-[MinutesCoreTests.EmailTests testLongASCIISubjectIsFolded]' started.
+Test Case '-[MinutesCoreTests.EmailTests testLongASCIISubjectIsFolded]' passed (0.001 seconds).
+Test Case '-[MinutesCoreTests.EmailTests testNonASCIISubjectIsEncodedAndDecodesBack]' started.
+Test Case '-[MinutesCoreTests.EmailTests testNonASCIISubjectIsEncodedAndDecodesBack]' passed (0.002 seconds).
+Test Case '-[MinutesCoreTests.EmailTests testPlainMessageWithoutAttachments]' started.
+Test Case '-[MinutesCoreTests.EmailTests testPlainMessageWithoutAttachments]' passed (0.001 seconds).
+Test Case '-[MinutesCoreTests.EmailTests testWireFormatIsCRLFAndLinesAreShort]' started.
+Test Case '-[MinutesCoreTests.EmailTests testWireFormatIsCRLFAndLinesAreShort]' passed (0.003 seconds).
+Test Suite 'EmailTests' passed at 2026-10-15 17:23:03.792.
+	 Executed 9 tests, with 0 failures (0 unexpected) in 0.019 (0.022) seconds
+Test Suite 'LiveNoteTakerTests' started at 2026-10-15 17:23:03.792.
+Test Case '-[MinutesCoreTests.LiveNoteTakerTests testNothingIsExtractedUntilEnoughHasSettled]' started.
+Test Case '-[MinutesCoreTests.LiveNoteTakerTests testNothingIsExtractedUntilEnoughHasSettled]' passed (0.001 seconds).
+Test Case '-[MinutesCoreTests.LiveNoteTakerTests testSettledStretchesBecomeSectionsWithProvisionalNames]' started.
+Test Case '-[MinutesCoreTests.LiveNoteTakerTests testSettledStretchesBecomeSectionsWithProvisionalNames]' passed (0.003 seconds).
+Test Case '-[MinutesCoreTests.LiveNoteTakerTests testThrottlingLeavesTheStretchForLater]' started.
+Test Case '-[MinutesCoreTests.LiveNoteTakerTests testThrottlingLeavesTheStretchForLater]' passed (0.082 seconds).
+Test Suite 'LiveNoteTakerTests' passed at 2026-10-15 17:23:03.878.
+	 Executed 3 tests, with 0 failures (0 unexpected) in 0.085 (0.086) seconds
+Test Suite 'LiveWorkTests' started at 2026-10-15 17:23:03.878.
+Test Case '-[MinutesCoreTests.LiveWorkTests testPipelineUsesLiveWorkAndExtractsOnlyTheTail]' started.
+Test Case '-[MinutesCoreTests.LiveWorkTests testPipelineUsesLiveWorkAndExtractsOnlyTheTail]' passed (0.022 seconds).
+Test Case '-[MinutesCoreTests.LiveWorkTests testProvisionalNamesAreResolvedToFinalSpeakers]' started.
+Test Case '-[MinutesCoreTests.LiveWorkTests testProvisionalNamesAreResolvedToFinalSpeakers]' passed (0.000 seconds).
+Test Suite 'LiveWorkTests' passed at 2026-10-15 17:23:03.901.
+	 Executed 2 tests, with 0 failures (0 unexpected) in 0.022 (0.023) seconds
+Test Suite 'NamingTests' started at 2026-10-15 17:23:03.901.
+Test Case '-[MinutesCoreTests.NamingTests testLearningVoices]' started.
+Test Case '-[MinutesCoreTests.NamingTests testLearningVoices]' passed (0.001 seconds).
+Test Case '-[MinutesCoreTests.NamingTests testNamingASpeakerUpdatesTheNotes]' started.
+Test Case '-[MinutesCoreTests.NamingTests testNamingASpeakerUpdatesTheNotes]' passed (0.000 seconds).
+Test Case '-[MinutesCoreTests.NamingTests testRenamingAndClearing]' started.
+Test Case '-[MinutesCoreTests.NamingTests testRenamingAndClearing]' passed (0.000 seconds).
+Test Case '-[MinutesCoreTests.NamingTests testReplacingNameRespectsWordBoundaries]' started.
+Test Case '-[MinutesCoreTests.NamingTests testReplacingNameRespectsWordBoundaries]' passed (0.000 seconds).
+Test Suite 'NamingTests' passed at 2026-10-15 17:23:03.903.
+	 Executed 4 tests, with 0 failures (0 unexpected) in 0.002 (0.002) seconds
+Test Suite 'NetworkTransportTests' started at 2026-10-15 17:23:03.903.
+Test Case '-[MinutesCoreTests.NetworkTransportTests testTLSHandshakeAndGreetingFromGmail]' started.
+/Users/runner/work/minutes-ios/minutes-ios/Packages/MinutesCore/Tests/MinutesCoreTests/NetworkTransportTests.swift:11: -[MinutesCoreTests.NetworkTransportTests testTLSHandshakeAndGreetingFromGmail] : Test skipped - live network tests not enabled
+Test Case '-[MinutesCoreTests.NetworkTransportTests testTLSHandshakeAndGreetingFromGmail]' skipped (0.002 seconds).
+Test Case '-[MinutesCoreTests.NetworkTransportTests testUnreachableServerFailsInsteadOfHanging]' started.
+/Users/runner/work/minutes-ios/minutes-ios/Packages/MinutesCore/Tests/MinutesCoreTests/NetworkTransportTests.swift:11: -[MinutesCoreTests.NetworkTransportTests testUnreachableServerFailsInsteadOfHanging] : Test skipped - live network tests not enabled
+Test Case '-[MinutesCoreTests.NetworkTransportTests testUnreachableServerFailsInsteadOfHanging]' skipped (0.001 seconds).
+Test Case '-[MinutesCoreTests.NetworkTransportTests testWrongPasswordAgainstGmailIsReportedAsSignInFailure]' started.
+/Users/runner/work/minutes-ios/minutes-ios/Packages/MinutesCore/Tests/MinutesCoreTests/NetworkTransportTests.swift:11: -[MinutesCoreTests.NetworkTransportTests testWrongPasswordAgainstGmailIsReportedAsSignInFailure] : Test skipped - live network tests not enabled
+Test Case '-[MinutesCoreTests.NetworkTransportTests testWrongPasswordAgainstGmailIsReportedAsSignInFailure]' skipped (0.001 seconds).
+Test Suite 'NetworkTransportTests' passed at 2026-10-15 17:23:03.907.
+	 Executed 3 tests, with 3 tests skipped and 0 failures (0 unexpected) in 0.003 (0.004) seconds
+Test Suite 'NotesCleaningTests' started at 2026-10-15 17:23:03.907.
+Test Case '-[MinutesCoreTests.NotesCleaningTests testConsolidatedListsLoseTheirMarkersToo]' started.
+Test Case '-[MinutesCoreTests.NotesCleaningTests testConsolidatedListsLoseTheirMarkersToo]' passed (0.006 seconds).
+Test Case '-[MinutesCoreTests.NotesCleaningTests testFiguresWithNumbersNobodySaidAreDropped]' started.
+Test Case '-[MinutesCoreTests.NotesCleaningTests testFiguresWithNumbersNobodySaidAreDropped]' passed (0.001 seconds).
+Test Case '-[MinutesCoreTests.NotesCleaningTests testListMarkersAndFillerSentencesAreStripped]' started.
+Test Case '-[MinutesCoreTests.NotesCleaningTests testListMarkersAndFillerSentencesAreStripped]' passed (0.001 seconds).
+Test Case '-[MinutesCoreTests.NotesCleaningTests testNumbersAreNormalized]' started.
+Test Case '-[MinutesCoreTests.NotesCleaningTests testNumbersAreNormalized]' passed (0.001 seconds).
+Test Case '-[MinutesCoreTests.NotesCleaningTests testSpellingsReachEverySectionAndShrinkTheBudget]' started.
+Test Case '-[MinutesCoreTests.NotesCleaningTests testSpellingsReachEverySectionAndShrinkTheBudget]' passed (0.003 seconds).
+Test Suite 'NotesCleaningTests' passed at 2026-10-15 17:23:03.920.
+	 Executed 5 tests, with 0 failures (0 unexpected) in 0.012 (0.013) seconds
+Test Suite 'NotesEngineTests' started at 2026-10-15 17:23:03.920.
+Test Case '-[MinutesCoreTests.NotesEngineTests testBriefThrottlingIsRetried]' started.
+Test Case '-[MinutesCoreTests.NotesEngineTests testBriefThrottlingIsRetried]' passed (0.038 seconds).
+Test Case '-[MinutesCoreTests.NotesEngineTests testConsolidationFailureKeepsItemsInsteadOfLosingThem]' started.
+Test Case '-[MinutesCoreTests.NotesEngineTests testConsolidationFailureKeepsItemsInsteadOfLosingThem]' passed (0.005 seconds).
+Test Case '-[MinutesCoreTests.NotesEngineTests testDedupe]' started.
+Test Case '-[MinutesCoreTests.NotesEngineTests testDedupe]' passed (0.000 seconds).
+Test Case '-[MinutesCoreTests.NotesEngineTests testEmptyTranscriptThrows]' started.
+Test Case '-[MinutesCoreTests.NotesEngineTests testEmptyTranscriptThrows]' passed (0.000 seconds).
+Test Case '-[MinutesCoreTests.NotesEngineTests testEstimatesWhenModelCannotCount]' started.
+Test Case '-[MinutesCoreTests.NotesEngineTests testEstimatesWhenModelCannotCount]' passed (0.006 seconds).
+Test Case '-[MinutesCoreTests.NotesEngineTests testEverySectionRefusedThrows]' started.
+Test Case '-[MinutesCoreTests.NotesEngineTests testEverySectionRefusedThrows]' passed (0.000 seconds).
+Test Case '-[MinutesCoreTests.NotesEngineTests testInterruptedNotesContinueFromTheNextSection]' started.
+Test Case '-[MinutesCoreTests.NotesEngineTests testInterruptedNotesContinueFromTheNextSection]' passed (0.058 seconds).
+Test Case '-[MinutesCoreTests.NotesEngineTests testKeyPointsAreConsolidatedToTheLimit]' started.
+Test Case '-[MinutesCoreTests.NotesEngineTests testKeyPointsAreConsolidatedToTheLimit]' passed (0.011 seconds).
+Test Case '-[MinutesCoreTests.NotesEngineTests testLargerContextMeansFewerSections]' started.
+Test Case '-[MinutesCoreTests.NotesEngineTests testLargerContextMeansFewerSections]' passed (0.009 seconds).
+Test Case '-[MinutesCoreTests.NotesEngineTests testLongMeetingIsSplitToFitTheContextWindow]' started.
+Test Case '-[MinutesCoreTests.NotesEngineTests testLongMeetingIsSplitToFitTheContextWindow]' passed (0.005 seconds).
+Test Case '-[MinutesCoreTests.NotesEngineTests testOneVeryLongLineIsSplitWithSpeakerPrefix]' started.
+Test Case '-[MinutesCoreTests.NotesEngineTests testOneVeryLongLineIsSplitWithSpeakerPrefix]' passed (0.005 seconds).
+Test Case '-[MinutesCoreTests.NotesEngineTests testOversizedSectionIsHalvedUntilItFits]' started.
+Test Case '-[MinutesCoreTests.NotesEngineTests testOversizedSectionIsHalvedUntilItFits]' passed (0.003 seconds).
+Test Case '-[MinutesCoreTests.NotesEngineTests testOverviewFailureFallsBackToGistsAndHint]' started.
+Test Case '-[MinutesCoreTests.NotesEngineTests testOverviewFailureFallsBackToGistsAndHint]' passed (0.001 seconds).
+Test Case '-[MinutesCoreTests.NotesEngineTests testPersistentThrottlingIsReportedAsRateLimited]' started.
+Test Case '-[MinutesCoreTests.NotesEngineTests testPersistentThrottlingIsReportedAsRateLimited]' passed (0.054 seconds).
+Test Case '-[MinutesCoreTests.NotesEngineTests testRefusedSectionIsSkippedAndCounted]' started.
+Test Case '-[MinutesCoreTests.NotesEngineTests testRefusedSectionIsSkippedAndCounted]' passed (0.006 seconds).
+Test Case '-[MinutesCoreTests.NotesEngineTests testSavedWorkForADifferentTranscriptIsIgnored]' started.
+Test Case '-[MinutesCoreTests.NotesEngineTests testSavedWorkForADifferentTranscriptIsIgnored]' passed (0.000 seconds).
+Test Case '-[MinutesCoreTests.NotesEngineTests testShortMeetingIsOneSectionAndSkipsConsolidation]' started.
+Test Case '-[MinutesCoreTests.NotesEngineTests testShortMeetingIsOneSectionAndSkipsConsolidation]' passed (0.000 seconds).
+Test Case '-[MinutesCoreTests.NotesEngineTests testTidyItemRemovesFillersAndBullets]' started.
+Test Case '-[MinutesCoreTests.NotesEngineTests testTidyItemRemovesFillersAndBullets]' passed (0.000 seconds).
+Test Suite 'NotesEngineTests' passed at 2026-10-15 17:23:04.127.
+	 Executed 18 tests, with 0 failures (0 unexpected) in 0.204 (0.207) seconds
+Test Suite 'PipelineTests' started at 2026-10-15 17:23:04.127.
+Test Case '-[MinutesCoreTests.PipelineTests testCancellationLeavesAResumableMeeting]' started.
+Test Case '-[MinutesCoreTests.PipelineTests testCancellationLeavesAResumableMeeting]' passed (0.032 seconds).
+Test Case '-[MinutesCoreTests.PipelineTests testEmailNotSetUpFinishesWithoutSending]' started.
+Test Case '-[MinutesCoreTests.PipelineTests testEmailNotSetUpFinishesWithoutSending]' passed (0.029 seconds).
+Test Case '-[MinutesCoreTests.PipelineTests testEngineErrorIsRecordedAndRetryable]' started.
+Test Case '-[MinutesCoreTests.PipelineTests testEngineErrorIsRecordedAndRetryable]' passed (0.027 seconds).
+Test Case '-[MinutesCoreTests.PipelineTests testFullRun]' started.
+Test Case '-[MinutesCoreTests.PipelineTests testFullRun]' passed (0.028 seconds).
+Test Case '-[MinutesCoreTests.PipelineTests testKnownVoicesAreNamedAutomatically]' started.
+Test Case '-[MinutesCoreTests.PipelineTests testKnownVoicesAreNamedAutomatically]' passed (0.020 seconds).
+Test Case '-[MinutesCoreTests.PipelineTests testMissingAudio]' started.
+Test Case '-[MinutesCoreTests.PipelineTests testMissingAudio]' passed (0.003 seconds).
+Test Case '-[MinutesCoreTests.PipelineTests testModelUnavailableStillEmailsTheTranscript]' started.
+Test Case '-[MinutesCoreTests.PipelineTests testModelUnavailableStillEmailsTheTranscript]' passed (0.022 seconds).
+Test Case '-[MinutesCoreTests.PipelineTests testNotesFailureStillEmailsTheTranscript]' started.
+Test Case '-[MinutesCoreTests.PipelineTests testNotesFailureStillEmailsTheTranscript]' passed (0.030 seconds).
+Test Case '-[MinutesCoreTests.PipelineTests testOverallProgressIsMonotonicAcrossStages]' started.
+Test Case '-[MinutesCoreTests.PipelineTests testOverallProgressIsMonotonicAcrossStages]' passed (0.001 seconds).
+Test Case '-[MinutesCoreTests.PipelineTests testResumesFromTheStageThatWasInterrupted]' started.
+Test Case '-[MinutesCoreTests.PipelineTests testResumesFromTheStageThatWasInterrupted]' passed (0.030 seconds).
+Test Case '-[MinutesCoreTests.PipelineTests testSeparatingAgainKeepsTheTranscribedWords]' started.
+Test Case '-[MinutesCoreTests.PipelineTests testSeparatingAgainKeepsTheTranscribedWords]' passed (0.034 seconds).
+Test Case '-[MinutesCoreTests.PipelineTests testSeparationFindingNothingStillTranscribes]' started.
+Test Case '-[MinutesCoreTests.PipelineTests testSeparationFindingNothingStillTranscribes]' passed (0.027 seconds).
+Test Case '-[MinutesCoreTests.PipelineTests testSilenceIsReportedAsNoSpeech]' started.
+Test Case '-[MinutesCoreTests.PipelineTests testSilenceIsReportedAsNoSpeech]' passed (0.009 seconds).
+Test Case '-[MinutesCoreTests.PipelineTests testThrottledNotesDoNotHoldUpTheEmail]' started.
+Test Case '-[MinutesCoreTests.PipelineTests testThrottledNotesDoNotHoldUpTheEmail]' passed (0.163 seconds).
+Test Case '-[MinutesCoreTests.PipelineTests testThrottledNotesKeepFinishedSectionsAndContinue]' started.
+2026-10-15 17:23:03.883 [info] meeting 8E2609C5-81D8-4B30-9363-3C0FEE8212BA: starting separateSpeakers
+2026-10-15 17:23:03.883 [info] meeting 8E2609C5-81D8-4B30-9363-3C0FEE8212BA: grouping voices analyzed during the recording
+2026-10-15 17:23:03.884 [info] meeting 8E2609C5-81D8-4B30-9363-3C0FEE8212BA: finished separateSpeakers in 0.0s
+2026-10-15 17:23:03.884 [info] meeting 8E2609C5-81D8-4B30-9363-3C0FEE8212BA: starting transcribe
+2026-10-15 17:23:03.884 [info] meeting 8E2609C5-81D8-4B30-9363-3C0FEE8212BA: using the 40 words transcribed during the recording
+2026-10-15 17:23:03.885 [info] meeting 8E2609C5-81D8-4B30-9363-3C0FEE8212BA: finished transcribe in 0.0s
+2026-10-15 17:23:03.885 [info] meeting 8E2609C5-81D8-4B30-9363-3C0FEE8212BA: starting assemble
+2026-10-15 17:23:03.896 [info] meeting 8E2609C5-81D8-4B30-9363-3C0FEE8212BA: finished assemble in 0.0s
+2026-10-15 17:23:03.896 [info] meeting 8E2609C5-81D8-4B30-9363-3C0FEE8212BA: starting writeNotes
+2026-10-15 17:23:03.896 [info] meeting 8E2609C5-81D8-4B30-9363-3C0FEE8212BA: 1 note sections from the recording, 1 lines left to extract
+2026-10-15 17:23:03.898 [info] meeting 8E2609C5-81D8-4B30-9363-3C0FEE8212BA: finished writeNotes in 0.0s
+2026-10-15 17:23:03.898 [info] meeting 8E2609C5-81D8-4B30-9363-3C0FEE8212BA: starting email
+2026-10-15 17:23:03.899 [info] meeting 8E2609C5-81D8-4B30-9363-3C0FEE8212BA: finished email in 0.0s
+2026-10-15 17:23:04.142 [info] meeting AC0463DF-F99F-4463-B907-7375B4182586: starting separateSpeakers
+2026-10-15 17:23:04.143 [info] meeting AC0463DF-F99F-4463-B907-7375B4182586: finished separateSpeakers in 0.0s
+2026-10-15 17:23:04.144 [info] meeting AC0463DF-F99F-4463-B907-7375B4182586: starting transcribe
+2026-10-15 17:23:04.145 [info] meeting AC0463DF-F99F-4463-B907-7375B4182586: finished transcribe in 0.0s
+2026-10-15 17:23:04.145 [info] meeting AC0463DF-F99F-4463-B907-7375B4182586: starting assemble
+2026-10-15 17:23:04.155 [info] meeting AC0463DF-F99F-4463-B907-7375B4182586: finished assemble in 0.0s
+2026-10-15 17:23:04.155 [info] meeting AC0463DF-F99F-4463-B907-7375B4182586: starting writeNotes
+2026-10-15 17:23:04.157 [info] meeting AC0463DF-F99F-4463-B907-7375B4182586: finished writeNotes in 0.0s
+2026-10-15 17:23:04.157 [info] meeting AC0463DF-F99F-4463-B907-7375B4182586: starting email
+2026-10-15 17:23:04.158 [info] meeting AC0463DF-F99F-4463-B907-7375B4182586: finished email in 0.0s
+2026-10-15 17:23:04.166 [info] meeting 265A3374-9289-40C4-B3FF-3E3A4FFAB8E3: starting separateSpeakers
+2026-10-15 17:23:04.166 [info] meeting 265A3374-9289-40C4-B3FF-3E3A4FFAB8E3: finished separateSpeakers in 0.0s
+2026-10-15 17:23:04.166 [info] meeting 265A3374-9289-40C4-B3FF-3E3A4FFAB8E3: starting transcribe
+2026-10-15 17:23:04.167 [info] meeting 265A3374-9289-40C4-B3FF-3E3A4FFAB8E3: finished transcribe in 0.0s
+2026-10-15 17:23:04.167 [info] meeting 265A3374-9289-40C4-B3FF-3E3A4FFAB8E3: starting assemble
+2026-10-15 17:23:04.181 [info] meeting 265A3374-9289-40C4-B3FF-3E3A4FFAB8E3: finished assemble in 0.0s
+2026-10-15 17:23:04.181 [info] meeting 265A3374-9289-40C4-B3FF-3E3A4FFAB8E3: starting writeNotes
+2026-10-15 17:23:04.184 [info] meeting 265A3374-9289-40C4-B3FF-3E3A4FFAB8E3: finished writeNotes in 0.0s
+2026-10-15 17:23:04.184 [info] meeting 265A3374-9289-40C4-B3FF-3E3A4FFAB8E3: starting email
+2026-10-15 17:23:04.185 [info] meeting 265A3374-9289-40C4-B3FF-3E3A4FFAB8E3: finished email in 0.0s
+2026-10-15 17:23:04.196 [info] meeting 1B154178-98B4-42AF-B703-C8D8D6437A3B: starting separateSpeakers
+2026-10-15 17:23:04.196 [info] meeting 1B154178-98B4-42AF-B703-C8D8D6437A3B: finished separateSpeakers in 0.0s
+2026-10-15 17:23:04.196 [info] meeting 1B154178-98B4-42AF-B703-C8D8D6437A3B: starting transcribe
+2026-10-15 17:23:04.197 [error] meeting 1B154178-98B4-42AF-B703-C8D8D6437A3B: transcribe failed: The speech model failed to load.
+2026-10-15 17:23:04.198 [info] meeting 1B154178-98B4-42AF-B703-C8D8D6437A3B: starting transcribe
+2026-10-15 17:23:04.198 [info] meeting 1B154178-98B4-42AF-B703-C8D8D6437A3B: finished transcribe in 0.0s
+2026-10-15 17:23:04.198 [info] meeting 1B154178-98B4-42AF-B703-C8D8D6437A3B: starting assemble
+2026-10-15 17:23:04.210 [info] meeting 1B154178-98B4-42AF-B703-C8D8D6437A3B: finished assemble in 0.0s
+2026-10-15 17:23:04.210 [info] meeting 1B154178-98B4-42AF-B703-C8D8D6437A3B: starting writeNotes
+2026-10-15 17:23:04.214 [info] meeting 1B154178-98B4-42AF-B703-C8D8D6437A3B: finished writeNotes in 0.0s
+2026-10-15 17:23:04.214 [info] meeting 1B154178-98B4-42AF-B703-C8D8D6437A3B: starting email
+2026-10-15 17:23:04.214 [info] meeting 1B154178-98B4-42AF-B703-C8D8D6437A3B: finished email in 0.0s
+2026-10-15 17:23:04.226 [info] meeting BCE6C39C-29C3-4078-A74D-F5A0089F5A1B: starting separateSpeakers
+2026-10-15 17:23:04.229 [info] meeting BCE6C39C-29C3-4078-A74D-F5A0089F5A1B: finished separateSpeakers in 0.0s
+2026-10-15 17:23:04.229 [info] meeting BCE6C39C-29C3-4078-A74D-F5A0089F5A1B: starting transcribe
+2026-10-15 17:23:04.230 [info] meeting BCE6C39C-29C3-4078-A74D-F5A0089F5A1B: finished transcribe in 0.0s
+2026-10-15 17:23:04.230 [info] meeting BCE6C39C-29C3-4078-A74D-F5A0089F5A1B: starting assemble
+2026-10-15 17:23:04.239 [info] meeting BCE6C39C-29C3-4078-A74D-F5A0089F5A1B: finished assemble in 0.0s
+2026-10-15 17:23:04.240 [info] meeting BCE6C39C-29C3-4078-A74D-F5A0089F5A1B: starting writeNotes
+2026-10-15 17:23:04.241 [info] meeting BCE6C39C-29C3-4078-A74D-F5A0089F5A1B: finished writeNotes in 0.0s
+2026-10-15 17:23:04.241 [info] meeting BCE6C39C-29C3-4078-A74D-F5A0089F5A1B: starting email
+2026-10-15 17:23:04.242 [info] meeting BCE6C39C-29C3-4078-A74D-F5A0089F5A1B: finished email in 0.0s
+2026-10-15 17:23:04.249 [info] meeting 53026BBB-D4C7-481E-9D8C-44CDCAA3839C: starting separateSpeakers
+2026-10-15 17:23:04.250 [info] meeting 53026BBB-D4C7-481E-9D8C-44CDCAA3839C: finished separateSpeakers in 0.0s
+2026-10-15 17:23:04.250 [info] meeting 53026BBB-D4C7-481E-9D8C-44CDCAA3839C: starting transcribe
+2026-10-15 17:23:04.251 [info] meeting 53026BBB-D4C7-481E-9D8C-44CDCAA3839C: finished transcribe in 0.0s
+2026-10-15 17:23:04.251 [info] meeting 53026BBB-D4C7-481E-9D8C-44CDCAA3839C: starting assemble
+2026-10-15 17:23:04.260 [info] meeting 53026BBB-D4C7-481E-9D8C-44CDCAA3839C: finished assemble in 0.0s
+2026-10-15 17:23:04.260 [info] meeting 53026BBB-D4C7-481E-9D8C-44CDCAA3839C: starting writeNotes
+2026-10-15 17:23:04.262 [info] meeting 53026BBB-D4C7-481E-9D8C-44CDCAA3839C: finished writeNotes in 0.0s
+2026-10-15 17:23:04.262 [info] meeting 53026BBB-D4C7-481E-9D8C-44CDCAA3839C: starting email
+2026-10-15 17:23:04.263 [info] meeting 53026BBB-D4C7-481E-9D8C-44CDCAA3839C: finished email in 0.0s
+2026-10-15 17:23:04.266 [info] meeting 2B403549-1ACA-4AF9-A78C-6EC459D8FB6E: starting separateSpeakers
+2026-10-15 17:23:04.266 [error] meeting 2B403549-1ACA-4AF9-A78C-6EC459D8FB6E: separateSpeakers failed: The audio for this meeting is no longer on this iPhone.
+2026-10-15 17:23:04.273 [info] meeting 0B7BB393-B820-4F2F-90F1-F2D2786CED6C: starting separateSpeakers
+2026-10-15 17:23:04.274 [info] meeting 0B7BB393-B820-4F2F-90F1-F2D2786CED6C: finished separateSpeakers in 0.0s
+2026-10-15 17:23:04.274 [info] meeting 0B7BB393-B820-4F2F-90F1-F2D2786CED6C: starting transcribe
+2026-10-15 17:23:04.275 [info] meeting 0B7BB393-B820-4F2F-90F1-F2D2786CED6C: finished transcribe in 0.0s
+2026-10-15 17:23:04.275 [info] meeting 0B7BB393-B820-4F2F-90F1-F2D2786CED6C: starting assemble
+2026-10-15 17:23:04.285 [info] meeting 0B7BB393-B820-4F2F-90F1-F2D2786CED6C: finished assemble in 0.0s
+2026-10-15 17:23:04.285 [info] meeting 0B7BB393-B820-4F2F-90F1-F2D2786CED6C: starting writeNotes
+2026-10-15 17:23:04.286 [info] meeting 0B7BB393-B820-4F2F-90F1-F2D2786CED6C: finished writeNotes in 0.0s
+2026-10-15 17:23:04.286 [info] meeting 0B7BB393-B820-4F2F-90F1-F2D2786CED6C: starting email
+2026-10-15 17:23:04.286 [info] meeting 0B7BB393-B820-4F2F-90F1-F2D2786CED6C: finished email in 0.0s
+2026-10-15 17:23:04.301 [info] meeting B94AABD0-FC6A-4658-8C95-59221B5F138B: starting separateSpeakers
+2026-10-15 17:23:04.302 [info] meeting B94AABD0-FC6A-4658-8C95-59221B5F138B: finished separateSpeakers in 0.0s
+2026-10-15 17:23:04.302 [info] meeting B94AABD0-FC6A-4658-8C95-59221B5F138B: starting transcribe
+2026-10-15 17:23:04.304 [info] meeting B94AABD0-FC6A-4658-8C95-59221B5F138B: finished transcribe in 0.0s
+2026-10-15 17:23:04.304 [info] meeting B94AABD0-FC6A-4658-8C95-59221B5F138B: starting assemble
+2026-10-15 17:23:04.318 [info] meeting B94AABD0-FC6A-4658-8C95-59221B5F138B: finished assemble in 0.0s
+2026-10-15 17:23:04.318 [info] meeting B94AABD0-FC6A-4658-8C95-59221B5F138B: starting writeNotes
+2026-10-15 17:23:04.319 [info] meeting B94AABD0-FC6A-4658-8C95-59221B5F138B: finished writeNotes in 0.0s
+2026-10-15 17:23:04.319 [info] meeting B94AABD0-FC6A-4658-8C95-59221B5F138B: starting email
+2026-10-15 17:23:04.319 [info] meeting B94AABD0-FC6A-4658-8C95-59221B5F138B: finished email in 0.0s
+2026-10-15 17:23:04.330 [info] meeting 296E09E8-94B3-4A02-AAF0-4A2AF73703F9: starting separateSpeakers
+2026-10-15 17:23:04.331 [info] meeting 296E09E8-94B3-4A02-AAF0-4A2AF73703F9: finished separateSpeakers in 0.0s
+2026-10-15 17:23:04.331 [info] meeting 296E09E8-94B3-4A02-AAF0-4A2AF73703F9: starting transcribe
+2026-10-15 17:23:04.332 [info] meeting 296E09E8-94B3-4A02-AAF0-4A2AF73703F9: finished transcribe in 0.0s
+2026-10-15 17:23:04.332 [info] meeting 296E09E8-94B3-4A02-AAF0-4A2AF73703F9: starting assemble
+2026-10-15 17:23:04.346 [info] meeting 296E09E8-94B3-4A02-AAF0-4A2AF73703F9: finished assemble in 0.0s
+2026-10-15 17:23:04.346 [info] meeting 296E09E8-94B3-4A02-AAF0-4A2AF73703F9: starting writeNotes
+2026-10-15 17:23:04.348 [info] meeting 296E09E8-94B3-4A02-AAF0-4A2AF73703F9: finished writeNotes in 0.0s
+2026-10-15 17:23:04.348 [info] meeting 296E09E8-94B3-4A02-AAF0-4A2AF73703F9: starting email
+2026-10-15 17:23:04.348 [warn] meeting 296E09E8-94B3-4A02-AAF0-4A2AF73703F9: waiting at email: The email couldn't be sent yet (Couldn't reach the mail server: offline). Minutes sends it when the connection is back.
+2026-10-15 17:23:04.349 [info] meeting 296E09E8-94B3-4A02-AAF0-4A2AF73703F9: starting email
+2026-10-15 17:23:04.350 [info] meeting 296E09E8-94B3-4A02-AAF0-4A2AF73703F9: finished email in 0.0s
+2026-10-15 17:23:04.357 [info] meeting 1952368E-01D5-4441-AB0B-C72945ABAF88: starting separateSpeakers
+2026-10-15 17:23:04.358 [info] meeting 1952368E-01D5-4441-AB0B-C72945ABAF88: finished separateSpeakers in 0.0s
+2026-10-15 17:23:04.358 [info] meeting 1952368E-01D5-4441-AB0B-C72945ABAF88: starting transcribe
+2026-10-15 17:23:04.358 [info] meeting 1952368E-01D5-4441-AB0B-C72945ABAF88: finished transcribe in 0.0s
+2026-10-15 17:23:04.358 [info] meeting 1952368E-01D5-4441-AB0B-C72945ABAF88: starting assemble
+2026-10-15 17:23:04.367 [info] meeting 1952368E-01D5-4441-AB0B-C72945ABAF88: finished assemble in 0.0s
+2026-10-15 17:23:04.367 [info] meeting 1952368E-01D5-4441-AB0B-C72945ABAF88: starting writeNotes
+2026-10-15 17:23:04.369 [info] meeting 1952368E-01D5-4441-AB0B-C72945ABAF88: finished writeNotes in 0.0s
+2026-10-15 17:23:04.369 [info] meeting 1952368E-01D5-4441-AB0B-C72945ABAF88: starting email
+2026-10-15 17:23:04.370 [info] meeting 1952368E-01D5-4441-AB0B-C72945ABAF88: finished email in 0.0s
+2026-10-15 17:23:04.371 [info] meeting 1952368E-01D5-4441-AB0B-C72945ABAF88: starting separateSpeakers
+2026-10-15 17:23:04.372 [info] meeting 1952368E-01D5-4441-AB0B-C72945ABAF88: finished separateSpeakers in 0.0s
+2026-10-15 17:23:04.372 [info] meeting 1952368E-01D5-4441-AB0B-C72945ABAF88: starting transcribe
+2026-10-15 17:23:04.373 [info] meeting 1952368E-01D5-4441-AB0B-C72945ABAF88: finished transcribe in 0.0s
+2026-10-15 17:23:04.373 [info] meeting 1952368E-01D5-4441-AB0B-C72945ABAF88: starting assemble
+2026-10-15 17:23:04.382 [info] meeting 1952368E-01D5-4441-AB0B-C72945ABAF88: finished assemble in 0.0s
+2026-10-15 17:23:04.382 [info] meeting 1952368E-01D5-4441-AB0B-C72945ABAF88: starting writeNotes
+2026-10-15 17:23:04.383 [info] meeting 1952368E-01D5-4441-AB0B-C72945ABAF88: finished writeNotes in 0.0s
+2026-10-15 17:23:04.383 [info] meeting 1952368E-01D5-4441-AB0B-C72945ABAF88: starting email
+2026-10-15 17:23:04.384 [info] meeting 1952368E-01D5-4441-AB0B-C72945ABAF88: finished email in 0.0s
+2026-10-15 17:23:04.390 [info] meeting 76107CB5-4AAE-4318-8FB0-56ADB270580C: starting separateSpeakers
+2026-10-15 17:23:04.391 [info] meeting 76107CB5-4AAE-4318-8FB0-56ADB270580C: finished separateSpeakers in 0.0s
+2026-10-15 17:23:04.391 [info] meeting 76107CB5-4AAE-4318-8FB0-56ADB270580C: starting transcribe
+2026-10-15 17:23:04.392 [info] meeting 76107CB5-4AAE-4318-8FB0-56ADB270580C: finished transcribe in 0.0s
+2026-10-15 17:23:04.392 [info] meeting 76107CB5-4AAE-4318-8FB0-56ADB270580C: starting assemble
+2026-10-15 17:23:04.408 [info] meeting 76107CB5-4AAE-4318-8FB0-56ADB270580C: finished assemble in 0.0s
+2026-10-15 17:23:04.408 [info] meeting 76107CB5-4AAE-4318-8FB0-56ADB270580C: starting writeNotes
+2026-10-15 17:23:04.410 [info] meeting 76107CB5-4AAE-4318-8FB0-56ADB270580C: finished writeNotes in 0.0s
+2026-10-15 17:23:04.410 [info] meeting 76107CB5-4AAE-4318-8FB0-56ADB270580C: starting email
+2026-10-15 17:23:04.410 [info] meeting 76107CB5-4AAE-4318-8FB0-56ADB270580C: finished email in 0.0s
+2026-10-15 17:23:04.418 [info] meeting AAA05D37-FD43-459B-8628-BD4050B689A1: starting separateSpeakers
+2026-10-15 17:23:04.419 [info] meeting AAA05D37-FD43-459B-8628-BD4050B689A1: finished separateSpeakers in 0.0s
+2026-10-15 17:23:04.419 [info] meeting AAA05D37-FD43-459B-8628-BD4050B689A1: starting transcribe
+2026-10-15 17:23:04.420 [error] meeting AAA05D37-FD43-459B-8628-BD4050B689A1: transcribe failed: No speech was detected in this recording.
+2026-10-15 17:23:04.429 [info] meeting 41C1FA19-4EDE-454D-B9A2-B3473F7B900D: starting separateSpeakers
+2026-10-15 17:23:04.429 [info] meeting 41C1FA19-4EDE-454D-B9A2-B3473F7B900D: finished separateSpeakers in 0.0s
+2026-10-15 17:23:04.430 [info] meeting 41C1FA19-4EDE-454D-B9A2-B3473F7B900D: starting transcribe
+2026-10-15 17:23:04.430 [info] meeting 41C1FA19-4EDE-454D-B9A2-B3473F7B900D: finished transcribe in 0.0s
+2026-10-15 17:23:04.430 [info] meeting 41C1FA19-4EDE-454D-B9A2-B3473F7B900D: starting assemble
+2026-10-15 17:23:04.440 [info] meeting 41C1FA19-4EDE-454D-B9A2-B3473F7B900D: finished assemble in 0.0s
+2026-10-15 17:23:04.440 [info] meeting 41C1FA19-4EDE-454D-B9A2-B3473F7B900D: starting writeNotes
+2026-10-15 17:23:04.527 [info] meeting 41C1FA19-4EDE-454D-B9A2-B3473F7B900D: finished writeNotes in 0.1s
+2026-10-15 17:23:04.527 [info] meeting 41C1FA19-4EDE-454D-B9A2-B3473F7B900D: starting email
+2026-10-15 17:23:04.529 [info] meeting 41C1FA19-4EDE-454D-B9A2-B3473F7B900D: finished email in 0.0s
+2026-10-15 17:23:04.534 [info] meeting 41C1FA19-4EDE-454D-B9A2-B3473F7B900D: starting writeNotes
+2026-10-15 17:23:04.580 [info] meeting 41C1FA19-4EDE-454D-B9A2-B3473F7B900D: finished writeNotes in 0.0s
+2026-10-15 17:23:04.580 [info] meeting 41C1FA19-4EDE-454D-B9A2-B3473F7B900D: starting email
+2026-10-15 17:23:04.580 [info] meeting 41C1FA19-4EDE-454D-B9A2-B3473F7B900D: finished email in 0.0s
+2026-10-15 17:23:04.581 [info] meeting 41C1FA19-4EDE-454D-B9A2-B3473F7B900D: starting writeNotes
+2026-10-15 17:23:04.583 [info] meeting 41C1FA19-4EDE-454D-B9A2-B3473F7B900D: finished writeNotes in 0.0s
+2026-10-15 17:23:04.583 [info] meeting 41C1FA19-4EDE-454D-B9A2-B3473F7B900D: starting email
+2026-10-15 17:23:04.583 [info] meeting 41C1FA19-4EDE-454D-B9A2-B3473F7B900D: finished email in 0.0s
+2026-10-15 17:23:04.590 [info] meeting 4BF79FC4-BA90-4D3B-89BE-0D20DFA7A08C: starting separateSpeakers
+2026-10-15 17:23:04.592 [info] meeting 4BF79FC4-BA90-4D3B-89BE-0D20DFA7A08C: finished separateSpeakers in 0.0s
+2026-10-15 17:23:04.592 [info] meeting 4BF79FC4-BA90-4D3B-89BE-0D20DFA7A08C: starting transcribe
+2026-10-15 17:23:04.598 [info] meeting 4BF79FC4-BA90-4D3B-89BE-0D20DFA7A08C: finished transcribe in 0.0s
+2026-10-15 17:23:04.598 [info] meeting 4BF79FC4-BA90-4D3B-89BE-0D20DFA7A08C: starting assemble
+2026-10-15 17:23:04.632 [info] meeting 4BF79FC4-BA90-4D3B-89BE-0D20DFA7A08C: finished assemble in 0.0s
+2026-10-15 17:23:04.632 [info] meeting 4BF79FC4-BA90-4D3B-89BE-0D20DFA7A08C: starting writeNotes
+2026-10-15 17:23:04.715 [info] meeting 4BF79FC4-BA90-4D3B-89BE-0D20DFA7A08C: finished writeNotes in 0.1s
+2026-10-15 17:23:04.715 [info] meeting 4BTest Case '-[MinutesCoreTests.PipelineTests testThrottledNotesKeepFinishedSectionsAndContinue]' passed (0.263 seconds).
+Test Case '-[MinutesCoreTests.PipelineTests testTypedTitleIsKeptAndExpectedSpeakersIsPassedThrough]' started.
+Test Case '-[MinutesCoreTests.PipelineTests testTypedTitleIsKeptAndExpectedSpeakersIsPassedThrough]' passed (0.022 seconds).
+Test Case '-[MinutesCoreTests.PipelineTests testWrongPasswordStopsAtEmailForThePersonToFix]' started.
+Test Case '-[MinutesCoreTests.PipelineTests testWrongPasswordStopsAtEmailForThePersonToFix]' passed (0.022 seconds).
+Test Suite 'PipelineTests' passed at 2026-10-15 17:23:04.892.
+	 Executed 17 tests, with 0 failures (0 unexpected) in 0.762 (0.765) seconds
+Test Suite 'RefusalTests' started at 2026-10-15 17:23:04.892.
+Test Case '-[MinutesCoreTests.RefusalTests testARefusedSectionIsHalvedAndTheRestIsKept]' started.
+Test Case '-[MinutesCoreTests.RefusalTests testARefusedSectionIsHalvedAndTheRestIsKept]' passed (0.003 seconds).
+Test Case '-[MinutesCoreTests.RefusalTests testLiveExtractionSurvivesARefusedPassage]' started.
+Test Case '-[MinutesCoreTests.RefusalTests testLiveExtractionSurvivesARefusedPassage]' passed (0.001 seconds).
+Test Suite 'RefusalTests' passed at 2026-10-15 17:23:04.897.
+	 Executed 2 tests, with 0 failures (0 unexpected) in 0.004 (0.004) seconds
+Test Suite 'RenderTests' started at 2026-10-15 17:23:04.897.
+Test Case '-[MinutesCoreTests.RenderTests testClockAndSpan]' started.
+Test Case '-[MinutesCoreTests.RenderTests testClockAndSpan]' passed (0.000 seconds).
+Test Case '-[MinutesCoreTests.RenderTests testDatesUseTheGivenTimeZone]' started.
+Test Case '-[MinutesCoreTests.RenderTests testDatesUseTheGivenTimeZone]' passed (0.001 seconds).
+Test Case '-[MinutesCoreTests.RenderTests testEmailAssembly]' started.
+Test Case '-[MinutesCoreTests.RenderTests testEmailAssembly]' passed (0.001 seconds).
+Test Case '-[MinutesCoreTests.RenderTests testFileSafe]' started.
+Test Case '-[MinutesCoreTests.RenderTests testFileSafe]' passed (0.000 seconds).
+Test Case '-[MinutesCoreTests.RenderTests testHTMLIsEscapedEverywhere]' started.
+Test Case '-[MinutesCoreTests.RenderTests testHTMLIsEscapedEverywhere]' passed (0.001 seconds).
+Test Case '-[MinutesCoreTests.RenderTests testModelLinesHaveNoTimestamps]' started.
+Test Case '-[MinutesCoreTests.RenderTests testModelLinesHaveNoTimestamps]' passed (0.000 seconds).
+Test Case '-[MinutesCoreTests.RenderTests testNotesText]' started.
+Test Case '-[MinutesCoreTests.RenderTests testNotesText]' passed (0.000 seconds).
+Test Case '-[MinutesCoreTests.RenderTests testSpeakerNumberingFollowsFirstAppearance]' started.
+Test Case '-[MinutesCoreTests.RenderTests testSpeakerNumberingFollowsFirstAppearance]' passed (0.000 seconds).
+Test Case '-[MinutesCoreTests.RenderTests testTranscriptTextShowsCrosstalkAndGaps]' started.
+Test Case '-[MinutesCoreTests.RenderTests testTranscriptTextShowsCrosstalkAndGaps]' passed (0.000 seconds).
+Test Suite 'RenderTests' passed at 2026-10-15 17:23:04.902.
+	 Executed 9 tests, with 0 failures (0 unexpected) in 0.004 (0.005) seconds
+Test Suite 'SMTPIntegrationTests' started at 2026-10-15 17:23:04.902.
+Test Case '-[MinutesCoreTests.SMTPIntegrationTests testDeliversThroughARealServer]' started.
+/Users/runner/work/minutes-ios/minutes-ios/Packages/MinutesCore/Tests/MinutesCoreTests/SMTPIntegrationTests.swift:77: -[MinutesCoreTests.SMTPIntegrationTests testDeliversThroughARealServer] : Test skipped - no local SMTP server configured
+Test Case '-[MinutesCoreTests.SMTPIntegrationTests testDeliversThroughARealServer]' skipped (0.001 seconds).
+Test Case '-[MinutesCoreTests.SMTPIntegrationTests testWrongPasswordIsRejectedByARealServer]' started.
+/Users/runner/work/minutes-ios/minutes-ios/Packages/MinutesCore/Tests/MinutesCoreTests/SMTPIntegrationTests.swift:77: -[MinutesCoreTests.SMTPIntegrationTests testWrongPasswordIsRejectedByARealServer] : Test skipped - no local SMTP server configured
+Test Case '-[MinutesCoreTests.SMTPIntegrationTests testWrongPasswordIsRejectedByARealServer]' skipped (0.001 seconds).
+Test Suite 'SMTPIntegrationTests' passed at 2026-10-15 17:23:04.904.
+	 Executed 2 tests, with 2 tests skipped and 0 failures (0 unexpected) in 0.002 (0.002) seconds
+Test Suite 'SMTPTests' started at 2026-10-15 17:23:04.904.
+Test Case '-[MinutesCoreTests.SMTPTests testAcceptedMessageSurvivesAFailedGoodbye]' started.
+Test Case '-[MinutesCoreTests.SMTPTests testAcceptedMessageSurvivesAFailedGoodbye]' passed (0.002 seconds).
+Test Case '-[MinutesCoreTests.SMTPTests testAuthMechanismParsing]' started.
+Test Case '-[MinutesCoreTests.SMTPTests testAuthMechanismParsing]' passed (0.001 seconds).
+Test Case '-[MinutesCoreTests.SMTPTests testBadPasswordIsAnAuthenticationError]' started.
+Test Case '-[MinutesCoreTests.SMTPTests testBadPasswordIsAnAuthenticationError]' passed (0.000 seconds).
+Test Case '-[MinutesCoreTests.SMTPTests testConnectFailurePropagates]' started.
+Test Case '-[MinutesCoreTests.SMTPTests testConnectFailurePropagates]' passed (0.000 seconds).
+Test Case '-[MinutesCoreTests.SMTPTests testFallsBackToAuthLogin]' started.
+Test Case '-[MinutesCoreTests.SMTPTests testFallsBackToAuthLogin]' passed (0.001 seconds).
+Test Case '-[MinutesCoreTests.SMTPTests testGarbageReply]' started.
+Test Case '-[MinutesCoreTests.SMTPTests testGarbageReply]' passed (0.001 seconds).
+Test Case '-[MinutesCoreTests.SMTPTests testHappyPathWithAuthPlain]' started.
+Test Case '-[MinutesCoreTests.SMTPTests testHappyPathWithAuthPlain]' passed (0.003 seconds).
+Test Case '-[MinutesCoreTests.SMTPTests testNoRecipients]' started.
+Test Case '-[MinutesCoreTests.SMTPTests testNoRecipients]' passed (0.000 seconds).
+Test Case '-[MinutesCoreTests.SMTPTests testOAuthOnlyServerIsReportedClearly]' started.
+Test Case '-[MinutesCoreTests.SMTPTests testOAuthOnlyServerIsReportedClearly]' passed (0.000 seconds).
+Test Case '-[MinutesCoreTests.SMTPTests testRejectedRecipient]' started.
+Test Case '-[MinutesCoreTests.SMTPTests testRejectedRecipient]' passed (0.000 seconds).
+Test Case '-[MinutesCoreTests.SMTPTests testServerHangingUpMidConversation]' started.
+Test Case '-[MinutesCoreTests.SMTPTests testServerHangingUpMidConversation]' passed (0.004 seconds).
+Test Case '-[MinutesCoreTests.SMTPTests testTemporaryServerErrorIsRetryable]' started.
+Test Case '-[MinutesCoreTests.SMTPTests testTemporaryServerErrorIsRetryable]' passed (0.001 seconds).
+Test Suite 'SMTPTests' passed at 2026-10-15 17:23:04.919.
+	 Executed 12 tests, with 0 failures (0 unexpected) in 0.013 (0.015) seconds
+Test Suite 'SpeakerCounterTests' started at 2026-10-15 17:23:04.920.
+Test Case '-[MinutesCoreTests.SpeakerCounterTests testAFewStrayWindowsAreNotAPerson]' started.
+Test Case '-[MinutesCoreTests.SpeakerCounterTests testAFewStrayWindowsAreNotAPerson]' passed (0.396 seconds).
+Test Case '-[MinutesCoreTests.SpeakerCounterTests testAgreesWithReferenceImplementationOnRealMeetings]' started.
+/Users/runner/work/minutes-ios/minutes-ios/Packages/MinutesCore/Tests/MinutesCoreTests/SpeakerCounterTests.swift:106: -[MinutesCoreTests.SpeakerCounterTests testAgreesWithReferenceImplementationOnRealMeetings] : Test skipped - set MINUTES_VOICE_FIXTURES to run
+Test Case '-[MinutesCoreTests.SpeakerCounterTests testAgreesWithReferenceImplementationOnRealMeetings]' skipped (0.001 seconds).
+Test Case '-[MinutesCoreTests.SpeakerCounterTests testAQuietSpeakerStillCounts]' started.
+Test Case '-[MinutesCoreTests.SpeakerCounterTests testAQuietSpeakerStillCounts]' passed (0.670 seconds).
+Test Case '-[MinutesCoreTests.SpeakerCounterTests testCountsWellSeparatedVoices]' started.
+Test Case '-[MinutesCoreTests.SpeakerCounterTests testCountsWellSeparatedVoices]' passed (1.050 seconds).
+Test Case '-[MinutesCoreTests.SpeakerCounterTests testLongRecordingsAreThinnedNotTruncated]' started.
+Test Case '-[MinutesCoreTests.SpeakerCounterTests testLongRecordingsAreThinnedNotTruncated]' passed (0.544 seconds).
+Test Case '-[MinutesCoreTests.SpeakerCounterTests testNothingToCount]' started.
+Test Case '-[MinutesCoreTests.SpeakerCounterTests testNothingToCount]' passed (0.000 seconds).
+Test Case '-[MinutesCoreTests.SpeakerCounterTests testTreeMatchesTheTextbookMethod]' started.
+Test Case '-[MinutesCoreTests.SpeakerCounterTests testTreeMatchesTheTextbookMethod]' passed (0.024 seconds).
+Test Suite 'SpeakerCounterTests' passed at 2026-10-15 17:23:07.606.
+	 Executed 7 tests, with 1 test skipped and 0 failures (0 unexpected) in 2.684 (2.686) seconds
+Test Suite 'SpeakerMatcherTests' started at 2026-10-15 17:23:07.606.
+Test Case '-[MinutesCoreTests.SpeakerMatcherTests testAmbiguousBetweenTwoProfilesIsOnlyASuggestion]' started.
+Test Case '-[MinutesCoreTests.SpeakerMatcherTests testAmbiguousBetweenTwoProfilesIsOnlyASuggestion]' passed (0.001 seconds).
+Test Case '-[MinutesCoreTests.SpeakerMatcherTests testCosineAndNormalize]' started.
+Test Case '-[MinutesCoreTests.SpeakerMatcherTests testCosineAndNormalize]' passed (0.001 seconds).
+Test Case '-[MinutesCoreTests.SpeakerMatcherTests testEmptyInputs]' started.
+Test Case '-[MinutesCoreTests.SpeakerMatcherTests testEmptyInputs]' passed (0.000 seconds).
+Test Case '-[MinutesCoreTests.SpeakerMatcherTests testKnownVoicesAreNamedAndStrangersAreNot]' started.
+Test Case '-[MinutesCoreTests.SpeakerMatcherTests testKnownVoicesAreNamedAndStrangersAreNot]' passed (0.000 seconds).
+Test Case '-[MinutesCoreTests.SpeakerMatcherTests testOneProfileIsNeverGivenToTwoVoices]' started.
+Test Case '-[MinutesCoreTests.SpeakerMatcherTests testOneProfileIsNeverGivenToTwoVoices]' passed (0.000 seconds).
+Test Case '-[MinutesCoreTests.SpeakerMatcherTests testUpdateIgnoresWrongSizedEmbedding]' started.
+Test Case '-[MinutesCoreTests.SpeakerMatcherTests testUpdateIgnoresWrongSizedEmbedding]' passed (0.000 seconds).
+Test Case '-[MinutesCoreTests.SpeakerMatcherTests testUpdateMovesProfileTowardNewSampleAndStaysUnitLength]' started.
+Test Case '-[MinutesCoreTests.SpeakerMatcherTests testUpdateMovesProfileTowardNewSampleAndStaysUnitLength]' passed (0.000 seconds).
+Test Case '-[MinutesCoreTests.SpeakerMatcherTests testWeakMatchIsSuggestionNotApplied]' started.
+Test Case '-[MinutesCoreTests.SpeakerMatcherTests testWeakMatchIsSuggestionNotApplied]' passed (0.000 seconds).
+Test Suite 'SpeakerMatcherTests' passed at 2026-10-15 17:23:07.611.
+	 Executed 8 tests, with 0 failures (0 unexpected) in 0.003 (0.004) seconds
+Test Suite 'TranscriptAssemblerTests' started at 2026-10-15 17:23:07.611.
+Test Case '-[MinutesCoreTests.TranscriptAssemblerTests testASentenceTwoPeopleShareIsLeftSplit]' started.
+Test Case '-[MinutesCoreTests.TranscriptAssemblerTests testASentenceTwoPeopleShareIsLeftSplit]' passed (0.001 seconds).
+Test Case '-[MinutesCoreTests.TranscriptAssemblerTests testBoundarySnapKeepsSentenceWhole]' started.
+Test Case '-[MinutesCoreTests.TranscriptAssemblerTests testBoundarySnapKeepsSentenceWhole]' passed (0.000 seconds).
+Test Case '-[MinutesCoreTests.TranscriptAssemblerTests testCrosstalkIsFlaggedAndGivenToTheDominantVoice]' started.
+Test Case '-[MinutesCoreTests.TranscriptAssemblerTests testCrosstalkIsFlaggedAndGivenToTheDominantVoice]' passed (0.000 seconds).
+Test Case '-[MinutesCoreTests.TranscriptAssemblerTests testCrosstalkSecondsCountsOnlyDistinctVoices]' started.
+Test Case '-[MinutesCoreTests.TranscriptAssemblerTests testCrosstalkSecondsCountsOnlyDistinctVoices]' passed (0.001 seconds).
+Test Case '-[MinutesCoreTests.TranscriptAssemblerTests testEmptyInput]' started.
+Test Case '-[MinutesCoreTests.TranscriptAssemblerTests testEmptyInput]' passed (0.001 seconds).
+Test Case '-[MinutesCoreTests.TranscriptAssemblerTests testLateTurnBoundaryDoesNotSplitASentence]' started.
+Test Case '-[MinutesCoreTests.TranscriptAssemblerTests testLateTurnBoundaryDoesNotSplitASentence]' passed (0.001 seconds).
+Test Case '-[MinutesCoreTests.TranscriptAssemblerTests testLongMonologueSplitsAtSentenceEnds]' started.
+Test Case '-[MinutesCoreTests.TranscriptAssemblerTests testLongMonologueSplitsAtSentenceEnds]' passed (0.003 seconds).
+Test Case '-[MinutesCoreTests.TranscriptAssemblerTests testLongPauseStartsNewParagraphForSameSpeaker]' started.
+Test Case '-[MinutesCoreTests.TranscriptAssemblerTests testLongPauseStartsNewParagraphForSameSpeaker]' passed (0.001 seconds).
+Test Case '-[MinutesCoreTests.TranscriptAssemblerTests testManyWordsFromAnotherVoiceAreNotOverruled]' started.
+Test Case '-[MinutesCoreTests.TranscriptAssemblerTests testManyWordsFromAnotherVoiceAreNotOverruled]' passed (0.001 seconds).
+Test Case '-[MinutesCoreTests.TranscriptAssemblerTests testMoreThanFourSpeakersKeepDistinctLabels]' started.
+Test Case '-[MinutesCoreTests.TranscriptAssemblerTests testMoreThanFourSpeakersKeepDistinctLabels]' passed (0.002 seconds).
+Test Case '-[MinutesCoreTests.TranscriptAssemblerTests testNoTurnsMeansOneSpeaker]' started.
+Test Case '-[MinutesCoreTests.TranscriptAssemblerTests testNoTurnsMeansOneSpeaker]' passed (0.001 seconds).
+Test Case '-[MinutesCoreTests.TranscriptAssemblerTests testShortInterjectionIsKept]' started.
+Test Case '-[MinutesCoreTests.TranscriptAssemblerTests testShortInterjectionIsKept]' passed (0.001 seconds).
+Test Case '-[MinutesCoreTests.TranscriptAssemblerTests testStatsShares]' started.
+Test Case '-[MinutesCoreTests.TranscriptAssemblerTests testStatsShares]' passed (0.000 seconds).
+Test Case '-[MinutesCoreTests.TranscriptAssemblerTests testTwoSpeakersAlternate]' started.
+Test Case '-[MinutesCoreTests.TranscriptAssemblerTests testTwoSpeakersAlternate]' passed (0.000 seconds).
+Test Case '-[MinutesCoreTests.TranscriptAssemblerTests testUnsortedInputIsHandled]' started.
+Test Case '-[MinutesCoreTests.TranscriptAssemblerTests testUnsortedInputIsHandled]' passed (0.000 seconds).
+Test Case '-[MinutesCoreTests.TranscriptAssemblerTests testWordFarFromAnyTurnKeepsPreviousSpeaker]' started.
+Test Case '-[MinutesCoreTests.TranscriptAssemblerTests testWordFarFromAnyTurnKeepsPreviousSpeaker]' passed (0.000 seconds).
+Test Case '-[MinutesCoreTests.TranscriptAssemblerTests testWordOutsideAnyTurnGoesToNearestTurn]' started.
+Test Case '-[MinutesCoreTests.TranscriptAssemblerTests testWordOutsideAnyTurnGoesToNearestTurn]' passed (0.000 seconds).
+Test Case '-[MinutesCoreTests.TranscriptAssemblerTests testZeroLengthWordTimingsStillAttribute]' started.
+Test Case '-[MinutesCoreTests.TranscriptAssemblerTests testZeroLengthWordTimingsStillAttribute]' passed (0.000 seconds).
+Test Suite 'TranscriptAssemblerTests' passed at 2026-10-15 17:23:07.629.
+	 Executed 18 tests, with 0 failures (0 unexpected) in 0.013 (0.018) seconds
+Test Suite 'VocabularyTests' started at 2026-10-15 17:23:07.629.
+Test Case '-[MinutesCoreTests.VocabularyTests testBuiltInTermsFixCommonMishearings]' started.
+Test Case '-[MinutesCoreTests.VocabularyTests testBuiltInTermsFixCommonMishearings]' passed (0.033 seconds).
+Test Case '-[MinutesCoreTests.VocabularyTests testCorrectionIgnoresCaseAndKeepsTheRestOfTheLine]' started.
+Test Case '-[MinutesCoreTests.VocabularyTests testCorrectionIgnoresCaseAndKeepsTheRestOfTheLine]' passed (0.027 seconds).
+Test Case '-[MinutesCoreTests.VocabularyTests testEmptyAndSelfReferentialVariantsAreIgnored]' started.
+Test Case '-[MinutesCoreTests.VocabularyTests testEmptyAndSelfReferentialVariantsAreIgnored]' passed (0.008 seconds).
+Test Case '-[MinutesCoreTests.VocabularyTests testPersonalTermsMatchWholeWordsOnly]' started.
+Test Case '-[MinutesCoreTests.VocabularyTests testPersonalTermsMatchWholeWordsOnly]' passed (0.070 seconds).
+Test Case '-[MinutesCoreTests.VocabularyTests testSpellingsListPersonalTermsOnceWithoutBuiltIns]' started.
+Test Case '-[MinutesCoreTests.VocabularyTests testSpellingsListPersonalTermsOnceWithoutBuiltIns]' passed (0.000 seconds).
+Test Case '-[MinutesCoreTests.VocabularyTests testVocabularyRoundTripsThroughJSON]' started.
+Test Case '-[MinutesCoreTests.VocabularyTests testVocabularyRoundTripsThroughJSON]' passed (0.001 seconds).
+Test Suite 'VocabularyTests' passed at 2026-10-15 17:23:07.768.
+	 Executed 6 tests, with 0 failures (0 unexpected) in 0.138 (0.139) seconds
+Test Suite 'WAVAndStoreTests' started at 2026-10-15 17:23:07.769.
+Test Case '-[MinutesCoreTests.WAVAndStoreTests testAppendToExistingRecording]' started.
+Test Case '-[MinutesCoreTests.WAVAndStoreTests testAppendToExistingRecording]' passed (0.010 seconds).
+Test Case '-[MinutesCoreTests.WAVAndStoreTests testClippingDoesNotWrap]' started.
+Test Case '-[MinutesCoreTests.WAVAndStoreTests testClippingDoesNotWrap]' passed (0.002 seconds).
+Test Case '-[MinutesCoreTests.WAVAndStoreTests testCrashedRecordingIsRepairedFromFileSize]' started.
+Test Case '-[MinutesCoreTests.WAVAndStoreTests testCrashedRecordingIsRepairedFromFileSize]' passed (0.009 seconds).
+Test Case '-[MinutesCoreTests.WAVAndStoreTests testHeaderIsRefreshedWhileRecording]' started.
+Test Case '-[MinutesCoreTests.WAVAndStoreTests testHeaderIsRefreshedWhileRecording]' passed (0.056 seconds).
+Test Case '-[MinutesCoreTests.WAVAndStoreTests testLogWritesAndTrims]' started.
+Test Case '-[MinutesCoreTests.WAVAndStoreTests testLogWritesAndTrims]' passed (0.038 seconds).
+Test Case '-[MinutesCoreTests.WAVAndStoreTests testProfilesRoundTrip]' started.
+Test Case '-[MinutesCoreTests.WAVAndStoreTests testProfilesRoundTrip]' passed (0.001 seconds).
+Test Case '-[MinutesCoreTests.WAVAndStoreTests testRepairRejectsOtherFiles]' started.
+Test Case '-[MinutesCoreTests.WAVAndStoreTests testRepairRejectsOtherFiles]' passed (0.001 seconds).
+Test Case '-[MinutesCoreTests.WAVAndStoreTests testStoreRoundTrip]' started.
+Test Case '-[MinutesCoreTests.WAVAndStoreTests testStoreRoundTrip]' passed (0.004 seconds).
+Test Case '-[MinutesCoreTests.WAVAndStoreTests testStoreSkipsCorruptRecords]' started.
+Test Case '-[MinutesCoreTests.WAVAndStoreTests testStoreSkipsCorruptRecords]' passed (0.002 seconds).
+Test Case '-[MinutesCoreTests.WAVAndStoreTests testWriteAndReadBack]' started.
+Test Case '-[MinutesCoreTests.WAVAndStoreTests testWriteAndReadBack]' passed (0.028 seconds).
+Test Suite 'WAVAndStoreTests' passed at 2026-10-15 17:23:07.922.
+	 Executed 10 tests, with 0 failures (0 unexpected) in 0.152 (0.154) seconds
+Test Suite 'MinutesCorePackageTests.xctest' passed at 2026-10-15 17:23:07.922.
+	 Executed 135 tests, with 6 tests skipped and 0 failures (0 unexpected) in 4.123 (4.152) seconds
+Test Suite 'All tests' passed at 2026-10-15 17:23:07.922.
+	 Executed 135 tests, with 6 tests skipped and 0 failures (0 unexpected) in 4.123 (4.156) seconds
+F79FC4-BA90-4D3B-89BE-0D20DFA7A08C: starting email
+2026-10-15 17:23:04.721 [info] meeting 4BF79FC4-BA90-4D3B-89BE-0D20DFA7A08C: finished email in 0.0s
+2026-10-15 17:23:04.747 [info] meeting 4BF79FC4-BA90-4D3B-89BE-0D20DFA7A08C: starting writeNotes
+2026-10-15 17:23:04.834 [info] meeting 4BF79FC4-BA90-4D3B-89BE-0D20DFA7A08C: finished writeNotes in 0.1s
+2026-10-15 17:23:04.834 [info] meeting 4BF79FC4-BA90-4D3B-89BE-0D20DFA7A08C: starting email
+2026-10-15 17:23:04.840 [info] meeting 4BF79FC4-BA90-4D3B-89BE-0D20DFA7A08C: finished email in 0.0s
+2026-10-15 17:23:04.858 [info] meeting 405628A9-5C2E-4911-98E7-11479DADAECA: starting separateSpeakers
+2026-10-15 17:23:04.858 [info] meeting 405628A9-5C2E-4911-98E7-11479DADAECA: finished separateSpeakers in 0.0s
+2026-10-15 17:23:04.858 [info] meeting 405628A9-5C2E-4911-98E7-11479DADAECA: starting transcribe
+2026-10-15 17:23:04.859 [info] meeting 405628A9-5C2E-4911-98E7-11479DADAECA: finished transcribe in 0.0s
+2026-10-15 17:23:04.859 [info] meeting 405628A9-5C2E-4911-98E7-11479DADAECA: starting assemble
+2026-10-15 17:23:04.868 [info] meeting 405628A9-5C2E-4911-98E7-11479DADAECA: finished assemble in 0.0s
+2026-10-15 17:23:04.868 [info] meeting 405628A9-5C2E-4911-98E7-11479DADAECA: starting writeNotes
+2026-10-15 17:23:04.869 [info] meeting 405628A9-5C2E-4911-98E7-11479DADAECA: finished writeNotes in 0.0s
+2026-10-15 17:23:04.869 [info] meeting 405628A9-5C2E-4911-98E7-11479DADAECA: starting email
+2026-10-15 17:23:04.870 [info] meeting 405628A9-5C2E-4911-98E7-11479DADAECA: finished email in 0.0s
+2026-10-15 17:23:04.875 [info] meeting 12903938-C742-4BCB-9A0F-21EFFBFC1138: starting separateSpeakers
+2026-10-15 17:23:04.876 [info] meeting 12903938-C742-4BCB-9A0F-21EFFBFC1138: finished separateSpeakers in 0.0s
+2026-10-15 17:23:04.876 [info] meeting 12903938-C742-4BCB-9A0F-21EFFBFC1138: starting transcribe
+2026-10-15 17:23:04.876 [info] meeting 12903938-C742-4BCB-9A0F-21EFFBFC1138: finished transcribe in 0.0s
+2026-10-15 17:23:04.876 [info] meeting 12903938-C742-4BCB-9A0F-21EFFBFC1138: starting assemble
+2026-10-15 17:23:04.889 [info] meeting 12903938-C742-4BCB-9A0F-21EFFBFC1138: finished assemble in 0.0s
+2026-10-15 17:23:04.889 [info] meeting 12903938-C742-4BCB-9A0F-21EFFBFC1138: starting writeNotes
+2026-10-15 17:23:04.890 [info] meeting 12903938-C742-4BCB-9A0F-21EFFBFC1138: finished writeNotes in 0.0s
+2026-10-15 17:23:04.890 [info] meeting 12903938-C742-4BCB-9A0F-21EFFBFC1138: starting email
+2026-10-15 17:23:04.892 [error] meeting 12903938-C742-4BCB-9A0F-21EFFBFC1138: email failed: The mail server rejected the sign-in. Check the email address and app password. (535 5.7.8 Username and Password not accepted)
+2026-10-15 17:23:07.848 [info] first line
+2026-10-15 17:23:07.849 [error] second line
+◇ Test run started.
+↳ Testing Library Version: 1902
+↳ Target Platform: arm64e-apple-macos14.0
+✔ Test run with 0 tests in 0 suites passed after 0.001 seconds.

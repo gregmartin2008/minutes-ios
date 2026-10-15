@@ -1,0 +1,23 @@
+[0/1] Planning build
+Building for debugging...
+[0/2] Write swift-version-7974D3F7F03D5E95.txt
+Build complete! (0.20s)
+Test Suite 'Selected tests' started at 2026-10-15 17:23:25.639.
+Test Suite 'MinutesCorePackageTests.xctest' started at 2026-10-15 17:23:25.640.
+Test Suite 'NetworkTransportTests' started at 2026-10-15 17:23:25.640.
+Test Case '-[MinutesCoreTests.NetworkTransportTests testTLSHandshakeAndGreetingFromGmail]' started.
+Test Case '-[MinutesCoreTests.NetworkTransportTests testTLSHandshakeAndGreetingFromGmail]' passed (0.105 seconds).
+Test Case '-[MinutesCoreTests.NetworkTransportTests testUnreachableServerFailsInsteadOfHanging]' started.
+Test Case '-[MinutesCoreTests.NetworkTransportTests testUnreachableServerFailsInsteadOfHanging]' passed (0.005 seconds).
+Test Case '-[MinutesCoreTests.NetworkTransportTests testWrongPasswordAgainstGmailIsReportedAsSignInFailure]' started.
+Test Case '-[MinutesCoreTests.NetworkTransportTests testWrongPasswordAgainstGmailIsReportedAsSignInFailure]' passed (0.070 seconds).
+Test Suite 'NetworkTransportTests' passed at 2026-10-15 17:23:25.821.
+	 Executed 3 tests, with 0 failures (0 unexpected) in 0.180 (0.181) seconds
+Test Suite 'MinutesCorePackageTests.xctest' passed at 2026-10-15 17:23:25.821.
+	 Executed 3 tests, with 0 failures (0 unexpected) in 0.180 (0.181) seconds
+Test Suite 'Selected tests' passed at 2026-10-15 17:23:25.821.
+	 Executed 3 tests, with 0 failures (0 unexpected) in 0.180 (0.182) seconds
+◇ Test run started.
+↳ Testing Library Version: 1902
+↳ Target Platform: arm64e-apple-macos14.0
+✔ Test run with 0 tests in 0 suites passed after 0.001 seconds.
