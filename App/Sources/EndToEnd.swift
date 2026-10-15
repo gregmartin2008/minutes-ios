@@ -80,7 +80,8 @@ enum EndToEnd {
         var vocabulary = Vocabulary()
         vocabulary.terms = [VocabularyTerm(term: "Soterra", heardAs: ["Sotera"]), VocabularyTerm(term: "Kestrel")]
         AppSettings.shared.vocabulary = vocabulary
-        AppSettings.shared.listensForVocabulary = true
+        // The shipped default (off): the end-to-end run checks what a person gets without touching settings.
+        AppSettings.shared.listensForVocabulary = false
         model.vocabulary = vocabulary
 
         status.phase = "downloading models"

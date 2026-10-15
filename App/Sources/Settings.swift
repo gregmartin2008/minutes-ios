@@ -62,10 +62,11 @@ final class AppSettings {
         set { defaults.set(try? JSONEncoder().encode(newValue), forKey: "vocabulary") }
     }
 
-    /// Whether the recognizer listens for the vocabulary and known names in the audio (a second,
-    /// small model, run on the CPU). On by default; the switch is there in case it misbehaves.
+    /// Whether the recognizer listens for the typed vocabulary in the audio (a second model, run
+    /// on the CPU for every piece of a meeting). Off by default: in a long meeting it made the
+    /// phone hot and gained little; the typed spelling corrections work without it.
     var listensForVocabulary: Bool {
-        get { defaults.object(forKey: "listensForVocabulary") as? Bool ?? true }
+        get { defaults.object(forKey: "listensForVocabulary") as? Bool ?? false }
         set { defaults.set(newValue, forKey: "listensForVocabulary") }
     }
 

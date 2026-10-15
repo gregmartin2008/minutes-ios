@@ -17,10 +17,22 @@ import Foundation
 @available(macOS 14.0, iOS 17.0, *)
 extension PreparedDiarization {
 
-    /// The first `count` segmentation windows and the embeddings that came from them.
+    /// The first `count` segmentation windows and the embeddings that came from them. The piece's
+    /// audio is not kept: `joined(_:audioSource:)` supplies the whole recording's instead, and a
+    /// minute of audio per piece adds up over a long meeting.
     public func keepingWindows(_ count: Int) -> PreparedDiarization {
         let kept = max(0, min(count, segmentation.numChunks))
-        guard kept < segmentation.numChunks else { return self }
+        let audioSource = ArrayAudioSampleSource(samples: [])
+        guard kept < segmentation.numChunks else {
+            return PreparedDiarization(
+                audioSource: audioSource,
+                segmentation: segmentation,
+                timedEmbeddings: timedEmbeddings,
+                audioLoadingSeconds: audioLoadingSeconds,
+                segmentationSeconds: segmentationSeconds,
+                embeddingExtractionSeconds: embeddingExtractionSeconds,
+                prepareWallSeconds: prepareWallSeconds)
+        }
         let seg = SegmentationOutput(
             logProbs: Array(segmentation.logProbs.prefix(kept)),
             speakerWeights: Array(segmentation.speakerWeights.prefix(kept)),

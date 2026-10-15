@@ -16,8 +16,13 @@ app as if it were being recorded), and its speech pipeline has been measured on 
 meetings (see "How accurate it is"). On an iPhone 18 Pro Max it has recorded and processed five
 real meetings, up to 1 hour 52 minutes and seven voices, with the notes written by Apple
 Intelligence and every email delivered. Those runs showed that a phone locked after the meeting
-gets almost no processor time, so the work was moved into the meeting itself (see "Using it");
-the first version of that is in this build and has not yet been timed on the phone.
+gets almost no processor time, so the work was moved into the meeting itself (see "Using it").
+On a 13-minute meeting the email arrived five seconds after the tap. On a 74-minute meeting the
+previous build started the final step before the meeting-time work had been handed over, redid
+the whole meeting from the recording and ran out of memory with the phone locked; this build
+fixes the order, keeps less in memory, logs memory use, and stops running the vocabulary model
+on the processor during a meeting, which had made the phone hot. It has not yet been through a
+long meeting on the phone.
 
 ## What it does
 
@@ -33,7 +38,10 @@ the first version of that is in this build and has not yet been timed on the pho
   items, open questions, figures and dates. A figure whose numbers were never said is left out.
 - **Learns your vocabulary.** Company names, people and the terms of your work that come out wrong
   ("EVITA" for EBITDA) are corrected in every transcript and spelled right in the notes. The common
-  finance terms are built in; add your own in Settings > Vocabulary.
+  finance terms are built in; add your own in Settings > Vocabulary. A second model that listens
+  for the terms in the audio is there as a switch, off by default: it runs on the processor for
+  every minute of a meeting, and in a long meeting it heated the phone and replaced common words
+  with names.
 - **Emails** the notes and the transcript, as the body of the message and as two text attachments,
   through your own Gmail account.
 - **Imports** a recording made elsewhere (a voice memo, a call recording) and treats it the same way.
