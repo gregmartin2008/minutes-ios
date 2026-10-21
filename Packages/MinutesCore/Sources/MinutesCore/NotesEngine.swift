@@ -128,6 +128,11 @@ public struct NotesEngine: Sendable {
         public var rateLimitBackoff: [Double] = [3, 10, 20, 30, 60]
         /// How long, in total, one call keeps retrying a throttled model before it gives up.
         public var rateLimitPatience: Double = 30 * 60
+        /// The same, for the pass after a meeting whose sections were drafted while it was
+        /// recorded. iOS throttles the model for an app in the background, which is where the
+        /// app usually is by then, so this pass waits only briefly and then finishes without the
+        /// model: the lists are merged as they are, and the summary is the sections' gists.
+        public var livePatience: Double = 30
         /// Assumed characters per token until the model has been asked.
         public var charactersPerToken = 3.3
 
@@ -161,14 +166,15 @@ public struct NotesEngine: Sendable {
         guard !cleaned.isEmpty || !leading.isEmpty else { throw NotesModelError.other("The transcript is empty.") }
         if cleaned.isEmpty {
             return try await finish(
-                fragments: leading, skipped: 0, lines: [], titleHint: titleHint, model: model,
+                fragments: leading, skipped: 0, titleHint: titleHint, model: model,
                 budgetTokens: max(options.minimumSectionTokens, (await model.contextSize()) - options.promptOverhead - options.responseReserve),
-                ratio: options.charactersPerToken, giveUpAt: Date().addingTimeInterval(options.rateLimitPatience),
-                progress: progress)
+                ratio: options.charactersPerToken, giveUpAt: Date().addingTimeInterval(options.livePatience),
+                withoutModelIfThrottled: true, progress: progress)
         }
 
         let fingerprint = Self.fingerprint(cleaned)
-        let giveUpAt = Date().addingTimeInterval(options.rateLimitPatience)
+        let afterLive = !leading.isEmpty
+        let giveUpAt = Date().addingTimeInterval(afterLive ? options.livePatience : options.rateLimitPatience)
         let spellingNote = Self.spellingNote(spellings)
         var saved: NotesCheckpoint
         if let resume, resume.fingerprint == fingerprint, resume.budgetTokens > 0, resume.charactersPerToken > 0 {
@@ -194,6 +200,7 @@ public struct NotesEngine: Sendable {
         var fragments: [NotesFragment] = leading + saved.sections.flatMap { $0.fragments }
         var skipped = saved.sections.reduce(0) { $0 + $1.skipped }
         var firstError: NotesModelError? = nil
+        var throttled = false
         var previousGist = fragments.last(where: { !$0.gist.isEmpty })?.gist ?? ""
         if !saved.sections.isEmpty {
             progress?(0.8 * Double(saved.sections.count) / Double(sections.count))
@@ -206,13 +213,21 @@ public struct NotesEngine: Sendable {
             var done = NotesCheckpoint.Section(fragments: [], skipped: 0)
             for r in results {
                 switch r {
-                case .success(let f):
+                case .success(var f):
+                    // A figure is only worth listing if its numbers were actually said in the
+                    // section it came from. A small model sometimes invents or garbles one, and
+                    // a wrong number in the notes is worse than none.
+                    f.figures = Self.verified(figures: f.figures, against: section)
                     done.fragments.append(f)
                     if !f.gist.isEmpty { previousGist = f.gist }
                 case .failure(let e):
                     // Throttling and unavailability affect every section; stop and let the caller wait.
                     // This section is not recorded, so it is tried again when the work resumes.
-                    if e == .rateLimited { throw e }
+                    // After a live meeting the wait is over already: the section is left out and
+                    // the notes are finished from what was drafted during the meeting.
+                    if e == .rateLimited {
+                        if afterLive { throttled = true } else { throw e }
+                    }
                     if case .unavailable = e { throw e }
                     if case .other(let why) = e, why == Self.cancelledMarker { throw CancellationError() }
                     done.skipped += 1
@@ -228,53 +243,63 @@ public struct NotesEngine: Sendable {
         guard !fragments.isEmpty else {
             throw firstError ?? NotesModelError.other("The language model returned nothing.")
         }
-        return try await finish(
-            fragments: fragments, skipped: skipped, lines: cleaned, titleHint: titleHint, model: model,
-            budgetTokens: sectionBudget, ratio: ratio, giveUpAt: giveUpAt, progress: progress)
+        var notes = try await finish(
+            fragments: fragments, skipped: skipped, titleHint: titleHint, model: model,
+            budgetTokens: sectionBudget, ratio: ratio, giveUpAt: giveUpAt,
+            withoutModelIfThrottled: afterLive, progress: progress)
+        if throttled { notes.throttled = true }
+        return notes
     }
 
     /// The reduce half of the work: merges the sections' lists and writes the title and summary.
-    /// `lines` is whatever part of the transcript is at hand, used to check the figures; the
-    /// figures from sections extracted live are checked against their own sections already.
+    /// Every fragment's figures have been checked against its own section by now.
     private func finish(
-        fragments: [NotesFragment], skipped: Int, lines: [String], titleHint: String?, model: NotesModel,
+        fragments: [NotesFragment], skipped: Int, titleHint: String?, model: NotesModel,
         budgetTokens sectionBudget: Int, ratio: Double, giveUpAt: Date,
+        withoutModelIfThrottled: Bool,
         progress: (@Sendable (Double) -> Void)?
     ) async throws -> MeetingNotes {
         let total = fragments.count + skipped
+        var throttled = false
         // Reduce: merge each list across sections.
         var merged: [NoteKind: [String]] = [:]
         for (i, kind) in NoteKind.allCases.enumerated() {
             try Task.checkCancellation()
             let all = Self.dedupe(fragments.flatMap { $0.items(kind) })
             let limit = options.limits[kind] ?? 12
-            merged[kind] = try await reduce(
-                kind: kind, items: all, limit: limit, sectionCount: fragments.count,
-                budgetTokens: sectionBudget, ratio: ratio, model: model, giveUpAt: giveUpAt)
+            if throttled {
+                merged[kind] = Array(all.prefix(limit))
+            } else {
+                do {
+                    merged[kind] = try await reduce(
+                        kind: kind, items: all, limit: limit, sectionCount: fragments.count,
+                        budgetTokens: sectionBudget, ratio: ratio, model: model, giveUpAt: giveUpAt)
+                } catch let e as NotesModelError where e == .rateLimited && withoutModelIfThrottled {
+                    throttled = true
+                    merged[kind] = Array(all.prefix(limit))
+                }
+            }
             progress?(0.8 + 0.15 * Double(i + 1) / Double(NoteKind.allCases.count))
         }
-        // A figure is only worth listing if its numbers were actually said. A small model
-        // sometimes invents or garbles one, and a wrong number in the notes is worse than none.
-        if !lines.isEmpty {
-            merged[.figures] = Self.verified(figures: merged[.figures] ?? [], against: lines)
-        }
-
-        // Overview: title and summary from the merged notes.
+        // Overview: title and summary from the merged notes. Without the model, the summary is
+        // the sections' gists in order, which read as a plain account of the meeting.
         let gists = fragments.map { $0.gist }.filter { !$0.isEmpty }
-        var overview = NotesOverview(title: titleHint ?? "", summary: gists.prefix(4).joined(separator: " "))
-        do {
-            let points = merged[.keyPoints] ?? [], decided = merged[.decisions] ?? []
-            let leadGists = Array(gists.prefix(12))
-            let o = try await withBackoff(until: giveUpAt) {
-                try await model.overview(
-                    keyPoints: points, decisions: decided, gists: leadGists, titleHint: titleHint)
+        var overview = NotesOverview(title: titleHint ?? "", summary: Self.gistSummary(gists))
+        if !throttled {
+            do {
+                let points = merged[.keyPoints] ?? [], decided = merged[.decisions] ?? []
+                let leadGists = Array(gists.prefix(12))
+                let o = try await withBackoff(until: giveUpAt) {
+                    try await model.overview(
+                        keyPoints: points, decisions: decided, gists: leadGists, titleHint: titleHint)
+                }
+                if !o.summary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { overview.summary = o.summary }
+                if !o.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { overview.title = o.title }
+            } catch let e as NotesModelError where e == .rateLimited {
+                if withoutModelIfThrottled { throttled = true } else { throw e }
+            } catch {
+                // Keep the stitched-together gists as the summary.
             }
-            if !o.summary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { overview.summary = o.summary }
-            if !o.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { overview.title = o.title }
-        } catch let e as NotesModelError where e == .rateLimited {
-            throw e
-        } catch {
-            // Keep the stitched-together gists as the summary.
         }
         progress?(1)
 
@@ -287,7 +312,18 @@ public struct NotesEngine: Sendable {
             openQuestions: merged[.openQuestions] ?? [],
             figures: merged[.figures] ?? [],
             skippedSections: skipped,
-            totalSections: total)
+            totalSections: total,
+            throttled: throttled ? true : nil)
+    }
+
+    /// The gists joined into one paragraph, kept to a readable length by dropping from the
+    /// middle: the opening and the close of a meeting say the most about it.
+    static func gistSummary(_ gists: [String], maxCharacters: Int = 1100) -> String {
+        var kept = gists
+        while kept.count > 2, kept.joined(separator: " ").count > maxCharacters {
+            kept.remove(at: kept.count / 2)
+        }
+        return kept.joined(separator: " ")
     }
 
     // MARK: Map

@@ -388,8 +388,8 @@ private struct NotesTab: View {
                         }
                     }
                 }
-                if notes.skippedSections > 0 {
-                    Text("\(notes.skippedSections) of \(notes.totalSections) parts of the transcript couldn't be summarized and are missing from these notes. The transcript is complete.")
+                if let remark = Render.remark(notes) {
+                    Text(remark + " The transcript is complete.")
                         .font(.footnote)
                         .foregroundStyle(Theme.warn)
                         .fixedSize(horizontal: false, vertical: true)

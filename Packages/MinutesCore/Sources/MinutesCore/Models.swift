@@ -76,11 +76,14 @@ public struct MeetingNotes: Codable, Equatable, Sendable {
     /// Number of transcript sections the model could not process (guardrails, errors).
     public var skippedSections: Int
     public var totalSections: Int
+    /// True when the final pass was finished without the language model because iOS was
+    /// throttling it (it does this to an app in the background).
+    public var throttled: Bool?
 
     public init(
         title: String = "", summary: String = "", keyPoints: [String] = [], decisions: [String] = [],
         actionItems: [String] = [], openQuestions: [String] = [], figures: [String] = [],
-        skippedSections: Int = 0, totalSections: Int = 0
+        skippedSections: Int = 0, totalSections: Int = 0, throttled: Bool? = nil
     ) {
         self.title = title
         self.summary = summary
@@ -91,6 +94,7 @@ public struct MeetingNotes: Codable, Equatable, Sendable {
         self.figures = figures
         self.skippedSections = skippedSections
         self.totalSections = totalSections
+        self.throttled = throttled
     }
 
     public var isEmpty: Bool {

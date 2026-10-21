@@ -92,6 +92,21 @@ public enum Render {
         ].filter { !$0.1.isEmpty }
     }
 
+    /// What to say under the notes when they are not everything they could have been.
+    public static func remark(_ n: MeetingNotes) -> String? {
+        var parts: [String] = []
+        if n.skippedSections > 0 {
+            parts.append(
+                n.throttled == true && n.skippedSections == 1 && n.totalSections > 1
+                    ? "The last few minutes of the meeting are in the transcript but not in these notes."
+                    : "\(n.skippedSections) of \(n.totalSections) parts of the transcript could not be summarized and are missing from these notes.")
+        }
+        if n.throttled == true {
+            parts.append("iOS limits the language model while Minutes is in the background, so these notes were finished without its final pass: the lists are as drafted during the meeting and the summary is their gists in order.")
+        }
+        return parts.isEmpty ? nil : parts.joined(separator: " ")
+    }
+
     static let notesPendingText =
         "The notes aren't written yet: iOS limited the language model while this meeting was being processed. Open Minutes and it writes them and sends a second email."
 
@@ -108,9 +123,7 @@ public enum Render {
             out += items.map { "- \($0)" }
             out.append("")
         }
-        if n.skippedSections > 0 {
-            out.append("Note: \(n.skippedSections) of \(n.totalSections) parts of the transcript could not be summarized and are missing from these notes.")
-        }
+        if let note = remark(n) { out.append("Note: " + note) }
         return out.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
@@ -177,8 +190,8 @@ public enum Render {
                 for item in items { html += "<li style=\"margin:0 0 6px\">\(e(item))</li>" }
                 html += "</ul>"
             }
-            if n.skippedSections > 0 {
-                html += "<p style=\"margin:14px 0 0;color:#8A5200\">\(n.skippedSections) of \(n.totalSections) parts of the transcript could not be summarized and are missing from these notes.</p>"
+            if let note = remark(n) {
+                html += "<p style=\"margin:14px 0 0;color:#8A5200\">\(e(note))</p>"
             }
         } else {
             if m.notesPending == true {

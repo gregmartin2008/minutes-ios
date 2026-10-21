@@ -20,9 +20,14 @@ gets almost no processor time, so the work was moved into the meeting itself (se
 On a 13-minute meeting the email arrived five seconds after the tap. On a 74-minute meeting the
 previous build started the final step before the meeting-time work had been handed over, redid
 the whole meeting from the recording and ran out of memory with the phone locked; this build
-fixes the order, keeps less in memory, logs memory use, and stops running the vocabulary model
-on the processor during a meeting, which had made the phone hot. It has not yet been through a
-long meeting on the phone.
+fixed the order, kept less in memory, logged memory use, and stopped running the vocabulary
+model on the processor during a meeting, which had made the phone hot; two 20-minute meetings
+then went from End to email in 25 seconds. A 37-minute meeting with the phone put to other uses
+right after End took 30 minutes: iOS throttles Apple's language model for an app in the
+background, and the final notes pass kept waiting for it. This build gives that pass 30 seconds
+and then finishes the notes from the sections drafted during the meeting (lists merged as they
+are, summary from their gists, the last few minutes left out and said so), so the email goes
+out in about a minute whatever the phone is doing. That has not yet been tried on the phone.
 
 ## What it does
 
