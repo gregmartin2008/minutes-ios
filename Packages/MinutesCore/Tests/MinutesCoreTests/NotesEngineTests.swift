@@ -101,7 +101,47 @@ final class NotesEngineTests: XCTestCase {
         var o = NotesEngine.Options()
         o.rateLimitBackoff = [0.01, 0.01]
         o.rateLimitPatience = patience
+        o.livePatience = patience
         return o
+    }
+
+    /// After a live meeting the app is usually in the background, where iOS throttles the model.
+    /// The notes are then finished from the sections drafted during the meeting, without
+    /// waiting: lists merged as they are, summary from the gists, the last stretch left out and
+    /// said so. The email must not wait on the model.
+    func testThrottledAfterLiveMeetingFinishesWithoutTheModel() async throws {
+        let model = FakeNotesModel()
+        model.alwaysRateLimit = true
+        let drafted = (1...3).map { n in
+            NotesFragment(
+                gist: "Gist \(n).", keyPoints: ["Point \(n)", "Shared point"], decisions: n == 1 ? ["Hold the bid"] : [],
+                actionItems: ["Dana: call customer \(n)"], openQuestions: ["Question \(n)?"], figures: ["\(n)0% of revenue"])
+        }
+        let started = Date()
+        let notes = try await NotesEngine(options: fastOptions(patience: 0.05)).write(
+            lines: ["Greg: One last thing.", "Dana: Noted."], titleHint: nil, model: model, leading: drafted)
+        XCTAssertLessThan(Date().timeIntervalSince(started), 5)
+        XCTAssertEqual(notes.throttled, true)
+        XCTAssertEqual(notes.skippedSections, 1)            // the lines after the last drafted section
+        XCTAssertEqual(notes.totalSections, 4)
+        XCTAssertEqual(notes.summary, "Gist 1. Gist 2. Gist 3.")
+        XCTAssertEqual(notes.keyPoints, ["Point 1", "Shared point", "Point 2", "Point 3"])
+        XCTAssertEqual(notes.decisions, ["Hold the bid"])
+        XCTAssertEqual(notes.actionItems.count, 3)
+        XCTAssertEqual(notes.figures.count, 3)
+        XCTAssertEqual(model.overviewCalls, 0)
+        let remark = try XCTUnwrap(Render.remark(notes))
+        XCTAssertTrue(remark.contains("last few minutes"))
+        XCTAssertTrue(remark.contains("background"))
+    }
+
+    func testGistSummaryDropsFromTheMiddle() {
+        let gists = (1...20).map { "Sentence number \($0) about the meeting, long enough to count." }
+        let summary = NotesEngine.gistSummary(gists, maxCharacters: 300)
+        XCTAssertTrue(summary.hasPrefix("Sentence number 1 "))
+        XCTAssertTrue(summary.hasSuffix("number 20 about the meeting, long enough to count."))
+        XCTAssertLessThanOrEqual(summary.count, 300)
+        XCTAssertEqual(NotesEngine.gistSummary(["A.", "B."], maxCharacters: 1), "A. B.")
     }
 
     func testShortMeetingIsOneSectionAndSkipsConsolidation() async throws {
