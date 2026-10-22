@@ -24,11 +24,14 @@ final class LiveMeeting {
         }
     }
 
-    init(meetingID: String, models: SpeechModels, vocabulary: Vocabulary, boost: [BoostTerm], notesModel: NotesModel?) {
+    init(
+        meetingID: String, models: SpeechModels, vocabulary: Vocabulary, boost: [BoostTerm], notesModel: NotesModel?,
+        engineOptions: NotesEngine.Options = NotesEngine.Options()
+    ) {
         self.meetingID = meetingID
         self.analyzer = LiveAnalyzer(models: models, boost: boost)
         self.vocabulary = VocabularyCorrector(vocabulary)
-        self.notes = notesModel.map { LiveNoteTaker(model: $0, spellings: vocabulary.spellings) }
+        self.notes = notesModel.map { LiveNoteTaker(model: $0, spellings: vocabulary.spellings, engineOptions: engineOptions) }
     }
 
     /// Loads the models and starts the periodic note-taking.

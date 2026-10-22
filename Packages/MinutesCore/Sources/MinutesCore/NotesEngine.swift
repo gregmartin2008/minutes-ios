@@ -133,6 +133,10 @@ public struct NotesEngine: Sendable {
         /// app usually is by then, so this pass waits only briefly and then finishes without the
         /// model: the lists are merged as they are, and the summary is the sections' gists.
         public var livePatience: Double = 30
+        /// Asked before each wait on a throttled model. Returning false ends the wait at once:
+        /// the app passes whether it is in the foreground, since iOS throttles the model for an
+        /// app in the background for as long as it stays there, and waiting gains nothing.
+        public var waitWhileThrottled: @Sendable () -> Bool = { true }
         /// Assumed characters per token until the model has been asked.
         public var charactersPerToken = 3.3
 
@@ -434,7 +438,7 @@ public struct NotesEngine: Sendable {
             do {
                 return try await body()
             } catch let e as NotesModelError where e == .rateLimited {
-                guard let last = options.rateLimitBackoff.last else { throw e }
+                guard let last = options.rateLimitBackoff.last, options.waitWhileThrottled() else { throw e }
                 let wait = attempt < options.rateLimitBackoff.count ? options.rateLimitBackoff[attempt] : last
                 guard Date().addingTimeInterval(wait) <= deadline else { throw e }
                 attempt += 1

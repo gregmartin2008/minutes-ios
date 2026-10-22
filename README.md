@@ -26,8 +26,10 @@ then went from End to email in 25 seconds. A 37-minute meeting with the phone pu
 right after End took 30 minutes: iOS throttles Apple's language model for an app in the
 background, and the final notes pass kept waiting for it. This build gives that pass 30 seconds
 and then finishes the notes from the sections drafted during the meeting (lists merged as they
-are, summary from their gists, the last few minutes left out and said so), so the email goes
-out in about a minute whatever the phone is doing. That has not yet been tried on the phone.
+are, summary from their gists, the last few minutes left out and said so). On the phone that
+brought a 28-minute meeting, with the phone put to other uses right after End, to 56 seconds
+from End to email; this build stops waiting on the model as soon as the app is in the
+background, which should bring that under 15 seconds.
 
 ## What it does
 
