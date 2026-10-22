@@ -369,7 +369,8 @@ final class AppModel: ObservableObject {
         case .failure: notesModel = nil
         }
         let live = LiveMeeting(
-            meetingID: id, models: models, vocabulary: AppSettings.shared.vocabulary, boost: boostTerms(), notesModel: notesModel)
+            meetingID: id, models: models, vocabulary: AppSettings.shared.vocabulary, boost: boostTerms(),
+            notesModel: notesModel, engineOptions: notesOptions)
         self.live = live
         recorder.onSamples = { samples in live.add(samples) }
         live.start()
@@ -464,6 +465,14 @@ final class AppModel: ObservableObject {
 
     // MARK: Processing
 
+    /// The notes engine's options: it waits on a throttled language model only while the app is
+    /// in the foreground. In the background iOS throttles the model until the app comes back.
+    private var notesOptions: NotesEngine.Options {
+        var o = NotesEngine.Options()
+        o.waitWhileThrottled = { AppState.shared.isActive }
+        return o
+    }
+
     private func services() -> PipelineServices {
         if let demoServices { return demoServices }
         let models = self.models
@@ -472,6 +481,7 @@ final class AppModel: ObservableObject {
             transcriber: FluidTranscriber(models: models, boost: boostTerms()),
             notesModel: { FoundationNotesModel.make() },
             mailer: SMTPMailer(),
+            notesOptions: notesOptions,
             vocabulary: { AppSettings.shared.vocabulary },
             liveWork: { [liveWork] id in liveWork.get(id) },
             stageWillStart: { [liveWork] stage, id in
@@ -747,9 +757,11 @@ final class AppModel: ObservableObject {
     private func watchAppState() {
         let center = NotificationCenter.default
         center.addObserver(forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: .main) { _ in
+            AppState.shared.isActive = false
             Log.shared.info("app went to the background")
         }
         center.addObserver(forName: UIApplication.willEnterForegroundNotification, object: nil, queue: .main) { _ in
+            AppState.shared.isActive = true
             Log.shared.info("app came to the foreground")
         }
         center.addObserver(forName: UIApplication.didReceiveMemoryWarningNotification, object: nil, queue: .main) { [weak self] _ in

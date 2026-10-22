@@ -135,6 +135,23 @@ final class NotesEngineTests: XCTestCase {
         XCTAssertTrue(remark.contains("background"))
     }
 
+    /// With the app in the background there is no point waiting at all: the notes are finished
+    /// at once from the drafted sections.
+    func testNoWaitingWhenTheAppSaysNotTo() async throws {
+        let model = FakeNotesModel()
+        model.alwaysRateLimit = true
+        var options = fastOptions(patience: 60)
+        options.rateLimitBackoff = [5, 5]
+        options.waitWhileThrottled = { false }
+        let drafted = [NotesFragment(gist: "Gist 1.", keyPoints: ["Point 1"])]
+        let started = Date()
+        let notes = try await NotesEngine(options: options).write(
+            lines: ["Greg: One last thing."], titleHint: nil, model: model, leading: drafted)
+        XCTAssertLessThan(Date().timeIntervalSince(started), 2)
+        XCTAssertEqual(notes.throttled, true)
+        XCTAssertEqual(notes.keyPoints, ["Point 1"])
+    }
+
     func testGistSummaryDropsFromTheMiddle() {
         let gists = (1...20).map { "Sentence number \($0) about the meeting, long enough to count." }
         let summary = NotesEngine.gistSummary(gists, maxCharacters: 300)
