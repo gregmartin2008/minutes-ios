@@ -68,14 +68,17 @@ Windows program that signs an app with your Apple ID and puts it on your iPhone.
    - Settings > Privacy & Security > Developer Mode > on, then restart when asked.
 6. **Open Minutes.**
 
-If Sideloadly's *Use automatic bundle ID* option is on (its default), it installs the app under an
-identifier with your Apple team's code appended, and iOS then refuses the app's request to keep
-working at full speed after the phone is locked, because that request has to carry the installed
-identifier. The build can be made with that identifier instead: put it in `App/bundle-id.txt`
-(or in a repository variable named `MINUTES_BUNDLE_ID`); Settings > Share diagnostics prints the
-installed identifier on its first line. From then on install with *Use automatic bundle ID* off
-and that identifier typed in. The app keeps its meetings and settings across the change, since
-the identifier is the same one it already has.
+The app is built as `app.minutes.recorder`. Sideloadly, AltStore, SideStore and iloader all append
+your Apple team's code to that when they sign it (Sideloadly's *Use automatic bundle ID*, on by
+default), so whichever tool installs it, the installed identifier is the same
+(`app.minutes.recorder.<team code>`) and a reinstall keeps the meetings and settings. If a tool
+is told not to append, it installs a second copy with no data. A different identifier can be
+built by putting it in `App/bundle-id.txt` or a repository variable named `MINUTES_BUNDLE_ID`.
+
+Since October 12, 2026, Apple has been refusing the Apple ID sign-in that these free tools use
+("This action cannot be completed at this time", -80045/-80046); each tool patches around it in
+turn. If Sideloadly fails with that error, try the latest iloader (https://github.com/nab138/iloader),
+which installs the same `.ipa` over a cable.
 
 Apple lets a free Apple ID sign an app for seven days. After that the app stops opening until it is
 signed again: connect the phone and click *Start* in Sideloadly again, which takes a minute and keeps
