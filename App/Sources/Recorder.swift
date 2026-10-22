@@ -56,6 +56,9 @@ final class Recorder: NSObject {
     private var peak: Float = 0
     private var writeFailed = false
     private var observers: [NSObjectProtocol] = []
+    /// Keeps trying to get the microphone back while a recording is interrupted.
+    private var retry: Timer?
+    private var retryCount = 0
 
     /// Seconds of audio written so far.
     var seconds: Double { fileQueue.sync { writer?.seconds ?? 0 } }
@@ -99,6 +102,7 @@ final class Recorder: NSObject {
             try AVAudioSession.sharedInstance().setActive(true)
             try startEngine()
             closeGapIfOpen()
+            cancelRetry()
             setState(.recording)
         } catch {
             Log.shared.warn("resume failed: \(error.localizedDescription)")
@@ -114,6 +118,7 @@ final class Recorder: NSObject {
     @discardableResult
     func stop(holdingSession: Bool = false) -> Double {
         guard state != .idle else { return 0 }
+        cancelRetry()
         closeGapIfOpen()
         var total = 0.0
         fileQueue.sync {
@@ -274,14 +279,50 @@ final class Recorder: NSObject {
         case .began:
             guard state == .recording else { return }
             interruptionStarted = Date()
-            Log.shared.warn("recording interrupted by the system")
+            Log.shared.warn("recording interrupted by the system (\(Self.describeInterruption(note)))")
             setState(.interrupted)
+            scheduleRetry()
         case .ended:
             guard state == .interrupted else { return }
             attemptRestart(reason: "interruption ended")
         @unknown default:
             break
         }
+    }
+
+    /// Why iOS took the microphone, as far as it says: a phone call or another app
+    /// (`default`), the app being suspended, the built-in microphone muted from Control Center
+    /// or the Action button, or the input (headset, car) going away.
+    private static func describeInterruption(_ note: Notification) -> String {
+        guard let raw = note.userInfo?[AVAudioSessionInterruptionReasonKey] as? UInt,
+              let reason = AVAudioSession.InterruptionReason(rawValue: raw) else { return "no reason given" }
+        switch reason {
+        case .default: return "a call or another app took the microphone"
+        case .appWasSuspended: return "the app was suspended"
+        case .builtInMicMuted: return "the microphone was muted"
+        case .routeDisconnected: return "the microphone in use was disconnected"
+        @unknown default: return "reason \(raw)"
+        }
+    }
+
+    /// Tries again every few seconds for ten minutes, then every half minute, until the
+    /// microphone is back or the recording is stopped. iOS reports the end of an interruption
+    /// only sometimes, and the first attempt after it often fails while the other app lets go.
+    private func scheduleRetry() {
+        retry?.invalidate()
+        retryCount += 1
+        let interval: TimeInterval = retryCount <= 200 ? 3 : 30
+        retry = Timer.scheduledTimer(withTimeInterval: interval, repeats: false) { [weak self] _ in
+            guard let self, self.state == .interrupted else { return }
+            self.attemptRestart(reason: "retry \(self.retryCount)")
+            if self.state == .interrupted { self.scheduleRetry() }
+        }
+    }
+
+    private func cancelRetry() {
+        retry?.invalidate()
+        retry = nil
+        retryCount = 0
     }
 
     /// The microphone hardware or route changed (headphones, a reset); the engine has stopped and needs rebuilding.
@@ -299,12 +340,17 @@ final class Recorder: NSObject {
             try configureSession()
             try startEngine()
             closeGapIfOpen()
+            cancelRetry()
             setState(.recording)
             Log.shared.info("recording resumed after \(reason)")
         } catch {
             if interruptionStarted == nil { interruptionStarted = Date() }
             setState(.interrupted)
-            Log.shared.warn("could not resume after \(reason): \(error.localizedDescription)")
+            // One line per failure would flood the log while an app holds the microphone.
+            if retryCount <= 1 || retryCount % 20 == 0 {
+                Log.shared.warn("could not resume after \(reason): \(error.localizedDescription)")
+            }
+            if retry == nil { scheduleRetry() }
         }
     }
 
