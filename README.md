@@ -114,6 +114,8 @@ it, Minutes still emails the full transcript and says why there are no notes.
   under a minute. The microphone indicator stays on until the email has gone, because keeping the
   microphone open is what keeps the phone's attention; nothing is recorded after End.
 - The email arrives when that finishes. Leaving Minutes open on the screen is no longer needed.
+- **Cancel meeting**, the quiet link under the buttons, throws the meeting away after a
+  confirmation: the recording is deleted and nothing is written or emailed.
 - In the **Speakers** tab, name the voices. Minutes updates the transcript and notes, remembers
   the voices, and can send the corrected email (menu > *Email again*).
 

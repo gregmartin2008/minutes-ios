@@ -122,6 +122,18 @@ public actor LiveAnalyzer {
         return FluidSeparator.convert(try manager.cluster(prepared)).turns
     }
 
+    /// Drops everything: no more audio is accepted and nothing further is worked on. Work in
+    /// flight on the current piece finishes on its own and is discarded.
+    public func cancel() {
+        finished = true
+        pending.takeAll()
+        asrBuffer.removeAll()
+        sepBuffer.removeAll()
+        words.removeAll()
+        pieces.removeAll()
+        log.info("live analysis canceled")
+    }
+
     /// Finishes the last pieces and returns everything. No more audio is accepted afterward.
     public func finish() async throws -> (words: [Word], analysis: FluidSeparator.PieceAnalysis?) {
         pump()
@@ -269,6 +281,7 @@ private final class PendingSamples: @unchecked Sendable {
         lock.unlock()
     }
 
+    @discardableResult
     func takeAll() -> [Float] {
         lock.lock()
         defer { lock.unlock() }

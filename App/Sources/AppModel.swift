@@ -325,6 +325,27 @@ final class AppModel: ObservableObject {
         }
     }
 
+    /// Throws the meeting being recorded away: the recording is deleted and nothing is written
+    /// or sent. The person confirms this in the recording screen first.
+    func cancelRecording() {
+        guard let r = recording else { return }
+        if isDemo {
+            recording = nil
+            return
+        }
+        recorder.stop()
+        recorder.onSamples = nil
+        recording = nil
+        live?.cancel()
+        live = nil
+        store.delete(id: r.meetingID)
+        meetings.removeAll { $0.id == r.meetingID }
+        liveWork.remove(r.meetingID)
+        if openMeetingID == r.meetingID { openMeetingID = nil }
+        Log.shared.info("meeting \(r.meetingID) canceled by the person; recording deleted")
+        banner = "Meeting canceled. Nothing was kept."
+    }
+
     /// Meetings the pipeline may start on now, oldest first.
     private var queued: [Meeting] {
         meetings.filter { $0.status == .processing && !liveFinishing.contains($0.id) }
