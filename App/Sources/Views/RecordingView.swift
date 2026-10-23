@@ -7,6 +7,7 @@ struct RecordingView: View {
     @EnvironmentObject private var model: AppModel
     @State private var title = ""
     @State private var confirmEnd = false
+    @State private var confirmCancel = false
     @State private var pulse = false
     @FocusState private var titleFocused: Bool
 
@@ -78,6 +79,15 @@ struct RecordingView: View {
         } message: {
             Text("The recording can't be continued after it ends.")
         }
+        .confirmationDialog("Cancel this meeting?", isPresented: $confirmCancel, titleVisibility: .visible) {
+            Button("Cancel meeting", role: .destructive) {
+                titleFocused = false
+                model.cancelRecording()
+            }
+            Button("Keep recording", role: .cancel) {}
+        } message: {
+            Text("The recording is deleted. No notes or transcript will be written, and nothing is emailed.")
+        }
     }
 
     private var header: some View {
@@ -140,22 +150,38 @@ struct RecordingView: View {
     }
 
     private var controls: some View {
-        HStack(spacing: 12) {
-            Button {
-                titleFocused = false
-                model.togglePause()
-            } label: {
-                Text(status.state == .recording ? "Pause" : "Resume")
-            }
-            .buttonStyle(OutlineButtonStyle(text: .white, fill: Color.white.opacity(0.12), border: Color.white.opacity(0.6), height: 60))
+        VStack(spacing: 14) {
+            HStack(spacing: 12) {
+                Button {
+                    titleFocused = false
+                    model.togglePause()
+                } label: {
+                    Text(status.state == .recording ? "Pause" : "Resume")
+                }
+                .buttonStyle(OutlineButtonStyle(text: .white, fill: Color.white.opacity(0.12), border: Color.white.opacity(0.6), height: 60))
 
+                Button {
+                    titleFocused = false
+                    confirmEnd = true
+                } label: {
+                    Text("End meeting")
+                }
+                .buttonStyle(SolidButtonStyle(fill: .white, text: field, height: 60))
+            }
+
+            // Deliberately quiet: a wrong tap here is confirmed before anything is lost.
             Button {
                 titleFocused = false
-                confirmEnd = true
+                confirmCancel = true
             } label: {
-                Text("End meeting")
+                Text("Cancel meeting")
+                    .font(.system(size: 15, weight: .medium))
+                    .underline()
+                    .opacity(0.85)
+                    .frame(maxWidth: .infinity, minHeight: 44)
             }
-            .buttonStyle(SolidButtonStyle(fill: .white, text: field, height: 60))
+            .buttonStyle(.plain)
+            .accessibilityHint("Deletes the recording without writing notes")
         }
     }
 }

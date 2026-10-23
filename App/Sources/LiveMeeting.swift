@@ -95,6 +95,14 @@ final class LiveMeeting {
         }
     }
 
+    /// Stops the live work and throws it away: the meeting was canceled.
+    func cancel() {
+        ticker?.cancel()
+        ticker = nil
+        let analyzer = self.analyzer
+        Task { await analyzer.cancel() }
+    }
+
     /// Ends the live work and returns everything for the pipeline.
     func finish() async -> LiveWork {
         ticker?.cancel()
