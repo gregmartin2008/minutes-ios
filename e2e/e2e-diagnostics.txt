@@ -1,0 +1,30 @@
+Minutes diagnostics
+Minutes 1.6.3, arm64, iOS 26.5, 7168 MB RAM, bundle app.minutes.recorder
+models ready: true, mail configured: true, voices: 0, meetings: 1
+language model: available
+- 90D7828E done/finished 115s speakers=5 assemble=0s email=0s separateSpeakers=47s transcribe=26s writeNotes=3s Apple's language model couldn't write the notes: it reported an error Minutes doesn't recognize.
+
+--- log ---
+2026-10-23 16:18:14.697 [info] launch: Minutes 1.6.3, arm64, iOS 26.5, 7168 MB RAM, bundle app.minutes.recorder
+2026-10-23 16:18:14.707 [info] background: the microphone is held while a recorded meeting is processed
+2026-10-23 16:18:14.873 [info] app came to the foreground
+2026-10-23 16:18:49.055 [info] transcription model ready in 33.8s (files 33.7s, load 0.1s)
+2026-10-23 16:19:04.304 [info] speaker-separation models ready in 15.2s
+2026-10-23 16:19:14.476 [info] transcription model warmed up in 7.5s
+2026-10-23 16:19:14.484 [info] speech models downloaded
+2026-10-23 16:19:15.020 [info] imported 115s of audio as meeting 90D7828E-F33A-4326-BA13-C09E16469827
+2026-10-23 16:19:21.227 [info] meeting 90D7828E-F33A-4326-BA13-C09E16469827: starting separateSpeakers
+2026-10-23 16:20:08.723 [info] meeting 90D7828E-F33A-4326-BA13-C09E16469827: finished separateSpeakers in 47.5s
+2026-10-23 16:20:08.724 [info] meeting 90D7828E-F33A-4326-BA13-C09E16469827: starting transcribe
+2026-10-23 16:20:34.695 [info] meeting 90D7828E-F33A-4326-BA13-C09E16469827: finished transcribe in 26.0s
+2026-10-23 16:20:34.696 [info] meeting 90D7828E-F33A-4326-BA13-C09E16469827: starting assemble
+2026-10-23 16:20:34.733 [info] meeting 90D7828E-F33A-4326-BA13-C09E16469827: finished assemble in 0.0s
+2026-10-23 16:20:34.733 [info] meeting 90D7828E-F33A-4326-BA13-C09E16469827: starting writeNotes
+2026-10-23 16:20:37.324 [error] language model error: Error Domain=FoundationModels.LanguageModelSession.GenerationError Code=-1 "(null)" UserInfo={NSMultipleUnderlyingErrorsKey=(
+    "Error Domain=FoundationModels.LanguageModelSession.GenerationError Code=-1 \"(null)\" UserInfo={NSMultipleUnderlyingErrorsKey=(\n    \"Error Domain=ModelManagerServices.ModelManagerError Code=1026 \\\"(null)\\\" UserInfo={NSMultipleUnderlyingErrorsKey=(\\n)}\"\n)}"
+)}
+2026-10-23 16:20:37.338 [info] meeting 90D7828E-F33A-4326-BA13-C09E16469827: finished writeNotes in 2.6s
+2026-10-23 16:20:37.339 [info] meeting 90D7828E-F33A-4326-BA13-C09E16469827: starting email
+2026-10-23 16:20:37.673 [info] mail accepted by 127.0.0.1: 2.0.0 OK queued
+2026-10-23 16:20:37.677 [info] meeting 90D7828E-F33A-4326-BA13-C09E16469827: finished email in 0.3s
+2026-10-23 16:20:37.705 [info] meeting 90D7828E-F33A-4326-BA13-C09E16469827 ended run as done at finished

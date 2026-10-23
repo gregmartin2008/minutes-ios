@@ -1,0 +1,34 @@
+/private/tmp/venv/lib/python3.9/site-packages/aiosmtpd/smtp.py:372: UserWarning: Requiring AUTH while not requiring TLS can lead to security vulnerabilities!
+  warn("Requiring AUTH while not requiring TLS "
+auth_required == True but auth_require_tls == False
+[    0s] mail server listening on 127.0.0.1:53449
+[   16s] launching: app.minutes.recorder: 24552
+[   21s] app: downloading models | None None
+[   80s] app: processing | processing separateSpeakers
+[  135s] app: processing | processing transcribe
+[  160s] app: processing | processing writeNotes
+/private/tmp/venv/lib/python3.9/site-packages/aiosmtpd/smtp.py:372: UserWarning: Requiring AUTH while not requiring TLS can lead to security vulnerabilities!
+  warn("Requiring AUTH while not requiring TLS "
+auth_required == True but auth_require_tls == False
+Session.login_data is deprecated and will be removed in version 2.0
+[  164s] app: finished | done finished
+PASS the app reported back before the time limit  (finished)
+PASS speech models downloaded inside the app
+PASS the meeting finished processing  (done at finished: None)
+PASS several voices were told apart  (5 voices)
+PASS overlapping speech was detected  (5 passages with overlap, 0 marked as crosstalk)
+PASS the app recorded the email as sent
+PASS exactly one email reached the mail server  (1)
+PASS envelope sender and recipient  (minutes-test@example.com -> ['reader@example.com'])
+PASS subject  (Meeting notes: Meeting, Oct 23 at 4:19 PM (Oct 23, 2026))
+PASS no parsing defects
+PASS has an HTML body with the transcript
+PASS transcript attached  (['Meeting, Oct 23 at 4 19 PM 2026-10-23 - Transcript.txt'])
+PASS emailed transcript matches what was said  (word error 4.4% over 344 words)
+PASS transcript names each voice  (['Speaker 1', 'Speaker 2', 'Speaker 3', 'Speaker 4', 'Speaker 5'])
+PASS the vocabulary terms were written as given  (['Soterra', 'Kestrel'])
+
+app timings: assemble 0.0s, email 0.3s, separateSpeakers 47.5s, transcribe 25.9s, writeNotes 2.6s | audio 115s | whole run 143s
+notes: Apple's language model couldn't write the notes: it reported an error Minutes doesn't recognize.
+
+15/15 end-to-end checks passed

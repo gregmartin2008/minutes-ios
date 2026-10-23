@@ -1,0 +1,4 @@
+/Users/runner/work/minutes-ios/minutes-ios/App/Sources/AppModel.swift:790:21: warning: main actor-isolated property 'runningID' can not be referenced from a Sendable closure
+/Users/runner/work/minutes-ios/minutes-ios/App/Sources/AppModel.swift:790:44: warning: main actor-isolated property 'live' can not be referenced from a Sendable closure
+/Users/runner/work/minutes-ios/minutes-ios/App/Sources/AppModel.swift:794:53: warning: main actor-isolated property 'lastMemoryWarningLog' can not be referenced from a Sendable closure
+/Users/runner/work/minutes-ios/minutes-ios/App/Sources/AppModel.swift:795:22: warning: main actor-isolated property 'lastMemoryWarningLog' can not be mutated from a Sendable closure

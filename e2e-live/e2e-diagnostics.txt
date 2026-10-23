@@ -1,0 +1,63 @@
+Minutes diagnostics
+Minutes 1.6.3, arm64, iOS 26.5, 7168 MB RAM, bundle app.minutes.recorder
+models ready: true, mail configured: true, voices: 0, meetings: 2
+language model: available
+- 7907EEDE done/finished 115s speakers=5 assemble=0s email=0s separateSpeakers=1s transcribe=0s writeNotes=0s Apple's language model couldn't write the notes: it reported an error Minutes doesn't recognize.
+- 90D7828E done/finished 115s speakers=5 assemble=0s email=0s separateSpeakers=47s transcribe=26s writeNotes=3s Apple's language model couldn't write the notes: it reported an error Minutes doesn't recognize.
+
+--- log ---
+2026-10-23 16:18:14.697 [info] launch: Minutes 1.6.3, arm64, iOS 26.5, 7168 MB RAM, bundle app.minutes.recorder
+2026-10-23 16:18:14.707 [info] background: the microphone is held while a recorded meeting is processed
+2026-10-23 16:18:14.873 [info] app came to the foreground
+2026-10-23 16:18:49.055 [info] transcription model ready in 33.8s (files 33.7s, load 0.1s)
+2026-10-23 16:19:04.304 [info] speaker-separation models ready in 15.2s
+2026-10-23 16:19:14.476 [info] transcription model warmed up in 7.5s
+2026-10-23 16:19:14.484 [info] speech models downloaded
+2026-10-23 16:19:15.020 [info] imported 115s of audio as meeting 90D7828E-F33A-4326-BA13-C09E16469827
+2026-10-23 16:19:21.227 [info] meeting 90D7828E-F33A-4326-BA13-C09E16469827: starting separateSpeakers
+2026-10-23 16:20:08.723 [info] meeting 90D7828E-F33A-4326-BA13-C09E16469827: finished separateSpeakers in 47.5s
+2026-10-23 16:20:08.724 [info] meeting 90D7828E-F33A-4326-BA13-C09E16469827: starting transcribe
+2026-10-23 16:20:34.695 [info] meeting 90D7828E-F33A-4326-BA13-C09E16469827: finished transcribe in 26.0s
+2026-10-23 16:20:34.696 [info] meeting 90D7828E-F33A-4326-BA13-C09E16469827: starting assemble
+2026-10-23 16:20:34.733 [info] meeting 90D7828E-F33A-4326-BA13-C09E16469827: finished assemble in 0.0s
+2026-10-23 16:20:34.733 [info] meeting 90D7828E-F33A-4326-BA13-C09E16469827: starting writeNotes
+2026-10-23 16:20:37.324 [error] language model error: Error Domain=FoundationModels.LanguageModelSession.GenerationError Code=-1 "(null)" UserInfo={NSMultipleUnderlyingErrorsKey=(
+    "Error Domain=FoundationModels.LanguageModelSession.GenerationError Code=-1 \"(null)\" UserInfo={NSMultipleUnderlyingErrorsKey=(\n    \"Error Domain=ModelManagerServices.ModelManagerError Code=1026 \\\"(null)\\\" UserInfo={NSMultipleUnderlyingErrorsKey=(\\n)}\"\n)}"
+)}
+2026-10-23 16:20:37.338 [info] meeting 90D7828E-F33A-4326-BA13-C09E16469827: finished writeNotes in 2.6s
+2026-10-23 16:20:37.339 [info] meeting 90D7828E-F33A-4326-BA13-C09E16469827: starting email
+2026-10-23 16:20:37.673 [info] mail accepted by 127.0.0.1: 2.0.0 OK queued
+2026-10-23 16:20:37.677 [info] meeting 90D7828E-F33A-4326-BA13-C09E16469827: finished email in 0.3s
+2026-10-23 16:20:37.705 [info] meeting 90D7828E-F33A-4326-BA13-C09E16469827 ended run as done at finished
+2026-10-23 16:21:00.173 [info] launch: Minutes 1.6.3, arm64, iOS 26.5, 7168 MB RAM, bundle app.minutes.recorder
+2026-10-23 16:21:00.187 [info] background: the microphone is held while a recorded meeting is processed
+2026-10-23 16:21:00.396 [info] app came to the foreground
+2026-10-23 16:21:11.632 [info] transcription model ready in 10.4s (files 10.4s, load 0.0s)
+2026-10-23 16:21:11.912 [info] speaker-separation models ready in 11.4s
+2026-10-23 16:21:18.491 [info] transcription model warmed up in 6.5s
+2026-10-23 16:21:18.497 [info] speech models downloaded
+2026-10-23 16:21:20.199 [info] live analysis ready
+2026-10-23 16:23:45.363 [info] live analysis finished: 333 words, 2 voice pieces, 115s received, errors 0/0, using 71 MB, 0 MB left
+2026-10-23 16:23:46.335 [error] language model error: Error Domain=FoundationModels.LanguageModelSession.GenerationError Code=-1 "(null)" UserInfo={NSMultipleUnderlyingErrorsKey=(
+    "Error Domain=FoundationModels.LanguageModelSession.GenerationError Code=-1 \"(null)\" UserInfo={NSMultipleUnderlyingErrorsKey=(\n    \"Error Domain=ModelManagerServices.ModelManagerError Code=1026 \\\"(null)\\\" UserInfo={NSMultipleUnderlyingErrorsKey=(\\n)}\"\n)}"
+)}
+2026-10-23 16:23:46.346 [warn] live notes: other("Apple\'s language model couldn\'t write the notes: it reported an error Minutes doesn\'t recognize.")
+2026-10-23 16:23:46.346 [info] live work handed over in 30.7s: 333 words, voices analyzed, 0 note sections
+2026-10-23 16:23:46.346 [info] simulated live meeting 7907EEDE-747D-418C-9408-38F310ACB42A: 115s fed, 333 words, 0 note sections
+2026-10-23 16:23:48.408 [info] meeting 7907EEDE-747D-418C-9408-38F310ACB42A: starting separateSpeakers
+2026-10-23 16:23:48.412 [info] meeting 7907EEDE-747D-418C-9408-38F310ACB42A: grouping voices analyzed during the recording
+2026-10-23 16:23:49.765 [info] meeting 7907EEDE-747D-418C-9408-38F310ACB42A: finished separateSpeakers in 1.4s
+2026-10-23 16:23:49.765 [info] meeting 7907EEDE-747D-418C-9408-38F310ACB42A: starting transcribe
+2026-10-23 16:23:49.765 [info] meeting 7907EEDE-747D-418C-9408-38F310ACB42A: using the 333 words transcribed during the recording
+2026-10-23 16:23:49.771 [info] meeting 7907EEDE-747D-418C-9408-38F310ACB42A: finished transcribe in 0.0s
+2026-10-23 16:23:49.772 [info] meeting 7907EEDE-747D-418C-9408-38F310ACB42A: starting assemble
+2026-10-23 16:23:49.819 [info] meeting 7907EEDE-747D-418C-9408-38F310ACB42A: finished assemble in 0.0s
+2026-10-23 16:23:49.819 [info] meeting 7907EEDE-747D-418C-9408-38F310ACB42A: starting writeNotes
+2026-10-23 16:23:50.096 [error] language model error: Error Domain=FoundationModels.LanguageModelSession.GenerationError Code=-1 "(null)" UserInfo={NSMultipleUnderlyingErrorsKey=(
+    "Error Domain=FoundationModels.LanguageModelSession.GenerationError Code=-1 \"(null)\" UserInfo={NSMultipleUnderlyingErrorsKey=(\n    \"Error Domain=ModelManagerServices.ModelManagerError Code=1026 \\\"(null)\\\" UserInfo={NSMultipleUnderlyingErrorsKey=(\\n)}\"\n)}"
+)}
+2026-10-23 16:23:50.106 [info] meeting 7907EEDE-747D-418C-9408-38F310ACB42A: finished writeNotes in 0.3s
+2026-10-23 16:23:50.106 [info] meeting 7907EEDE-747D-418C-9408-38F310ACB42A: starting email
+2026-10-23 16:23:50.351 [info] mail accepted by 127.0.0.1: 2.0.0 OK queued
+2026-10-23 16:23:50.355 [info] meeting 7907EEDE-747D-418C-9408-38F310ACB42A: finished email in 0.2s
+2026-10-23 16:23:50.376 [info] meeting 7907EEDE-747D-418C-9408-38F310ACB42A ended run as done at finished
