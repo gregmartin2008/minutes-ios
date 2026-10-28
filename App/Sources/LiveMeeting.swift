@@ -11,6 +11,7 @@ final class LiveMeeting {
     private let notes: LiveNoteTaker?
     private let vocabulary: VocabularyCorrector
     private var ticker: Task<Void, Never>?
+    private var stopping = false
     private var lastNotesOffer = 0.0
     private var ticking = false
     private var loggedHot = false
@@ -48,7 +49,7 @@ final class LiveMeeting {
         ticker = Task { [weak self] in
             while !Task.isCancelled {
                 try? await Task.sleep(nanoseconds: 30_000_000_000)
-                guard !Task.isCancelled else { return }
+                guard !Task.isCancelled, self?.stopping == false else { return }
                 await self?.tick(force: false)
             }
         }
@@ -105,9 +106,13 @@ final class LiveMeeting {
 
     /// Ends the live work and returns everything for the pipeline.
     func finish() async -> LiveWork {
-        ticker?.cancel()
+        // A section being drafted right now is allowed to finish rather than cancelled:
+        // cancelling it only to redo the same stretch in the final tick cost ten seconds.
+        stopping = true
+        if !ticking { ticker?.cancel() }
         ticker = nil
         let started = Date()
+        while ticking { try? await Task.sleep(nanoseconds: 100_000_000) }
         var words: [Word] = []
         var analysis: SeparationAnalysis?
         do {
