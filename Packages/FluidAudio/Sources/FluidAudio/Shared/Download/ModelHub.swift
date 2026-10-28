@@ -9,6 +9,21 @@ import Foundation
 /// table for the mechanical old→new spellings.
 public enum ModelHub {
 
+    // Added for Minutes (not in upstream FluidAudio). See UPSTREAM.md.
+    // How long each Core ML model took to load, for the app's own diagnostics; `takeLoadTimings`
+    // returns and clears them.
+    private static let timingsLock = NSLock()
+    nonisolated(unsafe) private static var loadTimings: [(name: String, seconds: Double)] = []
+
+    public static func takeLoadTimings() -> [(name: String, seconds: Double)] {
+        timingsLock.lock()
+        defer { timingsLock.unlock() }
+        let out = loadTimings
+        loadTimings = []
+        return out
+    }
+
+
     /// Historical log category retained deliberately across the 0.16 rename:
     /// existing `log stream --predicate 'category == "ModelHub"'`
     /// diagnostics keep capturing the whole download trail. Renaming the
@@ -381,6 +396,9 @@ public enum ModelHub {
             let elapsed = Date().timeIntervalSince(start)
 
             models[name] = model
+            timingsLock.lock()
+            loadTimings.append((name: name, seconds: elapsed))
+            timingsLock.unlock()
 
             let ms = elapsed * 1000
             let formatted = String(format: "%.2f", ms)

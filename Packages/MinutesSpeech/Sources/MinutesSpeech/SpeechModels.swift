@@ -130,6 +130,23 @@ public actor SpeechModels {
         }
     }
 
+    /// The size of the app's caches directory and its newest entry, where Core ML keeps compiled
+    /// models between launches.
+    static func cachesSummary() -> String {
+        guard let caches = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first else { return "unknown" }
+        var total: Int64 = 0
+        var newest = Date.distantPast
+        if let walker = FileManager.default.enumerator(at: caches, includingPropertiesForKeys: [.fileSizeKey, .contentModificationDateKey]) {
+            for case let url as URL in walker {
+                guard let values = try? url.resourceValues(forKeys: [.fileSizeKey, .contentModificationDateKey]) else { continue }
+                total += Int64(values.fileSize ?? 0)
+                if let date = values.contentModificationDate, date > newest { newest = date }
+            }
+        }
+        let ago = newest == .distantPast ? "nothing" : String(format: "newest %.0f min ago", Date().timeIntervalSince(newest) / 60)
+        return String(format: "%d MB, %@", Int(total / 1_048_576), ago)
+    }
+
     private static func isCompiling(_ phase: DownloadPhase) -> Bool {
         if case .compiling = phase { return true }
         return false
@@ -150,9 +167,15 @@ public actor SpeechModels {
             let loaded = Date()
             let manager = AsrManager(config: .default)
             try await manager.loadModels(models)
+            // Which part took the time, and whether iOS kept a compiled copy of the model between
+            // launches (the compiled copies live in the app's caches directory).
+            let parts = ModelHub.takeLoadTimings()
+                .map { String(format: "%@ %.0fs", $0.name.replacingOccurrences(of: ".mlmodelc", with: ""), $0.seconds) }
+                .joined(separator: ", ")
             log.info(String(
-                format: "transcription model ready in %.1fs (files %.1fs, load %.1fs)",
-                Date().timeIntervalSince(started), loaded.timeIntervalSince(started), Date().timeIntervalSince(loaded)))
+                format: "transcription model ready in %.1fs (files %.1fs, load %.1fs; %@; caches %@)",
+                Date().timeIntervalSince(started), loaded.timeIntervalSince(started), Date().timeIntervalSince(loaded),
+                parts, Self.cachesSummary()))
             return manager
         }
         asrLoading = task
