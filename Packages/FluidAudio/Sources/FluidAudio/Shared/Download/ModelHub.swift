@@ -16,11 +16,15 @@ public enum ModelHub {
     nonisolated(unsafe) private static var loadTimings: [(name: String, seconds: Double)] = []
 
     public static func takeLoadTimings() -> [(name: String, seconds: Double)] {
-        timingsLock.lock()
-        defer { timingsLock.unlock() }
-        let out = loadTimings
-        loadTimings = []
-        return out
+        timingsLock.withLock {
+            let out = loadTimings
+            loadTimings = []
+            return out
+        }
+    }
+
+    private static func recordLoadTiming(name: String, seconds: Double) {
+        timingsLock.withLock { loadTimings.append((name: name, seconds: seconds)) }
     }
 
 
@@ -396,9 +400,7 @@ public enum ModelHub {
             let elapsed = Date().timeIntervalSince(start)
 
             models[name] = model
-            timingsLock.lock()
-            loadTimings.append((name: name, seconds: elapsed))
-            timingsLock.unlock()
+            recordLoadTiming(name: name, seconds: elapsed)
 
             let ms = elapsed * 1000
             let formatted = String(format: "%.2f", ms)
