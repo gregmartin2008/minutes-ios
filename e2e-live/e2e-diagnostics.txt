@@ -1,0 +1,67 @@
+Minutes diagnostics
+Minutes 1.11, arm64, iOS 26.5, 7168 MB RAM, bundle app.minutes.recorder
+models ready: true, mail configured: true, voices: 0, meetings: 2
+language model: available
+- EF25BC16 done/finished 115s speakers=5 assemble=1s email=1s separateSpeakers=1s transcribe=0s writeNotes=0s Apple's language model couldn't write the notes: it reported an error Minutes doesn't recognize.
+- B59BEE05 done/finished 115s speakers=5 assemble=1s email=0s separateSpeakers=40s transcribe=23s writeNotes=3s Apple's language model couldn't write the notes: it reported an error Minutes doesn't recognize.
+
+--- log ---
+2026-10-29 18:52:53.680 [info] launch: Minutes 1.11, arm64, iOS 26.5, 7168 MB RAM, bundle app.minutes.recorder
+2026-10-29 18:52:53.690 [info] background: the microphone is held while a recorded meeting is processed
+2026-10-29 18:52:53.758 [info] calendar: on, access not asked yet
+2026-10-29 18:52:53.861 [info] app came to the foreground
+2026-10-29 18:53:32.785 [info] transcription model ready in 38.5s (files 38.5s, load 0.1s; Preprocessor 0s, Encoder 9s, Decoder 0s, JointDecisionv3 0s, Preprocessor 0s, Encoder 0s, Decoder 0s, JointDecisionv3 0s; caches 1169 MB, newest 0 min ago)
+2026-10-29 18:53:47.580 [info] speaker-separation models ready in 14.8s
+2026-10-29 18:53:53.756 [info] transcription model warmed up in 6.2s
+2026-10-29 18:53:53.761 [info] speech models downloaded
+2026-10-29 18:53:54.604 [info] imported 115s of audio as meeting B59BEE05-9EB6-45DF-87E0-68F527511DA1
+2026-10-29 18:53:56.643 [info] meeting B59BEE05-9EB6-45DF-87E0-68F527511DA1: starting separateSpeakers
+2026-10-29 18:54:36.258 [info] meeting B59BEE05-9EB6-45DF-87E0-68F527511DA1: finished separateSpeakers in 39.6s
+2026-10-29 18:54:36.261 [info] meeting B59BEE05-9EB6-45DF-87E0-68F527511DA1: starting transcribe
+2026-10-29 18:54:59.150 [info] meeting B59BEE05-9EB6-45DF-87E0-68F527511DA1: finished transcribe in 22.9s
+2026-10-29 18:54:59.150 [info] meeting B59BEE05-9EB6-45DF-87E0-68F527511DA1: starting assemble
+2026-10-29 18:54:59.762 [info] meeting B59BEE05-9EB6-45DF-87E0-68F527511DA1: voice levels Speaker 1 -17 dBFS, Speaker 2 -20 dBFS, Speaker 3 -18 dBFS, Speaker 4 -18 dBFS, Speaker 5 -18 dBFS; room floor -60 dBFS
+2026-10-29 18:54:59.767 [info] meeting B59BEE05-9EB6-45DF-87E0-68F527511DA1: finished assemble in 0.6s
+2026-10-29 18:54:59.767 [info] meeting B59BEE05-9EB6-45DF-87E0-68F527511DA1: starting writeNotes
+2026-10-29 18:55:02.282 [error] language model error: Error Domain=FoundationModels.LanguageModelSession.GenerationError Code=-1 "(null)" UserInfo={NSMultipleUnderlyingErrorsKey=(
+    "Error Domain=FoundationModels.LanguageModelSession.GenerationError Code=-1 \"(null)\" UserInfo={NSMultipleUnderlyingErrorsKey=(\n    \"Error Domain=ModelManagerServices.ModelManagerError Code=1026 \\\"(null)\\\" UserInfo={NSMultipleUnderlyingErrorsKey=(\\n)}\"\n)}"
+)}
+2026-10-29 18:55:02.295 [info] meeting B59BEE05-9EB6-45DF-87E0-68F527511DA1: finished writeNotes in 2.5s
+2026-10-29 18:55:02.295 [info] meeting B59BEE05-9EB6-45DF-87E0-68F527511DA1: starting email
+2026-10-29 18:55:02.511 [info] mail accepted by 127.0.0.1: 2.0.0 OK queued
+2026-10-29 18:55:02.513 [info] meeting B59BEE05-9EB6-45DF-87E0-68F527511DA1: finished email in 0.2s
+2026-10-29 18:55:02.530 [info] meeting B59BEE05-9EB6-45DF-87E0-68F527511DA1 ended run as done at finished
+2026-10-29 18:55:22.310 [info] launch: Minutes 1.11, arm64, iOS 26.5, 7168 MB RAM, bundle app.minutes.recorder
+2026-10-29 18:55:22.323 [info] background: the microphone is held while a recorded meeting is processed
+2026-10-29 18:55:22.399 [info] calendar: off, access not asked yet
+2026-10-29 18:55:22.561 [info] app came to the foreground
+2026-10-29 18:55:29.603 [info] transcription model ready in 6.6s (files 6.6s, load 0.0s; Preprocessor 0s, Segmentation 1s, Encoder 6s, Embedding 6s, Decoder 1s, PldaRho 0s, JointDecisionv3 0s; caches 2405 MB, newest 0 min ago)
+2026-10-29 18:55:29.666 [info] speaker-separation models ready in 7.2s
+2026-10-29 18:55:37.423 [info] transcription model warmed up in 7.8s
+2026-10-29 18:55:37.429 [info] speech models downloaded
+2026-10-29 18:55:39.167 [info] live analysis ready
+2026-10-29 18:58:05.542 [info] live analysis finished: 333 words, 2 voice pieces, 115s received, errors 0/0, using 72 MB, 0 MB left
+2026-10-29 18:58:06.648 [error] language model error: Error Domain=FoundationModels.LanguageModelSession.GenerationError Code=-1 "(null)" UserInfo={NSMultipleUnderlyingErrorsKey=(
+    "Error Domain=FoundationModels.LanguageModelSession.GenerationError Code=-1 \"(null)\" UserInfo={NSMultipleUnderlyingErrorsKey=(\n    \"Error Domain=ModelManagerServices.ModelManagerError Code=1026 \\\"(null)\\\" UserInfo={NSMultipleUnderlyingErrorsKey=(\\n)}\"\n)}"
+)}
+2026-10-29 18:58:06.657 [warn] live notes: other("Apple\'s language model couldn\'t write the notes: it reported an error Minutes doesn\'t recognize.")
+2026-10-29 18:58:06.657 [info] live work handed over in 32.2s: 333 words, voices analyzed, 0 note sections
+2026-10-29 18:58:06.657 [info] simulated live meeting EF25BC16-7CB8-4D77-971A-CD1D72874E9C: 115s fed, 333 words, 0 note sections
+2026-10-29 18:58:08.391 [info] meeting EF25BC16-7CB8-4D77-971A-CD1D72874E9C: starting separateSpeakers
+2026-10-29 18:58:08.396 [info] meeting EF25BC16-7CB8-4D77-971A-CD1D72874E9C: grouping voices analyzed during the recording
+2026-10-29 18:58:09.740 [info] meeting EF25BC16-7CB8-4D77-971A-CD1D72874E9C: finished separateSpeakers in 1.3s
+2026-10-29 18:58:09.740 [info] meeting EF25BC16-7CB8-4D77-971A-CD1D72874E9C: starting transcribe
+2026-10-29 18:58:09.740 [info] meeting EF25BC16-7CB8-4D77-971A-CD1D72874E9C: using the 333 words transcribed during the recording
+2026-10-29 18:58:09.744 [info] meeting EF25BC16-7CB8-4D77-971A-CD1D72874E9C: finished transcribe in 0.0s
+2026-10-29 18:58:09.744 [info] meeting EF25BC16-7CB8-4D77-971A-CD1D72874E9C: starting assemble
+2026-10-29 18:58:10.519 [info] meeting EF25BC16-7CB8-4D77-971A-CD1D72874E9C: voice levels Speaker 1 -17 dBFS, Speaker 2 -20 dBFS, Speaker 3 -18 dBFS, Speaker 4 -18 dBFS, Speaker 5 -18 dBFS; room floor -60 dBFS
+2026-10-29 18:58:10.526 [info] meeting EF25BC16-7CB8-4D77-971A-CD1D72874E9C: finished assemble in 0.8s
+2026-10-29 18:58:10.526 [info] meeting EF25BC16-7CB8-4D77-971A-CD1D72874E9C: starting writeNotes
+2026-10-29 18:58:10.834 [error] language model error: Error Domain=FoundationModels.LanguageModelSession.GenerationError Code=-1 "(null)" UserInfo={NSMultipleUnderlyingErrorsKey=(
+    "Error Domain=FoundationModels.LanguageModelSession.GenerationError Code=-1 \"(null)\" UserInfo={NSMultipleUnderlyingErrorsKey=(\n    \"Error Domain=ModelManagerServices.ModelManagerError Code=1026 \\\"(null)\\\" UserInfo={NSMultipleUnderlyingErrorsKey=(\\n)}\"\n)}"
+)}
+2026-10-29 18:58:10.853 [info] meeting EF25BC16-7CB8-4D77-971A-CD1D72874E9C: finished writeNotes in 0.3s
+2026-10-29 18:58:10.853 [info] meeting EF25BC16-7CB8-4D77-971A-CD1D72874E9C: starting email
+2026-10-29 18:58:11.489 [info] mail accepted by 127.0.0.1: 2.0.0 OK queued
+2026-10-29 18:58:11.494 [info] meeting EF25BC16-7CB8-4D77-971A-CD1D72874E9C: finished email in 0.6s
+2026-10-29 18:58:11.520 [info] meeting EF25BC16-7CB8-4D77-971A-CD1D72874E9C ended run as done at finished

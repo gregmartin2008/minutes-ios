@@ -1,0 +1,11 @@
+size:  11M
+sha256: ddc22d1a9657d72637218ff01b502b1e51126644622bb9cf41d118d5efcbb86e
+commit: a6b1c7b158b6bd1542c50c4dee6fe7e180128373
+architectures: arm64
+app.minutes.recorder
+26.0
+Array {
+    audio
+}
+Minutes records your meetings so it can transcribe them on this iPhone.
+released

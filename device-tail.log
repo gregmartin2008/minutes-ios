@@ -1,0 +1,40 @@
+Ld /Users/runner/work/minutes-ios/minutes-ios/build/device/Build/Products/Release-iphoneos/Minutes.app/Minutes normal (in target 'Minutes' from project 'Minutes')
+    cd /Users/runner/work/minutes-ios/minutes-ios
+    /Applications/Xcode_26.6.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -Xlinker -reproducible -target arm64-apple-ios26.0 -isysroot /Applications/Xcode_26.6.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.5.sdk -Os -L/Users/runner/work/minu
+
+ExtractAppIntentsMetadata (in target 'Minutes' from project 'Minutes')
+    cd /Users/runner/work/minutes-ios/minutes-ios
+    /Applications/Xcode_26.6.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/appintentsmetadataprocessor --toolchain-dir /var/run/com.apple.security.cryptexd/mnt/com.apple.MobileAsset.MetalToolchain-v17.6.109.0.svrAQr/Metal.xctoolchain --module-name Minutes --sdk-root /Application
+2026-10-29 18:44:36.229 appintentsmetadataprocessor[9478:31049] Starting appintentsmetadataprocessor export
+2026-10-29 18:44:36.236 appintentsmetadataprocessor[9478:31049] warning: Metadata extraction skipped. No AppIntents.framework dependency found.
+
+GenerateDSYMFile /Users/runner/work/minutes-ios/minutes-ios/build/device/Build/Products/Release-iphoneos/Minutes.app.dSYM /Users/runner/work/minutes-ios/minutes-ios/build/device/Build/Products/Release-iphoneos/Minutes.app/Minutes (in target 'Minutes' from project 'Minutes')
+    cd /Users/runner/work/minutes-ios/minutes-ios
+    /Applications/Xcode_26.6.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/dsymutil /Users/runner/work/minutes-ios/minutes-ios/build/device/Build/Products/Release-iphoneos/Minutes.app/Minutes -o /Users/runner/work/minutes-ios/minutes-ios/build/device/Build/Products/Release-iphon
+
+CopySwiftLibs /Users/runner/work/minutes-ios/minutes-ios/build/device/Build/Products/Release-iphoneos/Minutes.app (in target 'Minutes' from project 'Minutes')
+    cd /Users/runner/work/minutes-ios/minutes-ios
+    builtin-swiftStdLibTool --copy --verbose --scan-executable /Users/runner/work/minutes-ios/minutes-ios/build/device/Build/Products/Release-iphoneos/Minutes.app/Minutes --scan-folder /Users/runner/work/minutes-ios/minutes-ios/build/device/Build/Products/Release-iphoneos/Minutes.app/Frameworks --sc
+Ignoring --strip-bitcode because --sign was not passed
+
+AppIntentsSSUTraining (in target 'Minutes' from project 'Minutes')
+    cd /Users/runner/work/minutes-ios/minutes-ios
+    /Applications/Xcode_26.6.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/appintentsnltrainingprocessor --infoplist-path /Users/runner/work/minutes-ios/minutes-ios/build/device/Build/Products/Release-iphoneos/Minutes.app/Info.plist --temp-dir-path /Users/runner/work/minutes-ios
+2026-10-29 18:44:36.292 appintentsnltrainingprocessor[9499:31089] Parsing options for appintentsnltrainingprocessor
+2026-10-29 18:44:36.293 appintentsnltrainingprocessor[9499:31089] Starting AppIntents SSU YAML Generation
+2026-10-29 18:44:36.296 appintentsnltrainingprocessor[9499:31089] No AppShortcuts found - Skipping.
+
+RegisterExecutionPolicyException /Users/runner/work/minutes-ios/minutes-ios/build/device/Build/Products/Release-iphoneos/Minutes.app (in target 'Minutes' from project 'Minutes')
+    cd /Users/runner/work/minutes-ios/minutes-ios
+    builtin-RegisterExecutionPolicyException /Users/runner/work/minutes-ios/minutes-ios/build/device/Build/Products/Release-iphoneos/Minutes.app
+
+Validate /Users/runner/work/minutes-ios/minutes-ios/build/device/Build/Products/Release-iphoneos/Minutes.app (in target 'Minutes' from project 'Minutes')
+    cd /Users/runner/work/minutes-ios/minutes-ios
+    builtin-validationUtility /Users/runner/work/minutes-ios/minutes-ios/build/device/Build/Products/Release-iphoneos/Minutes.app -shallow-bundle -infoplist-subpath Info.plist
+
+Touch /Users/runner/work/minutes-ios/minutes-ios/build/device/Build/Products/Release-iphoneos/Minutes.app (in target 'Minutes' from project 'Minutes')
+    cd /Users/runner/work/minutes-ios/minutes-ios
+    /usr/bin/touch -c /Users/runner/work/minutes-ios/minutes-ios/build/device/Build/Products/Release-iphoneos/Minutes.app
+
+** BUILD SUCCEEDED **
+
