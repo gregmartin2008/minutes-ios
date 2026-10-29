@@ -20,19 +20,37 @@ final class MeetingCalendar {
         }
     }
 
+    /// For the log: what iOS says about this app's calendar access.
+    var status: String {
+        switch EKEventStore.authorizationStatus(for: .event) {
+        case .fullAccess: return "full access"
+        case .writeOnly: return "write only (not enough to read meetings)"
+        case .notDetermined: return "not asked yet"
+        case .denied: return "denied"
+        case .restricted: return "restricted by a device policy"
+        @unknown default: return "unknown"
+        }
+    }
+
     /// Shows the iOS permission prompt (once; afterward iOS answers from Settings).
     func requestAccess() async -> Bool {
+        Log.shared.info("calendar: asking for access (was \(status))")
         do {
-            return try await store.requestFullAccessToEvents()
+            let granted = try await store.requestFullAccessToEvents()
+            Log.shared.info("calendar: access \(granted ? "granted" : "not granted") (now \(status))")
+            return granted
         } catch {
-            Log.shared.warn("calendar access: \(error)")
+            Log.shared.warn("calendar: asking for access failed: \(error) (now \(status))")
             return false
         }
     }
 
     /// The meetings on now or about to start, nearest first. Empty when access is off.
     func currentEvents(at now: Date = Date()) -> [CalendarEvent] {
-        guard access == .granted else { return [] }
+        guard access == .granted else {
+            Log.shared.info("calendar: not looked up, access is \(status)")
+            return []
+        }
         let predicate = store.predicateForEvents(
             withStart: now.addingTimeInterval(-6 * 3600), end: now.addingTimeInterval(3600), calendars: nil)
         let events = store.events(matching: predicate).filter { !$0.isAllDay && !Self.declined($0) }

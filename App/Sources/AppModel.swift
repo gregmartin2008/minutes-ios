@@ -20,6 +20,8 @@ struct RecordingStatus: Equatable {
     var calendarChoices: [CalendarEvent] = []
     /// The calendar meeting this recording is taken to be, if any.
     var calendarEventID: String?
+    /// The calendar is wanted but iOS has not allowed the app to read it.
+    var calendarOff = false
     var seconds: Double = 0
     /// Recent input levels, oldest first, for the level history strip.
     var levels: [Float] = []
@@ -104,6 +106,7 @@ final class AppModel: ObservableObject {
 
         Log.shared.info("launch: \(Self.deviceSummary())")
         Log.shared.info(BackgroundKeeper.shared.status)
+        Log.shared.info("calendar: \(AppSettings.shared.usesCalendar ? "on" : "off"), access \(MeetingCalendar.shared.status)")
         watchAppState()
         setup.ready = AppSettings.shared.modelsReady && models.transcriptionModelIsDownloaded()
         meetings = store.loadAll()
@@ -227,6 +230,7 @@ final class AppModel: ObservableObject {
         if !isDemo, AppSettings.shared.usesCalendar {
             if MeetingCalendar.shared.access == .notAsked { _ = await MeetingCalendar.shared.requestAccess() }
             status.calendarChoices = MeetingCalendar.shared.currentEvents(at: now)
+            status.calendarOff = MeetingCalendar.shared.access != .granted
             if typed.isEmpty, let first = status.calendarChoices.first {
                 Self.apply(first, to: &m, status: &status)
             }
