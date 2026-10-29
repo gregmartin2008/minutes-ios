@@ -4,7 +4,7 @@
 # stalled simulator shows up in the published log instead of hanging the build.
 set -uo pipefail
 app="build/sim/Build/Products/Debug-iphonesimulator/Minutes.app"
-device="iPhone 17 Pro Max"
+device="$(scripts/ci_simulator.sh)"
 bundle="${MINUTES_BUNDLE_ID:-$(tr -d "[:space:]" < App/bundle-id.txt)}"
 bundle="${bundle:-app.minutes.recorder}"
 mkdir -p out/shots
