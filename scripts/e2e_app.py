@@ -18,7 +18,17 @@ from aiosmtpd.smtp import AuthResult, LoginPassword
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from score_meeting import edit_distance, norm_words
 
-DEVICE = "iPhone 17 Pro Max"
+def _device():
+    if os.environ.get("MINUTES_SIMULATOR"):
+        return os.environ["MINUTES_SIMULATOR"]
+    script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ci_simulator.sh")
+    try:
+        return subprocess.run([script], capture_output=True, text=True, timeout=60).stdout.strip() or "iPhone 17 Pro Max"
+    except (OSError, subprocess.SubprocessError):
+        return "iPhone 17 Pro Max"
+
+
+DEVICE = _device()
 def _bundle_id():
     if os.environ.get("MINUTES_BUNDLE_ID"):
         return os.environ["MINUTES_BUNDLE_ID"]

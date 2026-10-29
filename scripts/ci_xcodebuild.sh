@@ -10,7 +10,9 @@ mkdir -p out build
 bundle_id="${MINUTES_BUNDLE_ID:-$(tr -d '[:space:]' < App/bundle-id.txt)}"
 bundle_id="${bundle_id:-app.minutes.recorder}"
 if [ "$kind" = sim ]; then
-  destination='platform=iOS Simulator,name=iPhone 17 Pro Max'
+  simulator=$(scripts/ci_simulator.sh)
+  echo "simulator: $simulator" | tee out/simulator.txt
+  destination="platform=iOS Simulator,name=$simulator"
   configuration=Debug
   # Signed "to run locally" (no certificate needed), so the simulator build can use the Keychain.
   signing=(CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO)

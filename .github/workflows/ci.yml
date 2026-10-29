@@ -92,6 +92,8 @@ jobs:
           mkdir -p out
           brew install xcodegen > /dev/null 2>&1 || brew install xcodegen
           xcodegen generate 2>&1 | tee out/xcodegen.log
+      - name: Pick a simulator
+        run: xcrun simctl list devices available | grep -E "^(--|    iPhone)" | head -40; echo "using: $(scripts/ci_simulator.sh)"
       - name: Build for the simulator
         run: scripts/ci_xcodebuild.sh sim
       - name: Build for iPhone
