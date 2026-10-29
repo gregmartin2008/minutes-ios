@@ -85,6 +85,16 @@ final class AppSettings {
         set { defaults.set(newValue, forKey: "usesCalendar") }
     }
 
+    static let hubspotKey = "hubspot-token"
+
+    /// The HubSpot private-app access token, in the Keychain. Empty means HubSpot is not set up.
+    var hubspotToken: String {
+        get { Keychain.get(Self.hubspotKey) ?? "" }
+        set {
+            if newValue.isEmpty { Keychain.delete(Self.hubspotKey) } else { Keychain.set(newValue, for: Self.hubspotKey) }
+        }
+    }
+
     var askedForNotifications: Bool {
         get { defaults.bool(forKey: "askedForNotifications") }
         set { defaults.set(newValue, forKey: "askedForNotifications") }
