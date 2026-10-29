@@ -392,9 +392,14 @@ public final class MeetingPipeline: @unchecked Sendable {
     /// in order of first speaking, when the counts line up. The person's own voice, if
     /// recognized, is left out of the count. Otherwise the names are left for the person to place.
     private func applyTypedNames(to m: inout Meeting) {
-        let typed = (m.attendees ?? []).map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
-        guard !typed.isEmpty else { return }
         let own = services.ownProfileID()
+        // A typed name that a voice already carries (the person's own, usually, or someone
+        // recognized by voice) is not looking for another voice.
+        var taken = Set(m.speakerNames.values.map { $0.lowercased() })
+        if let own, let ownName = store.loadProfiles().first(where: { $0.id == own })?.name { taken.insert(ownName.lowercased()) }
+        let typed = (m.attendees ?? []).map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty && !taken.contains($0.lowercased()) }
+        guard !typed.isEmpty else { return }
         let unnamed = m.speakerLabels.filter { m.speakerNames[$0] == nil }
         let ownRecognized = m.speakerProfiles.values.contains { $0 == own }
         // Without the person's own voice recognized, one more voice than names is expected: theirs.

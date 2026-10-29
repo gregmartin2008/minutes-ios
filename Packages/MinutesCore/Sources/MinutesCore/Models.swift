@@ -327,11 +327,12 @@ extension Meeting {
     /// The people met, falling back to the named voices (other than `own`) and to a name in the
     /// title written as "Firm - First Last", which is how conference meetings tend to be named.
     public func people(excluding own: String?) -> [Person] {
-        if let contacts { return contacts }
-        if let event = calendarEvent, !event.people.isEmpty { return event.people }
-        if let attendees, !attendees.isEmpty { return attendees.map { Person(name: $0) } }
-        var out: [Person] = []
         let ownName = own?.lowercased()
+        func notOwn(_ p: Person) -> Bool { p.name.lowercased() != ownName }
+        if let contacts { return contacts }
+        if let event = calendarEvent, !event.people.isEmpty { return event.people.filter(notOwn) }
+        if let attendees, !attendees.isEmpty { return attendees.map { Person(name: $0) }.filter(notOwn) }
+        var out: [Person] = []
         for label in speakerLabels {
             guard let name = speakerNames[label]?.trimmingCharacters(in: .whitespaces), !name.isEmpty else { continue }
             if name.lowercased() == ownName { continue }
