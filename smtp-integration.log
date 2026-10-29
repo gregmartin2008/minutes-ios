@@ -1,0 +1,25 @@
+/private/tmp/venv/lib/python3.9/site-packages/aiosmtpd/smtp.py:372: UserWarning: Requiring AUTH while not requiring TLS can lead to security vulnerabilities!
+  warn("Requiring AUTH while not requiring TLS "
+auth_required == True but auth_require_tls == False
+/private/tmp/venv/lib/python3.9/site-packages/aiosmtpd/smtp.py:372: UserWarning: Requiring AUTH while not requiring TLS can lead to security vulnerabilities!
+  warn("Requiring AUTH while not requiring TLS "
+auth_required == True but auth_require_tls == False
+Session.login_data is deprecated and will be removed in version 2.0
+/private/tmp/venv/lib/python3.9/site-packages/aiosmtpd/smtp.py:372: UserWarning: Requiring AUTH while not requiring TLS can lead to security vulnerabilities!
+  warn("Requiring AUTH while not requiring TLS "
+auth_required == True but auth_require_tls == False
+PASS subject decodes to the original, accents and all
+PASS sender shows as Minutes
+PASS recipient
+PASS has Date and Message-ID
+PASS no parsing defects
+PASS plain-text body is intact
+PASS HTML body is intact
+PASS line starting with a dot survived the wire
+PASS two attachments
+PASS notes attachment name and content
+PASS transcript attachment name and content
+PASS no line longer than 998 bytes (SMTP limit)
+PASS message is 7-bit clean on the wire
+
+13/13 checks passed, message size 163755 bytes
