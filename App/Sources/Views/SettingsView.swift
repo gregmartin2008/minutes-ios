@@ -29,6 +29,7 @@ struct SettingsView: View {
             }
             speechSection
             vocabularySection
+            microphoneSection
             voicesSection
             storageSection
             aboutSection
@@ -215,6 +216,23 @@ struct SettingsView: View {
     }
 
     // MARK: Vocabulary
+
+    @State private var rawMicrophone = AppSettings.shared.rawMicrophone
+
+    private var microphoneSection: some View {
+        Section {
+            Picker("Microphone", selection: $rawMicrophone) {
+                Text("Standard").tag(false)
+                Text("Raw").tag(true)
+            }
+            .pickerStyle(.segmented)
+            .onChange(of: rawMicrophone) { _, on in AppSettings.shared.rawMicrophone = on }
+        } header: {
+            Text("Microphone")
+        } footer: {
+            Text("Standard lets iOS adjust the microphone as it does for calls. Raw turns that off and records the room as it is, which may keep a quieter voice across the table from being flattened in a loud room. Try Raw for one noisy meeting and compare.")
+        }
+    }
 
     private var vocabularySection: some View {
         Section {

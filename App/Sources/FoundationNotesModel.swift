@@ -9,13 +9,13 @@ import MinutesCore
 struct SectionNotesSchema {
     @Guide(description: "One sentence: what this part of the meeting covered")
     var gist: String
-    @Guide(description: "Important points made, one sentence each, naming who made them", .maximumCount(6))
+    @Guide(description: "The important points, each one sentence in your own words stating what was said as fact, e.g. 'Dana said the fund targets $3M checks'. Not quotes, not transcript lines, no 'Name:' prefix", .maximumCount(6))
     var keyPoints: [String]
     @Guide(description: "Things the group explicitly agreed to do or settled, stated in the transcript. Not opinions, plans one person mentioned, or things still under discussion. Empty if none", .maximumCount(4))
     var decisions: [String]
     @Guide(description: "Tasks a named person agreed to do, as 'Name: task (deadline)'. Empty if none", .maximumCount(5))
     var actionItems: [String]
-    @Guide(description: "Questions raised and left unanswered. Empty if none", .maximumCount(4))
+    @Guide(description: "Substantive questions about the business or the deal that were asked and not answered, in your own words. Not small talk or conversational questions. Empty if none", .maximumCount(4))
     var openQuestions: [String]
     @Guide(description: "Numbers, prices, percentages, dates and deadlines, each copied exactly as it appears in the transcript, with what it refers to", .maximumCount(8))
     var figures: [String]
@@ -77,7 +77,8 @@ struct FoundationNotesModel: NotesModel {
             model: model,
             instructions: """
                 You take notes on business meetings. You are given part of a transcript; each line is \
-                "Speaker: what they said". Record only what the transcript says; never add a number, name \
+                "Speaker: what they said". Write notes in your own words, as a careful note-taker would: \
+                condense, do not copy lines. Record only what the transcript says; never add a number, name \
                 or fact that is not in it. Write speakers' names exactly as they appear. Leave a list empty \
                 when the transcript has nothing for it; do not write "no decisions were made".
                 """)

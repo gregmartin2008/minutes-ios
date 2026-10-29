@@ -95,7 +95,10 @@ public enum Render {
     /// What to say under the notes when they are not everything they could have been.
     public static func remark(_ n: MeetingNotes) -> String? {
         var parts: [String] = []
-        if n.skippedSections > 0 {
+        if let tail = n.missingTailSeconds, tail >= 30 {
+            let minutes = Int((tail / 60).rounded(.up))
+            parts.append("The last \(minutes == 1 ? "minute" : "\(minutes) minutes") of the meeting \(minutes == 1 ? "is" : "are") in the transcript but not in these notes.")
+        } else if n.skippedSections > 0 {
             parts.append(
                 n.throttled == true && n.skippedSections == 1 && n.totalSections > 1
                     ? "The last few minutes of the meeting are in the transcript but not in these notes."
@@ -127,11 +130,22 @@ public enum Render {
         return out.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
+    /// How the names in the header came about, when not all were typed by the person.
+    static func namesCaption(_ m: Meeting) -> String {
+        let typed = !(m.typedNamed ?? []).isEmpty
+        switch (m.autoNamed.isEmpty, typed) {
+        case (false, false): return " (names recognized by voice; check them)"
+        case (true, true): return " (names from what was typed before the meeting; check them)"
+        case (false, true): return " (names recognized by voice or from what was typed; check them)"
+        case (true, false): return ""
+        }
+    }
+
     public static func headerText(_ m: Meeting, timeZone: TimeZone = .current) -> String {
         var out = [m.title, metaLine(m, timeZone: timeZone)]
         let speakers = speakersLine(m)
         if !speakers.isEmpty {
-            out.append("Speakers: \(speakers)" + (m.autoNamed.isEmpty ? "" : " (names recognized by voice; check them)"))
+            out.append("Speakers: \(speakers)" + namesCaption(m))
         }
         out += m.remarks.map { "Note: \($0)" }
         return out.joined(separator: "\n")
@@ -178,7 +192,8 @@ public enum Render {
         let speakers = speakersLine(m)
         if !speakers.isEmpty {
             html += "<p style=\"margin:2px 0 0;color:#5A6774\">Speakers: \(e(speakers))"
-            if !m.autoNamed.isEmpty { html += " <i>(names recognized by voice; check them)</i>" }
+            let caption = namesCaption(m)
+            if !caption.isEmpty { html += " <i>\(e(caption.trimmingCharacters(in: .whitespaces)))</i>" }
             html += "</p>"
         }
         for r in m.remarks { html += "<p style=\"margin:10px 0 0;color:#8A5200\">\(e(r))</p>" }

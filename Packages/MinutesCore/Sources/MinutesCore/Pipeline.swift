@@ -58,6 +58,9 @@ public struct PipelineServices: Sendable {
     public var stageWillStart: (@Sendable (Stage, String) async -> Void)?
     /// Called after each stage so the app can release the models that stage loaded.
     public var stageDidFinish: (@Sendable (Stage) async -> Void)?
+    /// The voice profile of the person using the app, if the app can tell (the one heard in the
+    /// most meetings). It is matched a little more readily, and never given a typed name.
+    public var ownProfileID: @Sendable () -> String?
 
     public init(
         separator: SpeakerSeparating, transcriber: Transcribing,
@@ -66,6 +69,7 @@ public struct PipelineServices: Sendable {
         notesOptions: NotesEngine.Options = NotesEngine.Options(),
         vocabulary: @escaping @Sendable () -> Vocabulary = { Vocabulary() },
         liveWork: @escaping @Sendable (String) -> LiveWork? = { _ in nil },
+        ownProfileID: @escaping @Sendable () -> String? = { nil },
         stageWillStart: (@Sendable (Stage, String) async -> Void)? = nil,
         stageDidFinish: (@Sendable (Stage) async -> Void)? = nil
     ) {
@@ -77,6 +81,7 @@ public struct PipelineServices: Sendable {
         self.notesOptions = notesOptions
         self.vocabulary = vocabulary
         self.liveWork = liveWork
+        self.ownProfileID = ownProfileID
         self.stageWillStart = stageWillStart
         self.stageDidFinish = stageDidFinish
     }
@@ -246,13 +251,17 @@ public final class MeetingPipeline: @unchecked Sendable {
             for i in utterances.indices { utterances[i].text = corrector.correct(utterances[i].text) }
             m.utterances = utterances
             applyVoiceMatches(to: &m)
+            applyTypedNames(to: &m)
+            logSpeakerLevels(m, audio: try? audioURL(for: m))
 
         case .writeNotes:
             // Sections extracted during the recording cover the meeting up to their last `end`;
             // only what came after is extracted now.
             var lines = Render.modelLines(m)
             var leading: [NotesFragment] = []
+            var coveredThrough: Double?
             if let live = services.liveWork(m.id), !live.noteSections.isEmpty, let last = live.noteSections.last {
+                coveredThrough = last.end
                 let snapshot = m
                 leading = LiveWork.resolveNames(in: live.noteSections, finalTurns: m.turns ?? []) { snapshot.displayName(for: $0) }
                 // Paragraph boundaries differ between the live and the final assembly, so a
@@ -285,7 +294,14 @@ public final class MeetingPipeline: @unchecked Sendable {
                             try? store.save(copy)
                         },
                         progress: progress)
-                    m.notes = notes
+                    // When the pass was cut short, say how much of the end of the meeting is
+                    // missing in minutes rather than in "parts": the parts are small.
+                    var finished = notes
+                    if finished.throttled == true, finished.skippedSections > 0,
+                       finished.skippedSections == finished.totalSections - leading.count, let through = coveredThrough {
+                        finished.missingTailSeconds = max(0, m.duration - through)
+                    }
+                    m.notes = finished
                     m.notesError = nil
                     m.notesCheckpoint = nil
                     m.notesPending = nil
@@ -342,20 +358,97 @@ public final class MeetingPipeline: @unchecked Sendable {
     }
 
     /// Names the voices this app has heard before, without overriding names the person typed.
+    /// A match that is close but not confident is kept as a suggestion for the person to confirm.
     private func applyVoiceMatches(to m: inout Meeting) {
         guard let voices = m.voiceEmbeddings, !voices.isEmpty else { return }
         let present = Set(m.speakerLabels)
         let candidates = voices.filter { present.contains($0.key) && m.speakerNames[$0.key] == nil }
-        let matches = SpeakerMatcher.match(
-            voices: candidates, profiles: store.loadProfiles(), thresholds: services.thresholds)
-        for (label, match) in matches {
+        let thresholds = services.thresholds
+        let own = services.ownProfileID()
+        let matches = SpeakerMatcher.match(voices: candidates, profiles: store.loadProfiles(), thresholds: thresholds)
+        var suggestions = m.suggestedNames ?? [:]
+        for (label, match) in matches.sorted(by: { $0.key < $1.key }) {
             m.matchScores[label] = match.score
-            guard match.confident else { continue }
-            m.speakerNames[label] = match.name
-            m.speakerProfiles[label] = match.profileID
-            if !m.autoNamed.contains(label) { m.autoNamed.append(label) }
+            // The person's own voice has the best-trained profile; it may be taken a little sooner.
+            let ownAndClose = match.profileID == own && match.score >= thresholds.accept - 0.08
+            let apply = match.confident || ownAndClose
+            log.info(String(
+                format: "meeting %@: %@ sounds like %@ (%.2f) — %@", m.id, Meeting.genericName(for: label, among: m.speakerLabels),
+                match.name, match.score, apply ? "named" : "suggested only"))
+            if apply {
+                m.speakerNames[label] = match.name
+                m.speakerProfiles[label] = match.profileID
+                if !m.autoNamed.contains(label) { m.autoNamed.append(label) }
+                suggestions.removeValue(forKey: label)
+            } else {
+                suggestions[label] = match.name
+            }
         }
         m.autoNamed.sort()
+        m.suggestedNames = suggestions.isEmpty ? nil : suggestions
+    }
+
+    /// Gives the names typed before the meeting ("With: Dana, Lee") to the voices still unnamed,
+    /// in order of first speaking, when the counts line up. The person's own voice, if
+    /// recognized, is left out of the count. Otherwise the names are left for the person to place.
+    private func applyTypedNames(to m: inout Meeting) {
+        let typed = (m.attendees ?? []).map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+        guard !typed.isEmpty else { return }
+        let own = services.ownProfileID()
+        let unnamed = m.speakerLabels.filter { m.speakerNames[$0] == nil }
+        let ownRecognized = m.speakerProfiles.values.contains { $0 == own }
+        // Without the person's own voice recognized, one more voice than names is expected: theirs.
+        let spare = ownRecognized ? 0 : 1
+        guard unnamed.count == typed.count + spare else {
+            log.info("meeting \(m.id): \(typed.count) typed names not applied to \(unnamed.count) unnamed voices")
+            m.remarks.append("The names typed for this meeting (\(typed.joined(separator: ", "))) were not applied: \(unnamed.count) voices were not recognized for \(typed.count) names. Name them in the Speakers tab.")
+            return
+        }
+        var candidates = unnamed
+        if spare == 1 {
+            // The person's own voice is the one that talks the most, in a meeting they recorded.
+            let stats = TranscriptAssembler.stats(m.utterances ?? [])
+            if let mine = candidates.max(by: { (stats[$0]?.seconds ?? 0) < (stats[$1]?.seconds ?? 0) }) {
+                candidates.removeAll { $0 == mine }
+            }
+        }
+        var named: [String] = m.typedNamed ?? []
+        for (label, name) in zip(candidates, typed) {
+            m.speakerNames[label] = name
+            named.append(label)
+            log.info("meeting \(m.id): \(Meeting.genericName(for: label, among: m.speakerLabels)) named \(name) from the typed names")
+        }
+        m.typedNamed = named.sorted()
+    }
+
+    /// How loud each voice was and how loud the room was, for judging a rough transcript. Reads
+    /// the recording once; a minute of a long meeting costs nothing noticeable.
+    private func logSpeakerLevels(_ m: Meeting, audio: URL?) {
+        guard let audio, let (samples, rate) = try? WAVWriter.readSamples(url: audio), !samples.isEmpty else { return }
+        let frame = max(1, rate / 10)
+        var frameRMS: [Float] = []
+        frameRMS.reserveCapacity(samples.count / frame + 1)
+        var i = 0
+        while i + frame <= samples.count {
+            var e: Float = 0
+            for j in i..<(i + frame) { e += samples[j] * samples[j] }
+            frameRMS.append((e / Float(frame)).squareRoot())
+            i += frame
+        }
+        guard !frameRMS.isEmpty else { return }
+        func dB(_ x: Float) -> String { x > 0 ? String(format: "%.0f dBFS", 20 * log10(x)) : "silent" }
+        let sorted = frameRMS.sorted()
+        let floor = sorted[sorted.count / 10]
+        var parts: [String] = []
+        for label in m.speakerLabels {
+            var sum: Float = 0, n = 0
+            for t in (m.turns ?? []) where t.speaker == label {
+                let a = max(0, Int(t.start * 10)), b = min(frameRMS.count, Int(t.end * 10))
+                if b > a { for k in a..<b { sum += frameRMS[k]; n += 1 } }
+            }
+            if n > 0 { parts.append("\(m.displayName(for: label)) \(dB(sum / Float(n)))") }
+        }
+        log.info("meeting \(m.id): voice levels \(parts.joined(separator: ", ")); room floor \(dB(floor))")
     }
 
     private func persist(_ m: Meeting) {

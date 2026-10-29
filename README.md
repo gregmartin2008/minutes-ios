@@ -39,7 +39,10 @@ background, which should bring that under 15 seconds.
 - **Tells the speakers apart**, with no fixed limit on how many, and marks the passages where
   people talked over each other.
 - **Names people it has heard before.** Name a voice once ("Speaker 3" becomes "Dana") and it is
-  recognized in later meetings.
+  recognized in later meetings; a voice that only resembles someone known is offered as a
+  suggestion to confirm, never applied. Type who you are meeting with before you tap Record
+  ("With: Dana, Lee") and the voices that are not recognized get those names from the first
+  email. After naming voices in the Speakers tab, the app offers to email the corrected notes.
 - **Transcribes** on the phone, with a time on every passage; tap a time to hear that moment.
 - **Writes notes** with Apple's on-device language model: summary, key points, decisions, action
   items, open questions, figures and dates. A figure whose numbers were never said is left out.

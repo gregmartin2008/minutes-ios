@@ -14,6 +14,8 @@ struct RecordingStatus: Equatable {
     var customTitle = ""
     /// How many people the person says are in the room; nil lets Minutes work it out.
     var headCount: Int?
+    /// Who the person says they are meeting with, as typed ("Dana, Lee").
+    var attendees = ""
     var seconds: Double = 0
     /// Recent input levels, oldest first, for the level history strip.
     var levels: [Float] = []
@@ -249,6 +251,28 @@ final class AppModel: ObservableObject {
         m.title = wanted
         m.titleIsAuto = typed.isEmpty
         save(m)
+    }
+
+    /// Records who the person is meeting with, so the voices that are not recognized get those
+    /// names from the first email. Comma-separated.
+    func setAttendees(_ text: String) {
+        guard var r = recording else { return }
+        r.attendees = text
+        recording = r
+        guard !isDemo, var m = meeting(r.meetingID) else { return }
+        let names = text.split(separator: ",").map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
+        m.attendees = names.isEmpty ? nil : names
+        save(m)
+    }
+
+    /// The person's own voice profile: the one heard in the most meetings, once it has been heard
+    /// in at least three. Used to match their voice a little sooner and to keep it out of the
+    /// typed names.
+    func ownProfileID() -> String? {
+        var counts: [String: Int] = [:]
+        for m in meetings { for id in Set(m.speakerProfiles.values) { counts[id, default: 0] += 1 } }
+        guard let best = counts.max(by: { $0.value < $1.value }), best.value >= 3 else { return nil }
+        return best.key
     }
 
     /// Records how many people are in the room, which caps the number of voices Minutes looks for.
@@ -497,6 +521,7 @@ final class AppModel: ObservableObject {
     private func services() -> PipelineServices {
         if let demoServices { return demoServices }
         let models = self.models
+        let own = ownProfileID()
         return PipelineServices(
             separator: FluidSeparator(models: models),
             transcriber: FluidTranscriber(models: models, boost: boostTerms()),
@@ -505,6 +530,7 @@ final class AppModel: ObservableObject {
             notesOptions: notesOptions,
             vocabulary: { AppSettings.shared.vocabulary },
             liveWork: { [liveWork] id in liveWork.get(id) },
+            ownProfileID: { [own] in own },
             stageWillStart: { [liveWork] stage, id in
                 // For an imported recording, load the transcription model while the speakers are
                 // being separated. A recorded meeting was transcribed as it went.
@@ -675,9 +701,16 @@ final class AppModel: ObservableObject {
         }
     }
 
+    /// Meetings whose names changed after their email went out, so the detail screen can offer to
+    /// send the corrected notes and transcript.
+    @Published var renamedSinceEmail = Set<String>()
+
     /// Names a voice in this meeting and remembers the voice for future meetings.
     func nameSpeaker(_ label: String, as name: String, in id: String) {
         guard let m = meeting(id) else { return }
+        if m.emailedAt != nil, m.displayName(for: label) != name.trimmingCharacters(in: .whitespacesAndNewlines) {
+            renamedSinceEmail.insert(id)
+        }
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         var profileID: String?
         if !trimmed.isEmpty, let voice = m.voiceEmbeddings?[label], !voice.isEmpty {
@@ -750,6 +783,7 @@ final class AppModel: ObservableObject {
     /// Sends a finished meeting again, for example after naming the speakers. Returns nil on success.
     func sendEmail(_ id: String) async -> String? {
         guard var m = meeting(id), m.utterances != nil else { return "This meeting has no transcript yet." }
+        renamedSinceEmail.remove(id)
         if isDemo {
             m.emailedAt = Date()
             m.emailCount += 1

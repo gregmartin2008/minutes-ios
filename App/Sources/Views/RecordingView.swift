@@ -6,6 +6,7 @@ import SwiftUI
 struct RecordingView: View {
     @EnvironmentObject private var model: AppModel
     @State private var title = ""
+    @State private var attendees = ""
     @State private var confirmEnd = false
     @State private var confirmCancel = false
     @State private var pulse = false
@@ -65,10 +66,14 @@ struct RecordingView: View {
         .animation(.easeInOut(duration: 0.3), value: status.state)
         .onAppear {
             title = status.customTitle
+            attendees = status.attendees
             pulse = true
         }
         .onChange(of: title) { _, new in
             model.renameRecording(to: new)
+        }
+        .onChange(of: attendees) { _, new in
+            model.setAttendees(new)
         }
         .confirmationDialog("End this meeting?", isPresented: $confirmEnd, titleVisibility: .visible) {
             Button(model.mailReady ? "End and email the notes" : "End and write the notes") {
@@ -119,6 +124,26 @@ struct RecordingView: View {
             Text("Tap to name this meeting")
                 .font(.footnote)
                 .opacity(title.isEmpty ? 0.8 : 0)
+
+            HStack(spacing: 8) {
+                Text("With")
+                    .font(.system(size: 15, weight: .semibold))
+                    .opacity(0.9)
+                TextField("", text: $attendees, prompt: Text("names, separated by commas").foregroundStyle(Color.white.opacity(0.6)))
+                    .font(.system(size: 15))
+                    .submitLabel(.done)
+                    .autocorrectionDisabled()
+                    .accessibilityLabel("Who you are meeting with")
+            }
+            .padding(.vertical, 9)
+            .padding(.horizontal, 14)
+            .background(Color.white.opacity(0.12))
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            Text("Voices that aren't recognized get these names, in the order they first speak.")
+                .font(.footnote)
+                .opacity(0.8)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 

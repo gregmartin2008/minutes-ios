@@ -14,6 +14,8 @@ extension Meeting {
             speakerNames[label] = name
         }
         autoNamed.removeAll { $0 == label }
+        typedNamed?.removeAll { $0 == label }
+        suggestedNames?.removeValue(forKey: label)
         let after = displayName(for: label)
         guard before != after, var n = notes else { return }
         func fix(_ s: String) -> String { Meeting.replacingName(before, with: after, in: s) }

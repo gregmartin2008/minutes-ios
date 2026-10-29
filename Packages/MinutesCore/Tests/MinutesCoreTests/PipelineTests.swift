@@ -229,6 +229,53 @@ final class PipelineTests: XCTestCase {
         XCTAssertTrue(Render.headerText(out).contains("names recognized by voice"))
     }
 
+    /// A voice that only resembles a known one is offered as a suggestion, never named: a wrong
+    /// name reads as right.
+    func testNearMatchIsSuggestedNotApplied() async throws {
+        // Cosine with [2,0,0] is 0.6 at this angle: above suggest, below accept.
+        try store.saveProfiles([SpeakerMatcher.makeProfile(name: "Ben", embedding: [0.6, 0, 0.8])])
+        let m = try newMeeting()
+        let out = await pipeline().run(m) { _, _ in }
+        XCTAssertNil(out.speakerNames["S1"])
+        XCTAssertEqual(out.suggestedNames?["S1"], "Ben")
+        XCTAssertTrue(out.autoNamed.isEmpty)
+        XCTAssertFalse(Render.headerText(out).contains("recognized by voice"))
+    }
+
+    /// Names typed before the meeting go to the voices that were not recognized, in speaking
+    /// order; the person's own voice is identified and skipped.
+    func testTypedNamesAreGivenToTheUnrecognizedVoices() async throws {
+        let own = SpeakerMatcher.makeProfile(name: "Greg", embedding: [1, 0.05, 0])
+        try store.saveProfiles([own])
+        var m = try newMeeting()
+        m.attendees = ["Dana Lee"]
+        try store.save(m)
+        let result = modelResult!
+        var options = NotesEngine.Options()
+        options.rateLimitBackoff = [0.01]
+        options.rateLimitPatience = 0.05
+        let services = PipelineServices(
+            separator: separator, transcriber: transcriber, notesModel: { result }, mailer: mailer,
+            notesOptions: options, ownProfileID: { own.id })
+        let out = await MeetingPipeline(store: store, services: services, log: Log()).run(m) { _, _ in }
+        XCTAssertEqual(out.speakerNames["S1"], "Greg")
+        XCTAssertEqual(out.speakerNames["S2"], "Dana Lee")
+        XCTAssertEqual(out.typedNamed, ["S2"])
+        XCTAssertTrue(Render.headerText(out).contains("from what was typed"))
+        XCTAssertEqual(model.sections.first, "Greg: Hold the bid.\nDana Lee: Agreed, Greg.")
+    }
+
+    /// With more unnamed voices than typed names and no recognized own voice, the names are left
+    /// for the person rather than guessed, and the meeting says so.
+    func testTypedNamesAreHeldBackWhenTheCountsDoNotMatch() async throws {
+        var m = try newMeeting()
+        m.attendees = ["Dana", "Lee", "Sam"]
+        try store.save(m)
+        let out = await pipeline().run(m) { _, _ in }
+        XCTAssertTrue(out.speakerNames.isEmpty)
+        XCTAssertTrue(out.remarks.contains { $0.contains("were not applied") })
+    }
+
     func testResumesFromTheStageThatWasInterrupted() async throws {
         let m = try newMeeting()
         mailer.errors = [SMTPError.connection("offline")]

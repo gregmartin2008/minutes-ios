@@ -62,6 +62,14 @@ final class AppSettings {
         set { defaults.set(try? JSONEncoder().encode(newValue), forKey: "vocabulary") }
     }
 
+    /// Whether to record the microphone raw ("measurement" mode), without iOS's automatic gain
+    /// control and other input processing. Off by default; there to test whether the processing
+    /// is what flattens the quieter voice across a table in a loud room.
+    var rawMicrophone: Bool {
+        get { defaults.bool(forKey: "rawMicrophone") }
+        set { defaults.set(newValue, forKey: "rawMicrophone") }
+    }
+
     /// Whether the recognizer listens for the typed vocabulary in the audio (a second model, run
     /// on the CPU for every piece of a meeting). Off by default: in a long meeting it made the
     /// phone hot and gained little; the typed spelling corrections work without it.
