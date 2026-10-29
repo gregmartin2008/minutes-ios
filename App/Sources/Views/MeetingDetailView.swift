@@ -30,6 +30,7 @@ struct MeetingDetailView: View {
     @State private var sending = false
     @State private var notice: String?
     @State private var noticeIsError = false
+    @State private var editingPerson: PersonRef?
     @StateObject private var playback = Playback()
 
     var body: some View {
@@ -77,6 +78,9 @@ struct MeetingDetailView: View {
                     Label(remark, systemImage: "info.circle")
                         .font(.subheadline)
                         .foregroundStyle(Theme.muted)
+                }
+                if meeting.status == .done, model.hubspotReady || !meeting.people.isEmpty {
+                    HubSpotCard(meeting: meeting, onEdit: { editingPerson = $0 })
                 }
                 if meeting.utterances != nil {
                     Picker("Section", selection: $tab) {
@@ -130,6 +134,10 @@ struct MeetingDetailView: View {
         }
         .sheet(item: $share) { item in
             ShareSheet(items: [item.url])
+        }
+        .sheet(item: $editingPerson) { ref in
+            PersonSheet(meeting: meeting, index: ref.index)
+                .environmentObject(model)
         }
         .confirmationDialog("Delete this meeting?", isPresented: $confirmDelete, titleVisibility: .visible) {
             Button("Delete meeting", role: .destructive) {
@@ -209,6 +217,205 @@ struct MeetingDetailView: View {
         sending = false
         noticeIsError = problem != nil
         notice = problem ?? "Sent."
+    }
+}
+
+// MARK: - HubSpot
+
+/// A person picked for editing, by position in the meeting's people; nil index adds one.
+struct PersonRef: Identifiable {
+    let index: Int?
+    var id: Int { index ?? -1 }
+}
+
+/// The people met and the button that puts them, and the meeting, into HubSpot.
+private struct HubSpotCard: View {
+    @EnvironmentObject private var model: AppModel
+    let meeting: Meeting
+    let onEdit: (PersonRef) -> Void
+    @State private var sending = false
+    @State private var problem: String?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Eyebrow(text: "People met")
+            if meeting.people.isEmpty {
+                Text("No one is listed. Add the people in this meeting to create them in HubSpot.")
+                    .font(.subheadline)
+                    .foregroundStyle(Theme.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            ForEach(Array(meeting.people.enumerated()), id: \.offset) { i, p in
+                Button {
+                    onEdit(PersonRef(index: i))
+                } label: {
+                    HStack(alignment: .firstTextBaseline, spacing: 10) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(p.name)
+                                .font(.system(size: 15, weight: .semibold))
+                                .foregroundStyle(Theme.ink)
+                            Text(detail(p))
+                                .font(.footnote)
+                                .foregroundStyle(p.email == nil ? Theme.warn : Theme.muted)
+                        }
+                        Spacer(minLength: 0)
+                        Image(systemName: "pencil")
+                            .foregroundStyle(Theme.muted)
+                    }
+                }
+                .buttonStyle(.plain)
+            }
+            Button {
+                onEdit(PersonRef(index: nil))
+            } label: {
+                Label("Add a person", systemImage: "plus")
+                    .font(.subheadline.weight(.medium))
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(Theme.action)
+
+            if model.hubspotReady {
+                if let record = meeting.hubspot {
+                    Text("In HubSpot since \(Render.day(record.sentAt)) at \(Render.time(record.sentAt)). \(record.summary)")
+                        .font(.footnote)
+                        .foregroundStyle(Theme.muted)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Button {
+                    Task { await push() }
+                } label: {
+                    HStack(spacing: 10) {
+                        if sending { ProgressView() }
+                        Text(sending ? "Sending to HubSpot" : (meeting.hubspot == nil ? "Add to HubSpot" : "Send to HubSpot again"))
+                    }
+                }
+                .buttonStyle(OutlineButtonStyle())
+                .disabled(sending || meeting.people.isEmpty)
+                if let problem {
+                    Text(problem)
+                        .font(.subheadline)
+                        .foregroundStyle(Theme.record)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Text("Creates the contacts HubSpot does not have (matched by email) and logs this meeting with the notes on each of them. People without an email are skipped.")
+                    .font(.footnote)
+                    .foregroundStyle(Theme.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else {
+                Text("Add a HubSpot access token in Settings to create these people as contacts and log the meeting.")
+                    .font(.footnote)
+                    .foregroundStyle(Theme.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .card()
+    }
+
+    private func detail(_ p: Person) -> String {
+        var parts: [String] = []
+        if let title = p.title, !title.isEmpty { parts.append(title) }
+        if let company = p.company, !company.isEmpty { parts.append(company) }
+        parts.append(p.email ?? "no email: add one to create the contact")
+        return parts.joined(separator: " · ")
+    }
+
+    private func push() async {
+        sending = true
+        problem = nil
+        problem = await model.pushToHubSpot(meeting.id)
+        sending = false
+    }
+}
+
+/// Edits one of the people met, or adds one.
+private struct PersonSheet: View {
+    @EnvironmentObject private var model: AppModel
+    @Environment(\.dismiss) private var dismiss
+    let meeting: Meeting
+    let index: Int?
+
+    @State private var name = ""
+    @State private var email = ""
+    @State private var company = ""
+    @State private var title = ""
+    @State private var phone = ""
+    @FocusState private var focused: Bool
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    TextField("Name", text: $name)
+                        .textContentType(.name)
+                        .textInputAutocapitalization(.words)
+                        .autocorrectionDisabled()
+                        .focused($focused)
+                    TextField("Email", text: $email)
+                        .textContentType(.emailAddress)
+                        .keyboardType(.emailAddress)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                    TextField("Company", text: $company)
+                        .textContentType(.organizationName)
+                        .textInputAutocapitalization(.words)
+                    TextField("Title", text: $title)
+                        .textContentType(.jobTitle)
+                        .textInputAutocapitalization(.words)
+                    TextField("Phone", text: $phone)
+                        .textContentType(.telephoneNumber)
+                        .keyboardType(.phonePad)
+                } footer: {
+                    Text("The email is what HubSpot matches on; without one the person is not created.")
+                }
+                if index != nil {
+                    Section {
+                        Button("Remove from this meeting", role: .destructive) {
+                            var people = meeting.people
+                            if let index, people.indices.contains(index) { people.remove(at: index) }
+                            model.setContacts(people, in: meeting.id)
+                            dismiss()
+                        }
+                    }
+                }
+            }
+            .navigationTitle(index == nil ? "Add a person" : "Edit person")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save", action: save).disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
+                }
+            }
+            .onAppear {
+                if let index, meeting.people.indices.contains(index) {
+                    let p = meeting.people[index]
+                    name = p.name
+                    email = p.email ?? ""
+                    company = p.company ?? ""
+                    title = p.title ?? ""
+                    phone = p.phone ?? ""
+                }
+                focused = index == nil
+            }
+        }
+        .presentationDetents([.medium, .large])
+    }
+
+    private func save() {
+        func clean(_ s: String) -> String? {
+            let t = s.trimmingCharacters(in: .whitespacesAndNewlines)
+            return t.isEmpty ? nil : t
+        }
+        var people = meeting.people
+        var p = (index.flatMap { people.indices.contains($0) ? people[$0] : nil }) ?? Person(name: "")
+        p.name = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        p.email = clean(email)?.lowercased()
+        p.company = clean(company)
+        p.title = clean(title)
+        p.phone = clean(phone)
+        if let index, people.indices.contains(index) { people[index] = p } else { people.append(p) }
+        model.setContacts(people, in: meeting.id)
+        dismiss()
     }
 }
 

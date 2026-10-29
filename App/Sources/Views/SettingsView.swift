@@ -30,6 +30,7 @@ struct SettingsView: View {
             speechSection
             vocabularySection
             calendarSection
+            hubspotSection
             microphoneSection
             voicesSection
             storageSection
@@ -233,6 +234,69 @@ struct SettingsView: View {
         } footer: {
             Text("Standard lets iOS adjust the microphone as it does for calls. Raw turns that off and records the room as it is, which may keep a quieter voice across the table from being flattened in a loud room. Try Raw for one noisy meeting and compare.")
         }
+    }
+
+    // MARK: HubSpot
+
+    @State private var hubspotToken = ""
+    @State private var hubspotSaved = !AppSettings.shared.hubspotToken.isEmpty
+    @State private var hubspotChecking = false
+    @State private var hubspotResult: String?
+    @State private var hubspotFailed = false
+
+    private var hubspotSection: some View {
+        Section {
+            SecureField(hubspotSaved ? "Access token (saved)" : "Private app access token", text: $hubspotToken)
+                .textContentType(.password)
+                .autocorrectionDisabled()
+            Button {
+                Task { await saveAndCheckHubSpot() }
+            } label: {
+                HStack(spacing: 10) {
+                    if hubspotChecking { ProgressView() }
+                    Text(hubspotChecking ? "Checking" : "Save and check the connection")
+                }
+            }
+            .disabled(hubspotChecking || (hubspotToken.isEmpty && !hubspotSaved))
+            if let hubspotResult {
+                Label(hubspotResult, systemImage: hubspotFailed ? "exclamationmark.triangle" : "checkmark.circle")
+                    .font(.subheadline)
+                    .foregroundStyle(hubspotFailed ? Theme.record : Theme.ok)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if hubspotSaved {
+                Button("Remove the token", role: .destructive) {
+                    AppSettings.shared.hubspotToken = ""
+                    hubspotSaved = false
+                    hubspotToken = ""
+                    hubspotResult = nil
+                }
+            }
+        } header: {
+            Text("HubSpot")
+        } footer: {
+            Text("A HubSpot private app's access token (HubSpot Settings > Integrations > Private Apps; it needs the contacts read and write scopes). With it, a meeting's screen can add the people met as contacts and log the meeting with the notes on their records. Nothing is sent until you tap that. The token is kept in this iPhone's Keychain.")
+        }
+    }
+
+    private func saveAndCheckHubSpot() async {
+        hubspotChecking = true
+        hubspotResult = nil
+        let token = hubspotToken.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !token.isEmpty {
+            AppSettings.shared.hubspotToken = token
+            hubspotSaved = true
+            hubspotToken = ""
+        }
+        do {
+            try await HubSpotClient(token: AppSettings.shared.hubspotToken).check()
+            hubspotFailed = false
+            hubspotResult = "Connected to HubSpot."
+        } catch {
+            hubspotFailed = true
+            hubspotResult = error.localizedDescription
+        }
+        hubspotChecking = false
     }
 
     // MARK: Calendar

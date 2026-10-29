@@ -126,6 +126,12 @@ it, Minutes still emails the full transcript and says why there are no notes.
 - The email arrives when that finishes. Leaving Minutes open on the screen is no longer needed.
 - **Cancel meeting**, the quiet link under the buttons, throws the meeting away after a
   confirmation: the recording is deleted and nothing is written or emailed.
+- **People met and HubSpot.** A finished meeting lists the people in it (from the calendar
+  invitation or the *With* list; tap one to add an email, company, title or phone, or add a
+  person). With a HubSpot private-app access token saved in Settings, *Add to HubSpot* creates
+  the contacts HubSpot does not have (matched by email) and logs the meeting, with the notes, on
+  each of their records. Nothing is sent until that button is tapped. The token is kept in the
+  Keychain, like the mail password.
 - In the **Speakers** tab, name the voices. Minutes updates the transcript and notes, remembers
   the voices, and can send the corrected email (menu > *Email again*).
 
@@ -232,7 +238,8 @@ locked, and not the notes, which need Apple Intelligence and cannot run in a sim
 - The speech models are downloaded once from Hugging Face; nothing is uploaded.
 - Notes are written by Apple's on-device model (the Foundation Models framework).
 - The only data that leaves the phone is the email itself, sent over an encrypted connection
-  from your Gmail account to the address you chose.
+  from your Gmail account to the address you chose, and, only when you tap *Add to HubSpot*,
+  the people met and the notes of that meeting, sent to HubSpot's API with your own token.
 - The Gmail app password is kept in the iPhone's Keychain.
 - The calendar is only read, on the phone, to find the meeting on now; nothing is written to it.
 - Audio is erased 30 days after its email was sent (adjustable); transcripts and notes stay until

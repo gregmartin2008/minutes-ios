@@ -307,6 +307,37 @@ final class AppModel: ObservableObject {
         save(m)
     }
 
+    /// The people met, as edited on the meeting screen for the contact systems.
+    func setContacts(_ people: [Person], in id: String) {
+        guard var m = meeting(id) else { return }
+        m.contacts = people
+        save(m)
+    }
+
+    var hubspotReady: Bool { !AppSettings.shared.hubspotToken.isEmpty }
+
+    /// Creates the contacts that HubSpot does not have and logs the meeting with the notes on
+    /// each of them. Returns a problem to show, or nil when it went through.
+    func pushToHubSpot(_ id: String) async -> String? {
+        guard let m = meeting(id) else { return "This meeting is no longer on this iPhone." }
+        let token = AppSettings.shared.hubspotToken
+        guard !token.isEmpty else { return "Add the HubSpot access token in Settings first." }
+        let client = HubSpotClient(token: token)
+        let body = Render.notesText(m)
+        do {
+            let record = try await client.push(meeting: m, people: m.people, notesText: body.isEmpty ? "Recorded with Minutes." : body)
+            if var fresh = meeting(id) {
+                fresh.hubspot = record
+                save(fresh)
+            }
+            Log.shared.info("meeting \(id): HubSpot: \(record.summary)")
+            return nil
+        } catch {
+            Log.shared.error("meeting \(id): HubSpot failed: \(error.localizedDescription)")
+            return error.localizedDescription
+        }
+    }
+
     /// The person's own voice profile: the one heard in the most meetings, once it has been heard
     /// in at least three. Used to match their voice a little sooner and to keep it out of the
     /// typed names.

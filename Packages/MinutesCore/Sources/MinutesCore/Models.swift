@@ -232,6 +232,11 @@ public struct Meeting: Codable, Equatable, Identifiable, Sendable {
     /// The calendar meeting this recording was matched to, if any: its name becomes the
     /// meeting's, and the people invited become `attendees`.
     public var calendarEvent: CalendarEvent?
+    /// The people met, as edited for the contact systems. Nil until edited: then the calendar's
+    /// invited people, or the typed attendees, stand in (see `people`).
+    public var contacts: [Person]?
+    /// What the last push to HubSpot did.
+    public var hubspot: HubSpotRecord?
 
     // Notes and delivery
     public var notes: MeetingNotes?
@@ -275,6 +280,8 @@ public struct Meeting: Codable, Equatable, Identifiable, Sendable {
         self.attendees = nil
         self.typedNamed = nil
         self.calendarEvent = nil
+        self.contacts = nil
+        self.hubspot = nil
         self.notes = nil
         self.notesError = nil
         self.notesCheckpoint = nil
@@ -311,6 +318,15 @@ public struct Meeting: Codable, Equatable, Identifiable, Sendable {
     }
 }
 
+extension Meeting {
+    /// The people met: as edited, else as the calendar invited them, else the names typed in "With".
+    public var people: [Person] {
+        if let contacts { return contacts }
+        if let event = calendarEvent, !event.people.isEmpty { return event.people }
+        return (attendees ?? []).map { Person(name: $0) }
+    }
+}
+
 // MARK: - Calendar
 
 /// Someone invited to a calendar meeting, as the calendar lists them.
@@ -318,11 +334,17 @@ public struct Person: Codable, Equatable, Sendable {
     public var name: String
     public var email: String?
     public var organizer: Bool?
+    public var company: String?
+    public var title: String?
+    public var phone: String?
 
-    public init(name: String, email: String? = nil, organizer: Bool? = nil) {
+    public init(name: String, email: String? = nil, organizer: Bool? = nil, company: String? = nil, title: String? = nil, phone: String? = nil) {
         self.name = name
         self.email = email
         self.organizer = organizer
+        self.company = company
+        self.title = title
+        self.phone = phone
     }
 
     /// "Dov Herzberg <dov@florac.com>", or just the name.
