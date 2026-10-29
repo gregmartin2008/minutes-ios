@@ -85,6 +85,16 @@ final class AppSettings {
         set { defaults.set(newValue, forKey: "usesCalendar") }
     }
 
+    /// People known by name: email, company, title and phone, used to fill in the people met.
+    var directory: [Person] {
+        get {
+            guard let data = defaults.data(forKey: "directory"),
+                  let value = try? JSONDecoder().decode([Person].self, from: data) else { return [] }
+            return value
+        }
+        set { defaults.set(try? JSONEncoder().encode(newValue), forKey: "directory") }
+    }
+
     static let hubspotKey = "hubspot-token"
 
     /// The HubSpot private-app access token, in the Keychain. Empty means HubSpot is not set up.

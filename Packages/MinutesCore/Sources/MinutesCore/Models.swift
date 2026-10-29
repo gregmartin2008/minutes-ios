@@ -321,9 +321,78 @@ public struct Meeting: Codable, Equatable, Identifiable, Sendable {
 extension Meeting {
     /// The people met: as edited, else as the calendar invited them, else the names typed in "With".
     public var people: [Person] {
+        people(excluding: nil)
+    }
+
+    /// The people met, falling back to the named voices (other than `own`) and to a name in the
+    /// title written as "Firm - First Last", which is how conference meetings tend to be named.
+    public func people(excluding own: String?) -> [Person] {
         if let contacts { return contacts }
         if let event = calendarEvent, !event.people.isEmpty { return event.people }
-        return (attendees ?? []).map { Person(name: $0) }
+        if let attendees, !attendees.isEmpty { return attendees.map { Person(name: $0) } }
+        var out: [Person] = []
+        let ownName = own?.lowercased()
+        for label in speakerLabels {
+            guard let name = speakerNames[label]?.trimmingCharacters(in: .whitespaces), !name.isEmpty else { continue }
+            if name.lowercased() == ownName { continue }
+            if out.contains(where: { $0.name.lowercased() == name.lowercased() }) { continue }
+            out.append(Person(name: name))
+        }
+        if let fromTitle = Self.personFromTitle(title) {
+            if let i = out.firstIndex(where: { $0.name.lowercased() == fromTitle.name.lowercased() }) {
+                if out[i].company == nil { out[i].company = fromTitle.company }
+            } else if out.isEmpty {
+                out.append(fromTitle)
+            }
+        }
+        return out
+    }
+
+    /// "MWISC Florac - Dov Herzberg" → Dov Herzberg at Florac; "Florac (Dov Herzberg)" is not read.
+    public static func personFromTitle(_ title: String) -> Person? {
+        let parts = title.components(separatedBy: " - ")
+        guard parts.count == 2 else { return nil }
+        let name = parts[1].trimmingCharacters(in: .whitespaces)
+        let words = name.split(separator: " ")
+        guard (2...3).contains(words.count), words.allSatisfy({ $0.first?.isUppercase == true }) else { return nil }
+        var company = parts[0].trimmingCharacters(in: .whitespaces)
+        for prefix in ["MWISC ", "Meeting with ", "Call with "] where company.hasPrefix(prefix) {
+            company = String(company.dropFirst(prefix.count))
+        }
+        return Person(name: name, company: company.isEmpty ? nil : company)
+    }
+}
+
+extension Person {
+    /// Fills what this person is missing from a directory entry with the same name (or email).
+    public func completed(from directory: [Person]) -> Person {
+        let name = self.name.lowercased()
+        let email = self.email?.lowercased()
+        guard let match = directory.first(where: {
+            ($0.email != nil && $0.email?.lowercased() == email) || $0.name.lowercased() == name
+        }) else { return self }
+        var p = self
+        if p.email == nil { p.email = match.email }
+        if p.company == nil { p.company = match.company }
+        if p.title == nil { p.title = match.title }
+        if p.phone == nil { p.phone = match.phone }
+        return p
+    }
+
+    /// Reads "Name, email, company, title, phone" lines (commas or tabs; the later fields optional).
+    public static func parseDirectory(_ text: String) -> [Person] {
+        var out: [Person] = []
+        for raw in text.split(whereSeparator: \.isNewline) {
+            let line = raw.trimmingCharacters(in: .whitespaces)
+            guard !line.isEmpty, !line.lowercased().hasPrefix("name,"), !line.lowercased().hasPrefix("name\t") else { continue }
+            let fields = line.split(separator: line.contains("\t") ? "\t" : ",", omittingEmptySubsequences: false)
+                .map { $0.trimmingCharacters(in: .whitespaces) }
+            guard let name = fields.first, !name.isEmpty else { continue }
+            func field(_ i: Int) -> String? { fields.indices.contains(i) && !fields[i].isEmpty ? fields[i] : nil }
+            let email = field(1).flatMap { $0.contains("@") ? $0.lowercased() : nil }
+            out.append(Person(name: name, email: email, company: field(2), title: field(3), phone: field(4)))
+        }
+        return out
     }
 }
 

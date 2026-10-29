@@ -26,6 +26,7 @@ enum Route: Hashable {
     case meeting(String)
     case settings
     case vocabulary
+    case people
 }
 
 struct RootView: View {
@@ -40,6 +41,7 @@ struct RootView: View {
                     case .meeting(let id): MeetingDetailView(id: id)
                     case .settings: SettingsView()
                     case .vocabulary: VocabularyView()
+                    case .people: PeopleView()
                     }
                 }
         }

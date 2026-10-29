@@ -79,8 +79,8 @@ struct MeetingDetailView: View {
                         .font(.subheadline)
                         .foregroundStyle(Theme.muted)
                 }
-                if meeting.status == .done, model.hubspotReady || !meeting.people.isEmpty {
-                    HubSpotCard(meeting: meeting, onEdit: { editingPerson = $0 })
+                if meeting.status == .done, model.hubspotReady || !model.people(in: meeting).isEmpty {
+                    HubSpotCard(meeting: meeting, people: model.people(in: meeting), onEdit: { editingPerson = $0 })
                 }
                 if meeting.utterances != nil {
                     Picker("Section", selection: $tab) {
@@ -136,7 +136,7 @@ struct MeetingDetailView: View {
             ShareSheet(items: [item.url])
         }
         .sheet(item: $editingPerson) { ref in
-            PersonSheet(meeting: meeting, index: ref.index)
+            PersonSheet(meeting: meeting, people: model.people(in: meeting), index: ref.index)
                 .environmentObject(model)
         }
         .confirmationDialog("Delete this meeting?", isPresented: $confirmDelete, titleVisibility: .visible) {
@@ -232,6 +232,7 @@ struct PersonRef: Identifiable {
 private struct HubSpotCard: View {
     @EnvironmentObject private var model: AppModel
     let meeting: Meeting
+    let people: [Person]
     let onEdit: (PersonRef) -> Void
     @State private var sending = false
     @State private var problem: String?
@@ -239,13 +240,13 @@ private struct HubSpotCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Eyebrow(text: "People met")
-            if meeting.people.isEmpty {
+            if people.isEmpty {
                 Text("No one is listed. Add the people in this meeting to create them in HubSpot.")
                     .font(.subheadline)
                     .foregroundStyle(Theme.muted)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            ForEach(Array(meeting.people.enumerated()), id: \.offset) { i, p in
+            ForEach(Array(people.enumerated()), id: \.offset) { i, p in
                 Button {
                     onEdit(PersonRef(index: i))
                 } label: {
@@ -290,7 +291,7 @@ private struct HubSpotCard: View {
                     }
                 }
                 .buttonStyle(OutlineButtonStyle())
-                .disabled(sending || meeting.people.isEmpty)
+                .disabled(sending || people.isEmpty)
                 if let problem {
                     Text(problem)
                         .font(.subheadline)
@@ -332,6 +333,7 @@ private struct PersonSheet: View {
     @EnvironmentObject private var model: AppModel
     @Environment(\.dismiss) private var dismiss
     let meeting: Meeting
+    let people: [Person]
     let index: Int?
 
     @State private var name = ""
@@ -370,7 +372,7 @@ private struct PersonSheet: View {
                 if index != nil {
                     Section {
                         Button("Remove from this meeting", role: .destructive) {
-                            var people = meeting.people
+                            var people = self.people
                             if let index, people.indices.contains(index) { people.remove(at: index) }
                             model.setContacts(people, in: meeting.id)
                             dismiss()
@@ -387,8 +389,8 @@ private struct PersonSheet: View {
                 }
             }
             .onAppear {
-                if let index, meeting.people.indices.contains(index) {
-                    let p = meeting.people[index]
+                if let index, people.indices.contains(index) {
+                    let p = people[index]
                     name = p.name
                     email = p.email ?? ""
                     company = p.company ?? ""
@@ -406,7 +408,7 @@ private struct PersonSheet: View {
             let t = s.trimmingCharacters(in: .whitespacesAndNewlines)
             return t.isEmpty ? nil : t
         }
-        var people = meeting.people
+        var people = self.people
         var p = (index.flatMap { people.indices.contains($0) ? people[$0] : nil }) ?? Person(name: "")
         p.name = name.trimmingCharacters(in: .whitespacesAndNewlines)
         p.email = clean(email)?.lowercased()
