@@ -229,6 +229,9 @@ public struct Meeting: Codable, Equatable, Identifiable, Sendable {
     public var attendees: [String]?
     /// Labels named from `attendees` rather than by voice or by hand.
     public var typedNamed: [String]?
+    /// The calendar meeting this recording was matched to, if any: its name becomes the
+    /// meeting's, and the people invited become `attendees`.
+    public var calendarEvent: CalendarEvent?
 
     // Notes and delivery
     public var notes: MeetingNotes?
@@ -271,6 +274,7 @@ public struct Meeting: Codable, Equatable, Identifiable, Sendable {
         self.suggestedNames = nil
         self.attendees = nil
         self.typedNamed = nil
+        self.calendarEvent = nil
         self.notes = nil
         self.notesError = nil
         self.notesCheckpoint = nil
@@ -304,5 +308,61 @@ public struct Meeting: Codable, Equatable, Identifiable, Sendable {
         if let i = labels.firstIndex(of: label) { return "Speaker \(i + 1)" }
         let digits = label.filter { $0.isNumber }
         return digits.isEmpty ? "Speaker" : "Speaker \(digits)"
+    }
+}
+
+// MARK: - Calendar
+
+/// Someone invited to a calendar meeting, as the calendar lists them.
+public struct Person: Codable, Equatable, Sendable {
+    public var name: String
+    public var email: String?
+    public var organizer: Bool?
+
+    public init(name: String, email: String? = nil, organizer: Bool? = nil) {
+        self.name = name
+        self.email = email
+        self.organizer = organizer
+    }
+
+    /// "Dov Herzberg <dov@florac.com>", or just the name.
+    public var line: String {
+        guard let email, !email.isEmpty, email.lowercased() != name.lowercased() else { return name }
+        return "\(name) <\(email)>"
+    }
+}
+
+/// A meeting from the iPhone's calendar (which carries Google and other calendars added to iOS).
+public struct CalendarEvent: Codable, Equatable, Sendable {
+    public var id: String
+    public var title: String
+    public var start: Date
+    public var end: Date
+    /// Everyone invited other than the person recording.
+    public var people: [Person]
+    /// The calendar's name ("Work", "greg@…").
+    public var calendar: String?
+
+    public init(id: String, title: String, start: Date, end: Date, people: [Person], calendar: String? = nil) {
+        self.id = id
+        self.title = title
+        self.start = start
+        self.end = end
+        self.people = people
+        self.calendar = calendar
+    }
+
+    /// The invited people's names, for the "With" list.
+    public var names: [String] { people.map(\.name).filter { !$0.isEmpty } }
+
+    /// Which of `events` a recording started at `now` most likely belongs to, nearest first: meetings
+    /// that have begun (or begin within `before` seconds) and have not been over for longer than
+    /// `after` seconds. A meeting that ran long is still the one being recorded.
+    public static func current(
+        _ events: [CalendarEvent], at now: Date, before: TimeInterval = 15 * 60, after: TimeInterval = 10 * 60
+    ) -> [CalendarEvent] {
+        events
+            .filter { $0.start <= now.addingTimeInterval(before) && $0.end >= now.addingTimeInterval(-after) }
+            .sorted { abs($0.start.timeIntervalSince(now)) < abs($1.start.timeIntervalSince(now)) }
     }
 }

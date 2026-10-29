@@ -141,8 +141,15 @@ public enum Render {
         }
     }
 
+    /// "Invited: Dov Herzberg <dov@florac.com>, Lee Park" from the calendar meeting, or nil.
+    public static func invitedLine(_ m: Meeting) -> String? {
+        guard let event = m.calendarEvent, !event.people.isEmpty else { return nil }
+        return "Invited: " + event.people.map(\.line).joined(separator: ", ")
+    }
+
     public static func headerText(_ m: Meeting, timeZone: TimeZone = .current) -> String {
         var out = [m.title, metaLine(m, timeZone: timeZone)]
+        if let invited = invitedLine(m) { out.append(invited) }
         let speakers = speakersLine(m)
         if !speakers.isEmpty {
             out.append("Speakers: \(speakers)" + namesCaption(m))
@@ -189,6 +196,9 @@ public enum Render {
         var html = "<div style=\"font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;font-size:15px;line-height:1.55;color:#15202B;max-width:680px\">"
         html += "<h1 style=\"font-size:22px;line-height:1.25;margin:0 0 4px\">\(e(m.title))</h1>"
         html += "<p style=\"margin:0;color:#5A6774\">\(e(metaLine(m, timeZone: timeZone)))</p>"
+        if let invited = invitedLine(m) {
+            html += "<p style=\"margin:2px 0 0;color:#5A6774\">\(e(invited))</p>"
+        }
         let speakers = speakersLine(m)
         if !speakers.isEmpty {
             html += "<p style=\"margin:2px 0 0;color:#5A6774\">Speakers: \(e(speakers))"

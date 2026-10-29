@@ -99,4 +99,35 @@ final class RenderTests: XCTestCase {
     func testModelLinesHaveNoTimestamps() {
         XCTAssertEqual(Render.modelLines(sample())[1], "Speaker 2: The top ten are forty one percent.")
     }
+
+    func testInvitedLineComesFromTheCalendarMeeting() {
+        var m = sample()
+        XCTAssertNil(Render.invitedLine(m))
+        let start = Date(timeIntervalSince1970: 1_700_000_000)
+        m.calendarEvent = CalendarEvent(
+            id: "e1", title: "Florac intro", start: start, end: start + 1800,
+            people: [Person(name: "Dov Herzberg", email: "dov@florac.com"), Person(name: "Lee Park"), Person(name: "x@y.com", email: "x@y.com")])
+        XCTAssertEqual(Render.invitedLine(m), "Invited: Dov Herzberg <dov@florac.com>, Lee Park, x@y.com")
+        XCTAssertTrue(Render.headerText(m).contains("\nInvited: Dov Herzberg <dov@florac.com>, Lee Park, x@y.com\n"))
+        XCTAssertTrue(Render.emailHTML(m).contains("Invited: Dov Herzberg &lt;dov@florac.com&gt;"))
+        let data = try! JSONEncoder().encode(m)
+        XCTAssertEqual(try! JSONDecoder().decode(Meeting.self, from: data).calendarEvent, m.calendarEvent)
+    }
+
+    func testCurrentCalendarMeetingsAreTheOnesOnNow() {
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+        func event(_ id: String, _ startMinutes: Double, _ lengthMinutes: Double) -> CalendarEvent {
+            CalendarEvent(id: id, title: id, start: now + startMinutes * 60, end: now + (startMinutes + lengthMinutes) * 60, people: [])
+        }
+        let events = [
+            event("yesterday", -24 * 60, 60),
+            event("ended 30 min ago", -90, 60),
+            event("ran long", -70, 60),      // ended 10 min ago: still the one being recorded
+            event("on now", -20, 60),
+            event("in 10 min", 10, 30),
+            event("in an hour", 60, 30),
+        ]
+        XCTAssertEqual(CalendarEvent.current(events, at: now).map(\.id), ["in 10 min", "on now", "ran long"])
+        XCTAssertEqual(CalendarEvent.current([], at: now), [])
+    }
 }

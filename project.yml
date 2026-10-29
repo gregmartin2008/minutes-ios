@@ -8,8 +8,8 @@ options:
 settings:
   base:
     SWIFT_VERSION: "5.0"
-    MARKETING_VERSION: "1.7"
-    CURRENT_PROJECT_VERSION: "12"
+    MARKETING_VERSION: "1.8"
+    CURRENT_PROJECT_VERSION: "13"
     ENABLE_USER_SCRIPT_SANDBOXING: "NO"
 packages:
   MinutesCore:
@@ -40,6 +40,7 @@ targets:
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         UIBackgroundModes: [audio]
         NSMicrophoneUsageDescription: Minutes records your meetings so it can transcribe them on this iPhone.
+        NSCalendarsFullUsageDescription: Minutes looks up the meeting on your calendar to name the recording and list who is in it. Nothing is written to the calendar.
         ITSAppUsesNonExemptEncryption: false
     settings:
       base:

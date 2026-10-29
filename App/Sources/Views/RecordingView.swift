@@ -75,6 +75,10 @@ struct RecordingView: View {
         .onChange(of: attendees) { _, new in
             model.setAttendees(new)
         }
+        .onChange(of: status.attendees) { _, new in
+            // Picking a different calendar meeting changes the list under the field.
+            if new != attendees { attendees = new }
+        }
         .confirmationDialog("End this meeting?", isPresented: $confirmEnd, titleVisibility: .visible) {
             Button(model.mailReady ? "End and email the notes" : "End and write the notes") {
                 titleFocused = false
@@ -121,9 +125,13 @@ struct RecordingView: View {
                 .background(Color.white.opacity(0.12))
                 .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                 .accessibilityLabel("Meeting name")
-            Text("Tap to name this meeting")
-                .font(.footnote)
-                .opacity(title.isEmpty ? 0.8 : 0)
+            if status.calendarChoices.isEmpty {
+                Text("Tap to name this meeting")
+                    .font(.footnote)
+                    .opacity(title.isEmpty ? 0.8 : 0)
+            } else {
+                calendarPicker
+            }
 
             HStack(spacing: 8) {
                 Text("With")
@@ -145,6 +153,44 @@ struct RecordingView: View {
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
         }
+    }
+
+    /// Which calendar meeting this is, when one or more are on now. The name and the "With"
+    /// list follow the choice.
+    private var calendarPicker: some View {
+        Menu {
+            ForEach(status.calendarChoices, id: \.id) { event in
+                Button {
+                    model.chooseCalendarEvent(event.id)
+                } label: {
+                    if event.id == status.calendarEventID {
+                        Label(event.title, systemImage: "checkmark")
+                    } else {
+                        Text(event.title)
+                    }
+                }
+            }
+            Button {
+                model.chooseCalendarEvent(nil)
+            } label: {
+                if status.calendarEventID == nil {
+                    Label("Not a calendar meeting", systemImage: "checkmark")
+                } else {
+                    Text("Not a calendar meeting")
+                }
+            }
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "calendar")
+                Text(status.calendarEventID == nil ? "Not a calendar meeting" : "From your calendar")
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 11, weight: .semibold))
+            }
+            .font(.footnote.weight(.medium))
+            .opacity(0.9)
+            .frame(minHeight: 32)
+        }
+        .accessibilityLabel("Calendar meeting")
     }
 
     private var meter: some View {
