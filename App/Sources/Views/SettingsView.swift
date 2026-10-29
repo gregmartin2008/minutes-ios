@@ -1,5 +1,6 @@
 import MinutesCore
 import SwiftUI
+import UIKit
 
 /// Email account, speech models, remembered voices, storage and diagnostics.
 struct SettingsView: View {
@@ -366,8 +367,25 @@ struct SettingsView: View {
                         calendarAccess = MeetingCalendar.shared.access
                     }
                 }
+            HStack {
+                Text("Access")
+                Spacer()
+                Text(calendarAccessText)
+                    .foregroundStyle(calendarAccess == .granted ? Theme.ok : Theme.warn)
+            }
+            if usesCalendar, calendarAccess == .notAsked {
+                Button("Allow calendar access") {
+                    Task {
+                        _ = await MeetingCalendar.shared.requestAccess()
+                        calendarAccess = MeetingCalendar.shared.access
+                    }
+                }
+            }
             if usesCalendar, calendarAccess == .denied {
-                Text("Calendar access is off for Minutes. Turn it on in the iPhone's Settings, under Minutes.")
+                Button("Open iPhone Settings for Minutes") {
+                    if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) }
+                }
+                Text("Calendar access is off for Minutes. Turn on Calendars under Minutes in the iPhone's Settings, then come back.")
                     .font(.footnote)
                     .foregroundStyle(Theme.warn)
             }
@@ -377,6 +395,17 @@ struct SettingsView: View {
             Text("When a recording starts during a meeting on your calendar, the meeting takes that name and the people invited fill the \"With\" list. Google and other calendars added to this iPhone are included. Nothing is written to the calendar.")
         }
         .onAppear { calendarAccess = MeetingCalendar.shared.access }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
+            calendarAccess = MeetingCalendar.shared.access
+        }
+    }
+
+    private var calendarAccessText: String {
+        switch calendarAccess {
+        case .granted: return "Allowed"
+        case .notAsked: return "Not asked yet"
+        case .denied: return "Off"
+        }
     }
 
     private var vocabularySection: some View {

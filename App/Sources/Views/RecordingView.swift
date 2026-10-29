@@ -1,5 +1,6 @@
 import MinutesCore
 import SwiftUI
+import UIKit
 
 /// Shown for the whole meeting. The entire screen carries the state: red while recording,
 /// slate while paused, amber when iOS has taken the microphone.
@@ -125,7 +126,18 @@ struct RecordingView: View {
                 .background(Color.white.opacity(0.12))
                 .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                 .accessibilityLabel("Meeting name")
-            if status.calendarChoices.isEmpty {
+            if status.calendarOff {
+                Button {
+                    if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) }
+                } label: {
+                    Label("Calendar access is off. Allow it in iPhone Settings.", systemImage: "calendar.badge.exclamationmark")
+                        .font(.footnote.weight(.medium))
+                        .underline()
+                        .opacity(0.9)
+                        .frame(minHeight: 32)
+                }
+                .buttonStyle(.plain)
+            } else if status.calendarChoices.isEmpty {
                 Text("Tap to name this meeting")
                     .font(.footnote)
                     .opacity(title.isEmpty ? 0.8 : 0)
