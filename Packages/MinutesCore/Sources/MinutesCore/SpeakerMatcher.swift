@@ -16,7 +16,10 @@ public enum SpeakerMatcher {
         /// Similarity at or above which the app offers the name as a suggestion without applying it.
         public var suggest: Float
 
-        public init(accept: Float = 0.60, margin: Float = 0.10, suggest: Float = 0.45) {
+        /// `accept` was 0.60 until two conference days in a loud hall gave three strangers the
+        /// names of people met hours earlier. A wrong name reads as right, so the bar is higher
+        /// and the 0.45–0.70 band is shown as a suggestion to confirm instead.
+        public init(accept: Float = 0.70, margin: Float = 0.12, suggest: Float = 0.45) {
             self.accept = accept
             self.margin = margin
             self.suggest = suggest

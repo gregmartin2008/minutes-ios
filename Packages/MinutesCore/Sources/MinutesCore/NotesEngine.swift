@@ -222,6 +222,7 @@ public struct NotesEngine: Sendable {
                     // section it came from. A small model sometimes invents or garbles one, and
                     // a wrong number in the notes is worse than none.
                     f.figures = Self.verified(figures: f.figures, against: section)
+                    f = Self.unquoted(f, speakers: Self.speakers(in: section))
                     done.fragments.append(f)
                     if !f.gist.isEmpty { previousGist = f.gist }
                 case .failure(let e):
@@ -400,7 +401,7 @@ public struct NotesEngine: Sendable {
         guard !fragments.isEmpty else { throw firstError ?? NotesModelError.other("The language model returned nothing.") }
         var merged = Self.merge(fragments)
         merged.figures = Self.verified(figures: merged.figures, against: section)
-        return merged
+        return Self.unquoted(merged, speakers: Self.speakers(in: section))
     }
 
     /// One fragment from several (the halves of a section): lists joined, gists joined.
@@ -606,6 +607,38 @@ public struct NotesEngine: Sendable {
             gist: f.gist.trimmingCharacters(in: .whitespacesAndNewlines),
             keyPoints: tidy(f.keyPoints), decisions: tidy(f.decisions), actionItems: tidy(f.actionItems),
             openQuestions: tidy(f.openQuestions), figures: tidy(f.figures))
+    }
+
+    /// The speaker names a section's lines carry ("Name: what they said").
+    static func speakers(in section: [String]) -> Set<String> {
+        var out = Set<String>()
+        for line in section {
+            guard let colon = line.firstIndex(of: ":") else { continue }
+            let name = line[..<colon].trimmingCharacters(in: .whitespaces)
+            if !name.isEmpty, name.count <= 40, !name.contains(where: { $0.isNewline }) { out.insert(name) }
+        }
+        return out
+    }
+
+    /// Takes the transcript habits out of a fragment: a "Name: " prefix copied from the lines is
+    /// removed from points, decisions and questions (action items keep theirs by design), and a
+    /// conversational question of a few words ("Is he here?") is not an open question.
+    static func unquoted(_ f: NotesFragment, speakers: Set<String>) -> NotesFragment {
+        func strip(_ item: String) -> String {
+            guard let colon = item.firstIndex(of: ":") else { return item }
+            let prefix = item[..<colon].trimmingCharacters(in: .whitespaces)
+            guard speakers.contains(prefix) else { return item }
+            var rest = item[item.index(after: colon)...].trimmingCharacters(in: .whitespaces)
+            if let first = rest.first, first.isLowercase { rest = rest.prefix(1).uppercased() + rest.dropFirst() }
+            return rest
+        }
+        var out = f
+        out.keyPoints = dedupe(f.keyPoints.map(strip).filter { !$0.isEmpty })
+        out.decisions = dedupe(f.decisions.map(strip).filter { !$0.isEmpty })
+        out.openQuestions = dedupe(f.openQuestions.map(strip).filter { q in
+            !q.isEmpty && q.split(separator: " ").count >= 5
+        })
+        return out
     }
 
     /// Strips list markers and filler entries a model sometimes emits in place of an empty list.

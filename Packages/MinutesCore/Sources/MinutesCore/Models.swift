@@ -79,6 +79,9 @@ public struct MeetingNotes: Codable, Equatable, Sendable {
     /// True when the final pass was finished without the language model because iOS was
     /// throttling it (it does this to an app in the background).
     public var throttled: Bool?
+    /// Seconds at the end of the meeting that are in the transcript but not in the notes, when
+    /// the final pass was skipped before they could be summarized.
+    public var missingTailSeconds: Double?
 
     public init(
         title: String = "", summary: String = "", keyPoints: [String] = [], decisions: [String] = [],
@@ -218,6 +221,14 @@ public struct Meeting: Codable, Equatable, Identifiable, Sendable {
     /// Labels whose names came from voice recognition and have not been confirmed by the person.
     public var autoNamed: [String]
     public var matchScores: [String: Float]
+    /// Known voices that sounded like a speaker but not closely enough to apply the name;
+    /// offered to the person to confirm.
+    public var suggestedNames: [String: String]?
+    /// Names the person typed before the meeting ("With: Dana, Lee"), given to the voices that
+    /// were not recognized, in order of first speaking.
+    public var attendees: [String]?
+    /// Labels named from `attendees` rather than by voice or by hand.
+    public var typedNamed: [String]?
 
     // Notes and delivery
     public var notes: MeetingNotes?
@@ -257,6 +268,9 @@ public struct Meeting: Codable, Equatable, Identifiable, Sendable {
         self.speakerProfiles = [:]
         self.autoNamed = []
         self.matchScores = [:]
+        self.suggestedNames = nil
+        self.attendees = nil
+        self.typedNamed = nil
         self.notes = nil
         self.notesError = nil
         self.notesCheckpoint = nil

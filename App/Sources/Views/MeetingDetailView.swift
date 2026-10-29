@@ -63,6 +63,16 @@ struct MeetingDetailView: View {
                         .foregroundStyle(noticeIsError ? Theme.record : Theme.ok)
                         .fixedSize(horizontal: false, vertical: true)
                 }
+                if model.renamedSinceEmail.contains(meeting.id), meeting.emailCount > 0, !sending {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("The names changed since the email went out.")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(Theme.ink)
+                        Button("Email the corrected notes and transcript") { Task { await sendAgain() } }
+                            .buttonStyle(OutlineButtonStyle())
+                    }
+                    .card()
+                }
                 ForEach(meeting.remarks, id: \.self) { remark in
                     Label(remark, systemImage: "info.circle")
                         .font(.subheadline)
@@ -89,6 +99,7 @@ struct MeetingDetailView: View {
                             meeting: meeting, hasAudio: model.audioURL(meeting.id) != nil,
                             onName: { naming = SpeakerRef(label: $0) },
                             onConfirm: { label in model.nameSpeaker(label, as: meeting.displayName(for: label), in: meeting.id) },
+                            onSuggested: { label, name in model.nameSpeaker(label, as: name, in: meeting.id) },
                             onSeparate: { count in model.reseparate(meeting.id, speakers: count) })
                     }
                 }
@@ -588,6 +599,7 @@ private struct SpeakersTab: View {
     let hasAudio: Bool
     let onName: (String) -> Void
     let onConfirm: (String) -> Void
+    let onSuggested: (String, String) -> Void
     let onSeparate: (Int?) -> Void
 
     @State private var headCount = 0
@@ -691,9 +703,33 @@ private struct SpeakersTab: View {
                         .foregroundStyle(Theme.ok)
                         .buttonStyle(.plain)
                 }
+            } else if meeting.typedNamed?.contains(label) == true {
+                Text("Named from what was typed before the meeting. Check it.")
+                    .font(.footnote)
+                    .foregroundStyle(Theme.warn)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else if meeting.speakerNames[label] == nil, let suggested = meeting.suggestedNames?[label] {
+                HStack(spacing: 10) {
+                    Text(suggestText(suggested, label))
+                        .font(.footnote)
+                        .foregroundStyle(Theme.muted)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Spacer(minLength: 4)
+                    Button("Yes, it's \(suggested)") { onSuggested(label, suggested) }
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(Theme.ok)
+                        .buttonStyle(.plain)
+                }
             }
         }
         .padding(14)
+    }
+
+    private func suggestText(_ name: String, _ label: String) -> String {
+        if let score = meeting.matchScores[label] {
+            return "Sounds a little like \(name) (\(Int((score * 100).rounded()))% match), not enough to be sure."
+        }
+        return "Sounds a little like \(name), not enough to be sure."
     }
 
     private func detail(stats: TranscriptAssembler.SpeakerStats?, share: Double) -> String {

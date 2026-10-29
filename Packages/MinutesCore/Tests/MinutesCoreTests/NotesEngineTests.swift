@@ -152,6 +152,27 @@ final class NotesEngineTests: XCTestCase {
         XCTAssertEqual(notes.keyPoints, ["Point 1"])
     }
 
+    func testTranscriptHabitsAreTakenOutOfFragments() {
+        let section = ["Greg Martin: We target $3M checks.", "Dana Lee: Is he here?", "Dana Lee: What is the hold period?"]
+        let f = NotesFragment(
+            gist: "g", keyPoints: ["Greg Martin: we target $3M checks.", "The fund is evergreen"],
+            decisions: ["Dana Lee: hold the bid"], actionItems: ["Dana Lee: send the model"],
+            openQuestions: ["Is he here?", "Dana Lee: What is the hold period for the fund?"], figures: [])
+        let out = NotesEngine.unquoted(f, speakers: NotesEngine.speakers(in: section))
+        XCTAssertEqual(out.keyPoints, ["We target $3M checks.", "The fund is evergreen"])
+        XCTAssertEqual(out.decisions, ["Hold the bid"])
+        XCTAssertEqual(out.actionItems, ["Dana Lee: send the model"])           // kept by design
+        XCTAssertEqual(out.openQuestions, ["What is the hold period for the fund?"])
+    }
+
+    func testMissingTailIsSaidInMinutes() {
+        var n = MeetingNotes(summary: "s", skippedSections: 10, totalSections: 13, throttled: true)
+        n.missingTailSeconds = 200
+        XCTAssertEqual(Render.remark(n)?.hasPrefix("The last 4 minutes of the meeting are in the transcript but not in these notes."), true)
+        n.missingTailSeconds = 50
+        XCTAssertEqual(Render.remark(n)?.hasPrefix("The last minute of the meeting is in the transcript"), true)
+    }
+
     func testGistSummaryDropsFromTheMiddle() {
         let gists = (1...20).map { "Sentence number \($0) about the meeting, long enough to count." }
         let summary = NotesEngine.gistSummary(gists, maxCharacters: 300)
