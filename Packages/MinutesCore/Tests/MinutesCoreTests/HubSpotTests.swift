@@ -123,4 +123,39 @@ final class HubSpotTests: XCTestCase {
         XCTAssertEqual(HubSpotClient.splitName("Cher").first, "Cher")
         XCTAssertEqual(HubSpotClient.splitName("Cher").last, "")
     }
+
+    func testPeopleComeFromNamedVoicesAndTheTitleWhenNothingWasTyped() {
+        var m = Meeting(title: "MWISC Larkfield - Dan Hartwell")
+        XCTAssertEqual(m.people(excluding: "Greg Martin"), [Person(name: "Dan Hartwell", company: "Larkfield")])
+        m.speakerNames = ["Speaker 1": "Greg Martin", "Speaker 2": "Dan Hartwell", "Speaker 3": "Lee Park"]
+        m.utterances = [
+            Utterance(id: 0, speaker: "Speaker 1", start: 0, end: 1, text: "a"),
+            Utterance(id: 1, speaker: "Speaker 2", start: 1, end: 2, text: "b"),
+            Utterance(id: 2, speaker: "Speaker 3", start: 2, end: 3, text: "c"),
+        ]
+        XCTAssertEqual(m.people(excluding: "Greg Martin").map(\.name), ["Dan Hartwell", "Lee Park"])
+        XCTAssertEqual(m.people(excluding: "Greg Martin").first?.company, "Larkfield")
+        XCTAssertEqual(m.people(excluding: nil).map(\.name), ["Greg Martin", "Dan Hartwell", "Lee Park"])
+        XCTAssertNil(Meeting.personFromTitle("Weekly pipeline review"))
+        XCTAssertNil(Meeting.personFromTitle("Notes - the usual"))
+        XCTAssertEqual(Meeting.personFromTitle("Call with Halden - Clark Yardley")?.company, "Halden")
+    }
+
+    func testDirectoryFillsInWhatIsMissing() {
+        let directory = Person.parseDirectory("""
+        Name, Email, Company, Title, Phone
+        Dan Hartwell, Dan.Hartwell@larkfield.example, Larkfield, VP, 212-555-0147
+        Lee Park\tlee@example.com\tExample
+        Nobody
+        """)
+        XCTAssertEqual(directory.count, 3)
+        XCTAssertEqual(directory[0], Person(name: "Dan Hartwell", email: "dan.hartwell@larkfield.example", company: "Larkfield", title: "VP", phone: "212-555-0147"))
+        XCTAssertEqual(directory[1], Person(name: "Lee Park", email: "lee@example.com", company: "Example"))
+        XCTAssertEqual(directory[2], Person(name: "Nobody"))
+        let filled = Person(name: "dan hartwell", company: "Larkfield North America").completed(from: directory)
+        XCTAssertEqual(filled.email, "dan.hartwell@larkfield.example")
+        XCTAssertEqual(filled.company, "Larkfield North America")
+        XCTAssertEqual(filled.title, "VP")
+        XCTAssertEqual(Person(name: "Someone Else").completed(from: directory), Person(name: "Someone Else"))
+    }
 }

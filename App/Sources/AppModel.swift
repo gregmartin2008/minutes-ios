@@ -307,11 +307,51 @@ final class AppModel: ObservableObject {
         save(m)
     }
 
-    /// The people met, as edited on the meeting screen for the contact systems.
+    @Published var directory: [Person] = AppSettings.shared.directory
+
+    /// The person's own name, from the voice profile heard in the most meetings.
+    var ownName: String? {
+        guard let id = ownProfileID() else { return nil }
+        return profiles.first { $0.id == id }?.name
+    }
+
+    /// The people met in a meeting: as edited, from the calendar, the "With" list, the named
+    /// voices or the title, each filled in from the directory.
+    func people(in m: Meeting) -> [Person] {
+        m.people(excluding: ownName).map { $0.completed(from: directory) }
+    }
+
+    /// The people met, as edited on the meeting screen. What was typed also goes into the directory.
     func setContacts(_ people: [Person], in id: String) {
         guard var m = meeting(id) else { return }
         m.contacts = people
         save(m)
+        for p in people { remember(p) }
+    }
+
+    /// Adds or updates a directory entry, keeping any detail the new one lacks.
+    func remember(_ p: Person) {
+        var list = directory
+        if let i = list.firstIndex(where: { $0.name.lowercased() == p.name.lowercased() }) {
+            var merged = p
+            merged = merged.completed(from: [list[i]])
+            list[i] = merged
+        } else {
+            list.append(p)
+        }
+        setDirectory(list)
+    }
+
+    func setDirectory(_ list: [Person]) {
+        directory = list.sorted { $0.name.lowercased() < $1.name.lowercased() }
+        AppSettings.shared.directory = directory
+    }
+
+    /// Reads pasted "Name, email, company, title, phone" lines into the directory. Returns how many.
+    func importDirectory(_ text: String) -> Int {
+        let people = Person.parseDirectory(text)
+        for p in people { remember(p) }
+        return people.count
     }
 
     var hubspotReady: Bool { !AppSettings.shared.hubspotToken.isEmpty }
@@ -325,7 +365,7 @@ final class AppModel: ObservableObject {
         let client = HubSpotClient(token: token)
         let body = Render.notesText(m)
         do {
-            let record = try await client.push(meeting: m, people: m.people, notesText: body.isEmpty ? "Recorded with Minutes." : body)
+            let record = try await client.push(meeting: m, people: people(in: m), notesText: body.isEmpty ? "Recorded with Minutes." : body)
             if var fresh = meeting(id) {
                 fresh.hubspot = record
                 save(fresh)
@@ -336,6 +376,36 @@ final class AppModel: ObservableObject {
             Log.shared.error("meeting \(id): HubSpot failed: \(error.localizedDescription)")
             return error.localizedDescription
         }
+    }
+
+    /// Finished meetings not yet in HubSpot whose people include at least one email.
+    var meetingsReadyForHubSpot: [Meeting] {
+        meetings.filter { m in
+            m.status == .done && m.hubspot == nil && people(in: m).contains { $0.email?.contains("@") == true }
+        }
+    }
+
+    /// Sends every meeting in `meetingsReadyForHubSpot`, oldest first. Returns a report.
+    func pushAllToHubSpot(progress: @escaping (String) -> Void) async -> String {
+        let batch = meetingsReadyForHubSpot.sorted { $0.createdAt < $1.createdAt }
+        guard !batch.isEmpty else { return "Nothing to send: every finished meeting with an email address is already in HubSpot." }
+        var sent = 0
+        var created: [String] = []
+        var failed: [String] = []
+        for (i, m) in batch.enumerated() {
+            progress("Sending \(i + 1) of \(batch.count): \(m.title)")
+            if let problem = await pushToHubSpot(m.id) {
+                failed.append("\(m.title): \(problem)")
+                if problem.contains("access token") || problem.contains("permission") { break }
+            } else {
+                sent += 1
+                created += meeting(m.id)?.hubspot?.created ?? []
+            }
+        }
+        var report = "\(sent) of \(batch.count) meeting\(batch.count == 1 ? "" : "s") sent"
+        report += created.isEmpty ? ", no new contacts." : "; \(created.count) contact\(created.count == 1 ? "" : "s") created: \(created.joined(separator: ", "))."
+        if !failed.isEmpty { report += " Not sent: " + failed.joined(separator: " ") }
+        return report
     }
 
     /// The person's own voice profile: the one heard in the most meetings, once it has been heard

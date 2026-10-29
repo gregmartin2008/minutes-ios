@@ -4,7 +4,7 @@ import MinutesCore
 /// Sample content used when the app is launched with `-demo <screen>`, so each screen can be
 /// checked in the simulator, which has no microphone, speech models or mail account.
 enum DemoScenario: String {
-    case home, empty, recording, paused, processing, waiting, failed, notes, transcript, speakers, settings, vocabulary
+    case home, empty, recording, paused, processing, waiting, failed, notes, transcript, speakers, settings, vocabulary, people
 
     static func fromLaunchArguments() -> DemoScenario? {
         let args = ProcessInfo.processInfo.arguments
@@ -24,6 +24,8 @@ extension AppModel {
             return [.settings]
         case .vocabulary:
             return [.settings, .vocabulary]
+        case .people:
+            return [.settings, .people]
         case .home, .empty, .recording, .paused:
             return nil
         }
@@ -54,6 +56,11 @@ enum DemoData {
             VocabularyTerm(term: "Dana Whitfield", heardAs: ["Dana Whitfeld", "Donna Whitfield"]),
             VocabularyTerm(term: "Northwind Packaging", heardAs: ["north wind packaging", "Northwind packing"]),
         ])
+        model.directory = [
+            Person(name: "Dana Whitfield", email: "dana@harbortools.example", company: "Harbor Tools", title: "CFO"),
+            Person(name: "Lee Park", email: "lee@northwind.example", company: "Northwind Packaging", title: "Owner", phone: "412-555-0142"),
+            Person(name: "Sam Ortiz", company: "Kestrel Partners"),
+        ]
         guard scenario != .empty else {
             model.mailReady = false
             model.setup.ready = false

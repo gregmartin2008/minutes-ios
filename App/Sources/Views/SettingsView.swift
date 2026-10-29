@@ -30,6 +30,7 @@ struct SettingsView: View {
             speechSection
             vocabularySection
             calendarSection
+            peopleSection
             hubspotSection
             microphoneSection
             voicesSection
@@ -236,7 +237,31 @@ struct SettingsView: View {
         }
     }
 
+    // MARK: People
+
+    private var peopleSection: some View {
+        Section {
+            NavigationLink(value: Route.people) {
+                HStack {
+                    Text("People")
+                        .foregroundStyle(Theme.ink)
+                    Spacer()
+                    Text(model.directory.isEmpty ? "None yet" : "\(model.directory.count)")
+                        .foregroundStyle(Theme.muted)
+                }
+            }
+        } header: {
+            Text("People")
+        } footer: {
+            Text("The people you meet with, with the email, company and title HubSpot needs. A meeting's people are filled in from here by name; what you type on a meeting is remembered here.")
+        }
+    }
+
     // MARK: HubSpot
+
+    @State private var hubspotBatch = false
+    @State private var hubspotSending = false
+    @State private var hubspotProgress: String?
 
     @State private var hubspotToken = ""
     @State private var hubspotSaved = !AppSettings.shared.hubspotToken.isEmpty
@@ -265,6 +290,22 @@ struct SettingsView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             if hubspotSaved {
+                let ready = model.meetingsReadyForHubSpot.count
+                Button {
+                    hubspotBatch = true
+                } label: {
+                    HStack(spacing: 10) {
+                        if hubspotSending { ProgressView() }
+                        Text(hubspotSending ? (hubspotProgress ?? "Sending") : "Send all finished meetings (\(ready))")
+                    }
+                }
+                .disabled(hubspotSending || ready == 0)
+                .confirmationDialog("Send \(ready) meeting\(ready == 1 ? "" : "s") to HubSpot?", isPresented: $hubspotBatch, titleVisibility: .visible) {
+                    Button("Send to HubSpot") { Task { await sendAllToHubSpot() } }
+                    Button("Cancel", role: .cancel) {}
+                } message: {
+                    Text("Every finished meeting not yet in HubSpot whose people have an email address: the contacts HubSpot does not have are created, and each meeting is logged with its notes on their records.")
+                }
                 Button("Remove the token", role: .destructive) {
                     AppSettings.shared.hubspotToken = ""
                     hubspotSaved = false
@@ -277,6 +318,16 @@ struct SettingsView: View {
         } footer: {
             Text("A HubSpot private app's access token (HubSpot Settings > Integrations > Private Apps; it needs the contacts read and write scopes). With it, a meeting's screen can add the people met as contacts and log the meeting with the notes on their records. Nothing is sent until you tap that. The token is kept in this iPhone's Keychain.")
         }
+    }
+
+    private func sendAllToHubSpot() async {
+        hubspotSending = true
+        hubspotProgress = nil
+        let report = await model.pushAllToHubSpot { hubspotProgress = $0 }
+        hubspotSending = false
+        hubspotProgress = nil
+        hubspotFailed = report.contains("Not sent")
+        hubspotResult = report
     }
 
     private func saveAndCheckHubSpot() async {
