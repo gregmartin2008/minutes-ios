@@ -1,0 +1,150 @@
+{
+ "voices": {
+  "A": "Samantha",
+  "B": "Daniel",
+  "C": "Karen",
+  "D": "Rishi",
+  "E": "Moira",
+  "F": "Tessa"
+ },
+ "lines": [
+  {
+   "speaker": "A",
+   "start": 0.6,
+   "end": 6.784,
+   "text": "Thanks everyone for making time. I want to walk through where we landed on the diligence before we talk about price."
+  },
+  {
+   "speaker": "B",
+   "start": 7.284,
+   "end": 16.43,
+   "text": "Sure. The headline for me is customer concentration. The top ten customers are a large share of revenue, but the contracts run for several years."
+  },
+  {
+   "speaker": "C",
+   "start": 16.83,
+   "end": 23.07,
+   "text": "I looked at the renewal history. Nobody in the top ten has left in the last five years, which is reassuring."
+  },
+  {
+   "speaker": "A",
+   "start": 23.57,
+   "end": 28.416,
+   "text": "Good. What about the working capital target? The seller keeps pushing back on our number."
+  },
+  {
+   "speaker": "D",
+   "start": 28.816,
+   "end": 34.328,
+   "text": "They want it based on the trailing twelve months. We think the seasonal average is the fair measure."
+  },
+  {
+   "speaker": "E",
+   "start": 33.428,
+   "end": 37.848,
+   "text": "Can I jump in on that point? The seasonal swing is bigger than their model shows."
+  },
+  {
+   "speaker": "D",
+   "start": 38.148,
+   "end": 41.552,
+   "text": "Right, that is exactly the problem with their approach."
+  },
+  {
+   "speaker": "F",
+   "start": 42.052,
+   "end": 47.437,
+   "text": "From the lender side, the bank will want to see the covenant package before the end of the month."
+  },
+  {
+   "speaker": "B",
+   "start": 47.837,
+   "end": 51.629,
+   "text": "Then I would hold the bid where it is until the customer calls are finished."
+  },
+  {
+   "speaker": "C",
+   "start": 50.929,
+   "end": 53.286,
+   "text": "Agreed, I would not move on price yet."
+  },
+  {
+   "speaker": "A",
+   "start": 53.786,
+   "end": 57.228,
+   "text": "Okay. Who is taking the reference calls with the customers?"
+  },
+  {
+   "speaker": "E",
+   "start": 57.628,
+   "end": 61.037,
+   "text": "I will schedule three of them this week and report back on Friday."
+  },
+  {
+   "speaker": "F",
+   "start": 61.437,
+   "end": 65.785,
+   "text": "I can send the revised financing schedule to the group tomorrow morning."
+  },
+  {
+   "speaker": "A",
+   "start": 66.285,
+   "end": 70.932,
+   "text": "Perfect. Let us also make sure legal reviews the transition services agreement."
+  },
+  {
+   "speaker": "D",
+   "start": 71.332,
+   "end": 75.868,
+   "text": "I will ask outside counsel to mark it up and send comments by Thursday."
+  },
+  {
+   "speaker": "B",
+   "start": 74.868,
+   "end": 78.376,
+   "text": "And please include the environmental report in that review as well."
+  },
+  {
+   "speaker": "C",
+   "start": 78.876,
+   "end": 84.053,
+   "text": "One open question is whether the founder stays on after closing. He has not committed either way."
+  },
+  {
+   "speaker": "E",
+   "start": 84.453,
+   "end": 89.873,
+   "text": "My read is that he wants to stay for two years, but he wants that written into the agreement."
+  },
+  {
+   "speaker": "A",
+   "start": 90.373,
+   "end": 93.833,
+   "text": "Then we should offer an employment agreement and see how he responds."
+  },
+  {
+   "speaker": "F",
+   "start": 94.233,
+   "end": 99.862,
+   "text": "That works for the bank. They prefer continuity in management for the first year at least."
+  },
+  {
+   "speaker": "B",
+   "start": 100.362,
+   "end": 104.809,
+   "text": "Last thing from me. The quality of earnings report arrives next Wednesday."
+  },
+  {
+   "speaker": "D",
+   "start": 105.209,
+   "end": 110.133,
+   "text": "And Soterra should confirm with Kestrel that the lowboy order book stays open through the signing."
+  },
+  {
+   "speaker": "A",
+   "start": 110.533,
+   "end": 114.533,
+   "text": "Great. We will meet again after that report comes in. Thank you all."
+  }
+ ]
+}
