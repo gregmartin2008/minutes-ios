@@ -109,6 +109,13 @@ it, Minutes still emails the full transcript and says why there are no notes.
 - **Record meeting** starts immediately. The whole screen is red while it records, so the state is
   readable from across the table. You can name the meeting and say how many people are in the room
   while it records; both are optional.
+- **Calendar meetings name themselves.** When a recording starts during a meeting on the
+  iPhone's calendar (Google and other calendars added to iOS count), the meeting takes that name
+  and the people invited fill the *With* list, so the voices that are not recognized get their
+  names. If more than one meeting is on, a *From your calendar* menu on the recording screen
+  picks between them or says it is not a calendar meeting. iOS asks for calendar permission at
+  the first recording; the Settings screen can turn the feature off. The email's header lists
+  the invited people with their addresses.
 - **While it records**, Minutes transcribes the meeting, analyzes the voices and drafts the notes a
   few minutes behind live. This is the only time iOS lets an app work at full speed with the phone
   locked, so the work is done then.
@@ -227,6 +234,7 @@ locked, and not the notes, which need Apple Intelligence and cannot run in a sim
 - The only data that leaves the phone is the email itself, sent over an encrypted connection
   from your Gmail account to the address you chose.
 - The Gmail app password is kept in the iPhone's Keychain.
+- The calendar is only read, on the phone, to find the meeting on now; nothing is written to it.
 - Audio is erased 30 days after its email was sent (adjustable); transcripts and notes stay until
   you delete the meeting.
 

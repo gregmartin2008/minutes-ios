@@ -82,6 +82,7 @@ enum EndToEnd {
         AppSettings.shared.vocabulary = vocabulary
         // The shipped default (off): the end-to-end run checks what a person gets without touching settings.
         AppSettings.shared.listensForVocabulary = false
+        AppSettings.shared.usesCalendar = false
         model.vocabulary = vocabulary
 
         status.phase = "downloading models"

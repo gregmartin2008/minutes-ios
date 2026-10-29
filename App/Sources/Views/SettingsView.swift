@@ -29,6 +29,7 @@ struct SettingsView: View {
             }
             speechSection
             vocabularySection
+            calendarSection
             microphoneSection
             voicesSection
             storageSection
@@ -232,6 +233,35 @@ struct SettingsView: View {
         } footer: {
             Text("Standard lets iOS adjust the microphone as it does for calls. Raw turns that off and records the room as it is, which may keep a quieter voice across the table from being flattened in a loud room. Try Raw for one noisy meeting and compare.")
         }
+    }
+
+    // MARK: Calendar
+
+    @State private var usesCalendar = AppSettings.shared.usesCalendar
+    @State private var calendarAccess = MeetingCalendar.shared.access
+
+    private var calendarSection: some View {
+        Section {
+            Toggle("Use the calendar", isOn: $usesCalendar)
+                .onChange(of: usesCalendar) { _, on in
+                    AppSettings.shared.usesCalendar = on
+                    guard on, MeetingCalendar.shared.access == .notAsked else { return }
+                    Task {
+                        _ = await MeetingCalendar.shared.requestAccess()
+                        calendarAccess = MeetingCalendar.shared.access
+                    }
+                }
+            if usesCalendar, calendarAccess == .denied {
+                Text("Calendar access is off for Minutes. Turn it on in the iPhone's Settings, under Minutes.")
+                    .font(.footnote)
+                    .foregroundStyle(Theme.warn)
+            }
+        } header: {
+            Text("Calendar")
+        } footer: {
+            Text("When a recording starts during a meeting on your calendar, the meeting takes that name and the people invited fill the \"With\" list. Google and other calendars added to this iPhone are included. Nothing is written to the calendar.")
+        }
+        .onAppear { calendarAccess = MeetingCalendar.shared.access }
     }
 
     private var vocabularySection: some View {

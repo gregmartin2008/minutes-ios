@@ -14,8 +14,12 @@ struct RecordingStatus: Equatable {
     var customTitle = ""
     /// How many people the person says are in the room; nil lets Minutes work it out.
     var headCount: Int?
-    /// Who the person says they are meeting with, as typed ("Dana, Lee").
+    /// Who the person says they are meeting with, as typed ("Dana, Lee"), or as the calendar lists them.
     var attendees = ""
+    /// The calendar meetings on now, nearest first, for the person to pick from.
+    var calendarChoices: [CalendarEvent] = []
+    /// The calendar meeting this recording is taken to be, if any.
+    var calendarEventID: String?
     var seconds: Double = 0
     /// Recent input levels, oldest first, for the level history strip.
     var levels: [Float] = []
@@ -219,6 +223,14 @@ final class AppModel: ObservableObject {
         let typed = title.trimmingCharacters(in: .whitespacesAndNewlines)
         var m = Meeting(title: typed.isEmpty ? Render.defaultTitle(for: now) : typed, titleIsAuto: typed.isEmpty, createdAt: now)
         m.expectedSpeakers = expectedSpeakers
+        var status = RecordingStatus(meetingID: m.id, title: m.title)
+        if !isDemo, AppSettings.shared.usesCalendar {
+            if MeetingCalendar.shared.access == .notAsked { _ = await MeetingCalendar.shared.requestAccess() }
+            status.calendarChoices = MeetingCalendar.shared.currentEvents(at: now)
+            if typed.isEmpty, let first = status.calendarChoices.first {
+                Self.apply(first, to: &m, status: &status)
+            }
+        }
         do {
             try store.save(m)
             BackgroundKeeper.shared.suspendAudioForRecording()
@@ -231,7 +243,7 @@ final class AppModel: ObservableObject {
             return
         }
         meetings.insert(m, at: 0)
-        recording = RecordingStatus(meetingID: m.id, title: m.title)
+        recording = status
         startLiveWork(for: m.id)
         if !AppSettings.shared.askedForNotifications {
             AppSettings.shared.askedForNotifications = true
@@ -239,7 +251,8 @@ final class AppModel: ObservableObject {
         }
     }
 
-    /// Names the meeting being recorded. An empty name goes back to the automatic one.
+    /// Names the meeting being recorded. An empty name goes back to the automatic one (or the
+    /// calendar meeting's name).
     func renameRecording(to title: String) {
         guard var r = recording else { return }
         let typed = title.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -247,10 +260,39 @@ final class AppModel: ObservableObject {
         recording = r
         guard !isDemo, var m = meeting(r.meetingID) else { return }
         let wanted = typed.isEmpty ? r.title : typed
-        guard m.title != wanted || m.titleIsAuto != typed.isEmpty else { return }
+        let auto = typed.isEmpty && r.calendarEventID == nil
+        guard m.title != wanted || m.titleIsAuto != auto else { return }
         m.title = wanted
-        m.titleIsAuto = typed.isEmpty
+        m.titleIsAuto = auto
         save(m)
+    }
+
+    /// Takes the recording to be this calendar meeting (nil: none of them): its name and its
+    /// invited people replace the automatic name and the "With" list, unless the person typed a name.
+    func chooseCalendarEvent(_ id: String?) {
+        guard var r = recording, !isDemo, var m = meeting(r.meetingID) else { return }
+        let event = id.flatMap { id in r.calendarChoices.first { $0.id == id } }
+        Self.apply(event, to: &m, status: &r)
+        let typed = r.customTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !typed.isEmpty { m.title = typed; m.titleIsAuto = false }
+        recording = r
+        save(m)
+    }
+
+    private static func apply(_ event: CalendarEvent?, to m: inout Meeting, status: inout RecordingStatus) {
+        m.calendarEvent = event
+        status.calendarEventID = event?.id
+        if let event {
+            m.title = event.title
+            m.titleIsAuto = false
+            m.attendees = event.names.isEmpty ? nil : event.names
+        } else {
+            m.title = Render.defaultTitle(for: m.createdAt)
+            m.titleIsAuto = true
+            m.attendees = nil
+        }
+        status.title = m.title
+        status.attendees = (m.attendees ?? []).joined(separator: ", ")
     }
 
     /// Records who the person is meeting with, so the voices that are not recognized get those

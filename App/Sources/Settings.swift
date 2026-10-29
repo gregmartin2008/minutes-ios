@@ -78,6 +78,13 @@ final class AppSettings {
         set { defaults.set(newValue, forKey: "listensForVocabulary") }
     }
 
+    /// Whether a recording looks for the meeting on the iPhone's calendar, to take its name and
+    /// the people invited. On by default; the iOS calendar permission is asked at the first recording.
+    var usesCalendar: Bool {
+        get { defaults.object(forKey: "usesCalendar") as? Bool ?? true }
+        set { defaults.set(newValue, forKey: "usesCalendar") }
+    }
+
     var askedForNotifications: Bool {
         get { defaults.bool(forKey: "askedForNotifications") }
         set { defaults.set(newValue, forKey: "askedForNotifications") }
