@@ -116,6 +116,8 @@ final class HubSpotTests: XCTestCase {
         XCTAssertEqual(m.people, [])
         m.attendees = ["Tom Kim", "Lee"]
         XCTAssertEqual(m.people.map(\.name), ["Tom Kim", "Lee"])
+        m.attendees = ["Greg Martin", "Tom Kim", "Lee"]
+        XCTAssertEqual(m.people(excluding: "greg martin").map(\.name), ["Tom Kim", "Lee"])
         m.calendarEvent = CalendarEvent(id: "e", title: "x", start: Date(), end: Date(), people: [Person(name: "Dov", email: "d@f.com")])
         XCTAssertEqual(m.people.map(\.name), ["Dov"])
         m.contacts = [Person(name: "Dov Herzberg", email: "d@f.com", company: "Florac")]
