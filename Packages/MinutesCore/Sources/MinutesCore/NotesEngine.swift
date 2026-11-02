@@ -137,6 +137,11 @@ public struct NotesEngine: Sendable {
         /// the app passes whether it is in the foreground, since iOS throttles the model for an
         /// app in the background for as long as it stays there, and waiting gains nothing.
         public var waitWhileThrottled: @Sendable () -> Bool = { true }
+        /// Asked once when the pass after a live meeting reaches its final merge. Returning true
+        /// finishes without the model (lists merged as drafted, summary from the gists): the app
+        /// passes whether the phone is hot, when the half-dozen model calls of the merge would take
+        /// minutes and heat it further.
+        public var finishWithoutModel: @Sendable () -> Bool = { false }
         /// Assumed characters per token until the model has been asked.
         public var charactersPerToken = 3.3
 
@@ -266,6 +271,11 @@ public struct NotesEngine: Sendable {
     ) async throws -> MeetingNotes {
         let total = fragments.count + skipped
         var throttled = false
+        var hot = false
+        if withoutModelIfThrottled, options.finishWithoutModel() {
+            throttled = true
+            hot = true
+        }
         // Reduce: merge each list across sections.
         var merged: [NoteKind: [String]] = [:]
         for (i, kind) in NoteKind.allCases.enumerated() {
@@ -318,7 +328,8 @@ public struct NotesEngine: Sendable {
             figures: merged[.figures] ?? [],
             skippedSections: skipped,
             totalSections: total,
-            throttled: throttled ? true : nil)
+            throttled: throttled ? true : nil,
+            hot: hot ? true : nil)
     }
 
     /// The gists joined into one paragraph, kept to a readable length by dropping from the

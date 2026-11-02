@@ -109,6 +109,32 @@ final class NotesEngineTests: XCTestCase {
     /// The notes are then finished from the sections drafted during the meeting, without
     /// waiting: lists merged as they are, summary from the gists, the last stretch left out and
     /// said so. The email must not wait on the model.
+    func testAHotPhoneFinishesWithoutTheModelsFinalPass() async throws {
+        let model = FakeNotesModel()
+        let drafted = (1...3).map { n in
+            NotesFragment(
+                gist: "Gist \(n).", keyPoints: ["Point \(n)"], decisions: [], actionItems: [], openQuestions: [], figures: [])
+        }
+        var options = fastOptions(patience: 5)
+        options.finishWithoutModel = { true }
+        let notes = try await NotesEngine(options: options).write(
+            lines: [], titleHint: nil, model: model, leading: drafted)
+        XCTAssertEqual(notes.hot, true)
+        XCTAssertEqual(notes.throttled, true)
+        XCTAssertEqual(notes.summary, "Gist 1. Gist 2. Gist 3.")
+        XCTAssertEqual(notes.keyPoints, ["Point 1", "Point 2", "Point 3"])
+        XCTAssertEqual(model.overviewCalls, 0)
+        let remark = try XCTUnwrap(Render.remark(notes))
+        XCTAssertTrue(remark.contains("was hot"))
+        XCTAssertFalse(remark.contains("background"))
+
+        // Not after a meeting without live sections, and not when the phone is fine.
+        options.finishWithoutModel = { false }
+        let cool = try await NotesEngine(options: options).write(lines: [], titleHint: nil, model: model, leading: drafted)
+        XCTAssertNil(cool.hot)
+        XCTAssertEqual(model.overviewCalls, 1)
+    }
+
     func testThrottledAfterLiveMeetingFinishesWithoutTheModel() async throws {
         let model = FakeNotesModel()
         model.alwaysRateLimit = true

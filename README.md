@@ -123,6 +123,9 @@ it, Minutes still emails the full transcript and says why there are no notes.
   grouping of the voices, the merging of the notes, and the email, which together are meant to take
   under a minute. The microphone indicator stays on until the email has gone, because keeping the
   microphone open is what keeps the phone's attention; nothing is recorded after End.
+- If the iPhone is hot when the meeting ends, the notes are finished without the language
+  model's final pass (the lists stay as drafted during the meeting, the summary is their gists)
+  rather than running it for minutes on a throttled phone; the email says so.
 - The email arrives when that finishes. Leaving Minutes open on the screen is no longer needed.
 - **Cancel meeting**, the quiet link under the buttons, throws the meeting away after a
   confirmation: the recording is deleted and nothing is written or emailed.

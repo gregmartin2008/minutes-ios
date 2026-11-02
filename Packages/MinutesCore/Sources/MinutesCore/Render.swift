@@ -104,7 +104,9 @@ public enum Render {
                     ? "The last few minutes of the meeting are in the transcript but not in these notes."
                     : "\(n.skippedSections) of \(n.totalSections) parts of the transcript could not be summarized and are missing from these notes.")
         }
-        if n.throttled == true {
+        if n.hot == true {
+            parts.append("The iPhone was hot when the meeting ended, so these notes were finished without the language model's final pass: the lists are as drafted during the meeting and the summary is their gists in order.")
+        } else if n.throttled == true {
             parts.append("iOS limits the language model while Minutes is in the background, so these notes were finished without its final pass: the lists are as drafted during the meeting and the summary is their gists in order.")
         }
         return parts.isEmpty ? nil : parts.joined(separator: " ")
