@@ -662,6 +662,14 @@ final class AppModel: ObservableObject {
     private var notesOptions: NotesEngine.Options {
         var o = NotesEngine.Options()
         o.waitWhileThrottled = { AppState.shared.isActive }
+        o.finishWithoutModel = {
+            switch ProcessInfo.processInfo.thermalState {
+            case .serious, .critical:
+                Log.shared.info("notes: the phone is hot, finishing without the model's final pass")
+                return true
+            default: return false
+            }
+        }
         return o
     }
 

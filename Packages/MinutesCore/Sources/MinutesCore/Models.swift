@@ -79,6 +79,8 @@ public struct MeetingNotes: Codable, Equatable, Sendable {
     /// True when the final pass was finished without the language model because iOS was
     /// throttling it (it does this to an app in the background).
     public var throttled: Bool?
+    /// True when the final pass was skipped because the phone was hot when the meeting ended.
+    public var hot: Bool?
     /// Seconds at the end of the meeting that are in the transcript but not in the notes, when
     /// the final pass was skipped before they could be summarized.
     public var missingTailSeconds: Double?
@@ -86,7 +88,7 @@ public struct MeetingNotes: Codable, Equatable, Sendable {
     public init(
         title: String = "", summary: String = "", keyPoints: [String] = [], decisions: [String] = [],
         actionItems: [String] = [], openQuestions: [String] = [], figures: [String] = [],
-        skippedSections: Int = 0, totalSections: Int = 0, throttled: Bool? = nil
+        skippedSections: Int = 0, totalSections: Int = 0, throttled: Bool? = nil, hot: Bool? = nil
     ) {
         self.title = title
         self.summary = summary
@@ -98,6 +100,7 @@ public struct MeetingNotes: Codable, Equatable, Sendable {
         self.skippedSections = skippedSections
         self.totalSections = totalSections
         self.throttled = throttled
+        self.hot = hot
     }
 
     public var isEmpty: Bool {
