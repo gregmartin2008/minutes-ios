@@ -52,7 +52,7 @@ background, which should bring that under 15 seconds.
   for the terms in the audio is there as a switch, off by default: it runs on the processor for
   every minute of a meeting, and in a long meeting it heated the phone and replaced common words
   with names.
-- **Emails** the notes and the transcript, as the body of the message and as two text attachments,
+- **Emails** the notes and the transcript, as the body of the message and as one PDF attachment,
   through your own Gmail account.
 - **Imports** a recording made elsewhere (a voice memo, a call recording) and treats it the same way.
 
