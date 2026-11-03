@@ -8,9 +8,20 @@ struct SMTPMailer: MailSending {
         let settings = AppSettings.shared.mail
         let password = AppSettings.shared.mailPassword
         guard settings.hasAddress, !password.isEmpty else { return .notConfigured }
-        let message = Render.email(for: meeting, from: settings.address, to: settings.recipients)
+        let message = Render.email(for: meeting, from: settings.address, to: settings.recipients, document: Self.document(for: meeting))
         try await Self.deliver(message, settings: settings, password: password)
         return .sent
+    }
+
+    /// The attached document: the notes and transcript as a PDF. The automated end-to-end run
+    /// asks for the plain-text form, which its checks can read; so does a PDF that fails to draw.
+    static func document(for meeting: Meeting) -> EmailMessage.Attachment? {
+        if ProcessInfo.processInfo.arguments.contains("-plain-document") { return nil }
+        guard let data = MeetingDocument.pdf(meeting) else {
+            Log.shared.warn("meeting \(meeting.id): the PDF could not be drawn; sending the text document")
+            return nil
+        }
+        return EmailMessage.Attachment(filename: MeetingDocument.fileName(meeting), mimeType: "application/pdf", data: data)
     }
 
     static func deliver(_ message: EmailMessage, settings: MailSettings, password: String) async throws {

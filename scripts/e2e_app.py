@@ -100,7 +100,7 @@ def main():
     shutil.copy(wav, os.path.join(documents, "e2e.wav"))
     simctl("ui", DEVICE, "appearance", "light")
     simctl("terminate", DEVICE, BUNDLE)
-    args = ["-e2e", "e2e.wav", "-e2e-mail", f"127.0.0.1:{port}"] + (["-e2e-live"] if live else [])
+    args = ["-e2e", "e2e.wav", "-e2e-mail", f"127.0.0.1:{port}", "-plain-document"] + (["-e2e-live"] if live else [])
     print(stamp(), "launching:", simctl("launch", DEVICE, BUNDLE, *args, check=True), flush=True)
 
     status, last = {}, None
@@ -152,15 +152,15 @@ def main():
         html = msg.get_body(preferencelist=("html",))
         check("has an HTML body with the transcript", html is not None and "Transcript" in html.get_content())
         attachments = {a.get_filename(): a.get_content() for a in msg.iter_attachments()}
-        transcript = next((v for k, v in attachments.items() if k and k.endswith("Transcript.txt")), None)
-        check("transcript attached", transcript is not None, list(attachments))
+        document = next((v for k, v in attachments.items() if k and k.endswith("Notes and Transcript.txt")), None)
+        check("one document attached, with the notes and the transcript", document is not None and len(attachments) == 1, list(attachments))
+        transcript = document.replace("\r\n", "\n").split("\nTRANSCRIPT\n", 1)[-1] if document is not None else None
         if transcript is not None:
             ref = json.load(open(ref_path))["lines"]
             ref_words = [w for line in sorted(ref, key=lambda r: r["start"]) for w in norm_words(line["text"])]
             header = re.compile(r"^.{1,60} \[\d+:\d\d(:\d\d)?\]( \(.*\))?$")
-            # The attachment is a heading block, a blank line, then "Name [time]" lines each followed by speech.
-            parts = transcript.replace("\r\n", "\n").split("\n\n", 1)
-            body = parts[1] if len(parts) == 2 else transcript
+            # After the TRANSCRIPT heading: "Name [time]" lines each followed by speech.
+            body = transcript
             body_lines = [l for l in body.splitlines() if l.strip() and not header.match(l.strip()) and not l.startswith("[Recording paused")]
             hyp_words = norm_words(" ".join(body_lines))
             wer = edit_distance(ref_words, hyp_words) / max(len(ref_words), 1)

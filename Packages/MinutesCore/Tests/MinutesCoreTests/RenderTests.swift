@@ -58,7 +58,7 @@ final class RenderTests: XCTestCase {
 
     func testNotesText() {
         let text = Render.notesText(sample())
-        XCTAssertTrue(text.hasPrefix("SUMMARY\nWe reviewed diligence.\n\nKEY POINTS\n- Concentration is 41%\n\nDECISIONS\n- Hold at 6.5x\n\nACTION ITEMS\n- Dana: schedule calls (due Oct 20)\n\nFIGURES AND DATES\n- 6.5x"))
+        XCTAssertTrue(text.hasPrefix("SUMMARY\nWe reviewed diligence.\n\nNEXT STEPS\n- Dana: schedule calls (due Oct 20)\n\nDECISIONS\n- Hold at 6.5x\n\nKEY POINTS\n- Concentration is 41%\n\nFIGURES AND DATES\n- 6.5x"), text)
         XCTAssertFalse(text.contains("OPEN QUESTIONS"))
         XCTAssertTrue(text.hasSuffix("1 of 4 parts of the transcript could not be summarized and are missing from these notes."))
     }
@@ -78,13 +78,14 @@ final class RenderTests: XCTestCase {
         let m = sample()
         let e = Render.email(for: m, from: "me@gmail.com", to: ["me@gmail.com"], timeZone: tz, now: Date(timeIntervalSince1970: 1_791_830_000))
         XCTAssertEqual(e.subject, "Meeting notes: Harbor Tools <add-on> & \"diligence\" (Oct 12, 2026)")
-        XCTAssertEqual(e.attachments.map { $0.filename }, [
-            "Harbor Tools add-on & diligence 2026-10-12 - Notes.txt",
-            "Harbor Tools add-on & diligence 2026-10-12 - Transcript.txt",
-        ])
-        let transcript = String(decoding: e.attachments[1].data, as: UTF8.self)
+        XCTAssertEqual(e.attachments.map { $0.filename }, ["Harbor Tools add-on & diligence 2026-10-12 - Notes and Transcript.txt"])
+        let transcript = String(decoding: e.attachments[0].data, as: UTF8.self)
         XCTAssertTrue(transcript.contains("Speakers: Greg, Speaker 2, Speaker 3 (names recognized by voice; check them)"))
         XCTAssertTrue(transcript.contains("Late remark."))
+        XCTAssertTrue(transcript.contains("\nTRANSCRIPT\n"))
+        // The app's own document (a PDF) takes the place of the text one.
+        let pdf = EmailMessage.Attachment(filename: "x.pdf", mimeType: "application/pdf", data: Data([1, 2]))
+        XCTAssertEqual(Render.email(for: m, from: "a@b.c", to: ["a@b.c"], document: pdf).attachments.map { $0.filename }, ["x.pdf"])
         XCTAssertTrue(e.text.contains("TRANSCRIPT"))
         XCTAssertEqual(e.messageID, "\(m.id).1.1791830000")
         XCTAssertEqual(e.fromName, "Minutes")
@@ -108,6 +109,7 @@ final class RenderTests: XCTestCase {
             id: "e1", title: "Florac intro", start: start, end: start + 1800,
             people: [Person(name: "Dov Herzberg", email: "dov@florac.com"), Person(name: "Lee Park"), Person(name: "x@y.com", email: "x@y.com")])
         XCTAssertEqual(Render.invitedLine(m), "Invited: Dov Herzberg <dov@florac.com>, Lee Park, x@y.com")
+        XCTAssertEqual(m.calendarEvent?.names, ["Dov Herzberg", "Lee Park"])
         XCTAssertTrue(Render.headerText(m).contains("\nInvited: Dov Herzberg <dov@florac.com>, Lee Park, x@y.com\n"))
         XCTAssertTrue(Render.emailHTML(m).contains("Invited: Dov Herzberg &lt;dov@florac.com&gt;"))
         let data = try! JSONEncoder().encode(m)
@@ -129,5 +131,20 @@ final class RenderTests: XCTestCase {
         ]
         XCTAssertEqual(CalendarEvent.current(events, at: now).map(\.id), ["in 10 min", "on now", "ran long"])
         XCTAssertEqual(CalendarEvent.current([], at: now), [])
+    }
+
+    func testDetailsAreRenderedWithTheirHeadingsAndTimes() {
+        var m = sample()
+        m.notes = MeetingNotes(
+            summary: "Short.", decisions: ["Hold the bid"], actionItems: ["Dana: send the model"],
+            details: [
+                NotesDetail(topic: "Conference debrief", text: "They compared notes on Dallas.", startSeconds: 80),
+                NotesDetail(topic: "", text: "A part without a heading.", startSeconds: nil),
+            ])
+        let text = Render.notesText(m)
+        XCTAssertTrue(text.hasPrefix("SUMMARY\nShort.\n\nNEXT STEPS\n- Dana: send the model\n\nDECISIONS\n- Hold the bid\n\nDETAILS\nConference debrief (1:20)\nThey compared notes on Dallas.\n\nDetails\nA part without a heading."), text)
+        let html = Render.emailHTML(m)
+        XCTAssertTrue(html.contains("<b>Conference debrief</b> <span style=\"color:#5A6774;font-size:13px\">1:20</span>"))
+        XCTAssertTrue(html.range(of: "Next steps")! .lowerBound < html.range(of: "Decisions")!.lowerBound)
     }
 }

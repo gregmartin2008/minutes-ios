@@ -153,19 +153,26 @@ enum DemoData {
         m.notes = MeetingNotes(
             title: m.title,
             summary: "Greg walked the group through the diligence findings on the add-on. The team judged revenue quality acceptable given multi-year contracts and clean renewal history, but wants customer reference calls before moving the bid. The working capital target remains open with the seller.",
-            keyPoints: [
-                "Dana Whitfield: the top ten customers are about 41% of revenue, on multi-year contracts.",
-                "Speaker 3: no top-ten customer has left in the last five years.",
-                "Speaker 4 and Speaker 5: the seller's trailing-twelve-month working capital target understates the seasonal swing.",
-            ],
             decisions: ["Hold the bid at 6.5x until the customer reference calls are done."],
             actionItems: [
                 "Speaker 5: schedule three customer reference calls this week and report back Friday.",
                 "Speaker 6: get the covenant package to the bank before month end.",
             ],
-            openQuestions: ["Will the seller accept a working capital target based on the seasonal average?"],
-            figures: ["6.5x: the current bid multiple", "41%: top ten customers' share of revenue", "Friday: reference call report due"],
-            skippedSections: 0, totalSections: 5)
+            skippedSections: 0, totalSections: 5,
+            details: [
+                NotesDetail(
+                    topic: "Customer concentration and renewals",
+                    text: "Greg opened with where the diligence landed before turning to price. Dana Whitfield put the top ten customers at about 41% of revenue, offset by contracts that run several years, and Speaker 3 added that no top-ten customer has left in the last five years. The group took the revenue quality as acceptable on that basis.",
+                    startSeconds: 1),
+                NotesDetail(
+                    topic: "Working capital target",
+                    text: "Speaker 4 and Speaker 5 argued that the seller's trailing-twelve-month working capital target understates the seasonal swing, and that the peg should rest on a seasonal average instead. Whether the seller will accept that was left open.",
+                    startSeconds: 540),
+                NotesDetail(
+                    topic: "Bid and next steps",
+                    text: "The group agreed to hold the bid at 6.5x until customer reference calls are done. Speaker 5 will schedule three calls this week and report back Friday; Speaker 6 will get the covenant package to the bank before month end.",
+                    startSeconds: 1_380),
+            ])
         m.timings = ["separateSpeakers": 96, "transcribe": 41, "assemble": 0.2, "writeNotes": 138, "email": 2.1]
         return m
     }

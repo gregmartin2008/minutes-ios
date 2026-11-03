@@ -126,6 +126,13 @@ it, Minutes still emails the full transcript and says why there are no notes.
 - If the iPhone is hot when the meeting ends, the notes are finished without the language
   model's final pass (the lists stay as drafted during the meeting, the summary is their gists)
   rather than running it for minutes on a throttled phone; the email says so.
+- **What the notes look like.** A summary of a few sentences; *Next steps*, each a named
+  person's commitment; *Decisions*, only what was actually agreed; then *Details*: the meeting
+  part by part, each with a heading, the time it starts and a paragraph in the note-taker's own
+  words with the names and numbers as said. A sentence whose number was never said in that part
+  of the transcript is dropped rather than trusted.
+- **One document.** The email carries the notes in its body and one attachment, a PDF with the
+  notes followed by the full transcript; *Share* hands out the same PDF.
 - The email arrives when that finishes. Leaving Minutes open on the screen is no longer needed.
 - **Cancel meeting**, the quiet link under the buttons, throws the meeting away after a
   confirmation: the recording is deleted and nothing is written or emailed.

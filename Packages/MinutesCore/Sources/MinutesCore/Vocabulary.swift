@@ -32,7 +32,17 @@ public struct Vocabulary: Codable, Equatable, Sendable {
     /// Terms of business and finance that the recognizer reliably mishears. Fixed phrases only:
     /// nothing here replaces an ordinary English word.
     public static let builtIn: [VocabularyTerm] = [
-        VocabularyTerm(term: "EBITDA", heardAs: ["EVITA", "EBIDA", "EBITA", "E-BITDA", "EBIT DA", "E BIT DA"]),
+        VocabularyTerm(term: "EBITDA", heardAs: [
+            "EVITA", "EBIDA", "EBITA", "E-BITDA", "EBIT DA", "E BIT DA", "Eibit", "EIBIT", "Aibida", "eBayDA", "ebitdah", "even dah",
+            "EPATA", "evitaz", "ebitop", "ibada", "eBay da",
+        ]),
+        VocabularyTerm(term: "EBITDA", heardAs: ["Eibit debt", "EIBIT debt", "Aibida debt", "EBITDA debt"]),
+        VocabularyTerm(term: "amort", heardAs: ["AMORD", "a mort", "amored"]),
+        VocabularyTerm(term: "co-invest", heardAs: ["Co-Ivest", "co invest", "coinvest", "co-ivest"]),
+        VocabularyTerm(term: "Siemens", heardAs: ["Feman's", "Seaman's", "Siemen's", "Semens", "Seamen's"]),
+        VocabularyTerm(term: "pre-LOI", heardAs: ["pre LOI", "pre-L O I", "pre LOY", "pre-LOY"]),
+        VocabularyTerm(term: "MOIC", heardAs: ["M O I C", "moick", "mo-ick", "M.O.I.C."]),
+        VocabularyTerm(term: "independent sponsor", heardAs: ["independent sponser", "independant sponsor"]),
         VocabularyTerm(term: "ERP system", heardAs: ["PRP system", "E R P system", "ERB system"]),
         VocabularyTerm(term: "LOI", heardAs: ["L O I", "L.O.I.", "LOY", "loai", "L-O-I"]),
         VocabularyTerm(term: "IOI", heardAs: ["I O I", "I.O.I.", "I-O-I"]),
