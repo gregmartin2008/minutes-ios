@@ -65,6 +65,20 @@ public struct NotesFragment: Codable, Equatable, Sendable {
     /// The paragraph for the details, or the gist when the model wrote none.
     public var detailText: String { narrative.isEmpty ? gist : narrative }
 
+    /// The fragment with the vocabulary's spelling corrections applied to every text in it.
+    public func corrected(by corrector: VocabularyCorrector) -> NotesFragment {
+        var f = self
+        f.topic = corrector.correct(topic)
+        f.narrative = corrector.correct(narrative)
+        f.gist = corrector.correct(gist)
+        f.keyPoints = keyPoints.map(corrector.correct)
+        f.decisions = decisions.map(corrector.correct)
+        f.actionItems = actionItems.map(corrector.correct)
+        f.openQuestions = openQuestions.map(corrector.correct)
+        f.figures = figures.map(corrector.correct)
+        return f
+    }
+
     public func items(_ kind: NoteKind) -> [String] {
         switch kind {
         case .keyPoints: return keyPoints

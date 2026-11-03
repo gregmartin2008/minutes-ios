@@ -57,4 +57,14 @@ final class VocabularyTests: XCTestCase {
         let data = try JSONEncoder().encode(v)
         XCTAssertEqual(try JSONDecoder().decode(Vocabulary.self, from: data), v)
     }
+
+    func testFragmentsDraftedBeforeATermWasAddedAreCorrected() {
+        let v = Vocabulary(terms: [VocabularyTerm(term: "Soterra", heardAs: ["Sotera", "Zotero"])])
+        let f = NotesFragment(topic: "Sotera's background", narrative: "Zotero was founded in 2019.", gist: "About Sotera.", actionItems: ["Greg: send the Sotera deck"])
+        let c = f.corrected(by: VocabularyCorrector(v))
+        XCTAssertEqual(c.topic, "Soterra's background")
+        XCTAssertEqual(c.narrative, "Soterra was founded in 2019.")
+        XCTAssertEqual(c.gist, "About Soterra.")
+        XCTAssertEqual(c.actionItems, ["Greg: send the Soterra deck"])
+    }
 }
