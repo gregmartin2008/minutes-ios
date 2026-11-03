@@ -72,14 +72,13 @@ def main():
     check("line starting with a dot survived the wire", ". A line that starts with a dot" in norm(text.get_content()))
 
     atts = list(msg.iter_attachments())
-    check("two attachments", len(atts) == 2, len(atts))
-    if len(atts) == 2:
-        check("notes attachment name and content",
-              atts[0].get_filename() == expected["notes_name"] and norm(atts[0].get_content()) == norm(expected["notes"]),
+    check("one attachment, the document with the notes and the transcript", len(atts) == 1, len(atts))
+    if len(atts) == 1:
+        check("document name and content",
+              atts[0].get_filename() == expected["document_name"] and norm(atts[0].get_content()) == norm(expected["document"]),
               atts[0].get_filename())
-        check("transcript attachment name and content",
-              atts[1].get_filename() == expected["transcript_name"]
-              and norm(atts[1].get_content()) == norm(expected["transcript"]), atts[1].get_filename())
+        check("the document carries the notes and the transcript",
+              "SUMMARY" in atts[0].get_content() and "TRANSCRIPT" in atts[0].get_content())
     lines = raw.split(b"\r\n")
     check("no line longer than 998 bytes (SMTP limit)", max(len(l) for l in lines) <= 998, max(len(l) for l in lines))
     check("message is 7-bit clean on the wire", all(b < 128 for b in raw))

@@ -108,9 +108,8 @@ final class SMTPIntegrationTests: XCTestCase {
         if let out = ProcessInfo.processInfo.environment["MINUTES_SMTP_EXPECT"] {
             let expected: [String: String] = [
                 "subject": email.subject, "text": email.text, "html": email.html ?? "",
-                "notes": String(decoding: email.attachments[0].data, as: UTF8.self),
-                "transcript": String(decoding: email.attachments[1].data, as: UTF8.self),
-                "notes_name": email.attachments[0].filename, "transcript_name": email.attachments[1].filename,
+                "document": String(decoding: email.attachments[0].data, as: UTF8.self),
+                "document_name": email.attachments[0].filename,
             ]
             try JSONEncoder().encode(expected).write(to: URL(fileURLWithPath: out))
         }
