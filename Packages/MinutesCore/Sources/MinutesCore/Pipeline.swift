@@ -265,6 +265,9 @@ public final class MeetingPipeline: @unchecked Sendable {
                 coveredThrough = last.end
                 let snapshot = m
                 leading = LiveWork.resolveNames(in: live.noteSections, finalTurns: m.turns ?? []) { snapshot.displayName(for: $0) }
+                // A term added to the vocabulary during the meeting reaches the sections drafted before it.
+                let corrector = VocabularyCorrector(services.vocabulary())
+                leading = leading.map { $0.corrected(by: corrector) }
                 // Paragraph boundaries differ between the live and the final assembly, so a
                 // paragraph straddling the seam is taken whole rather than lost.
                 let rest = (m.utterances ?? []).filter { $0.end > last.end }
