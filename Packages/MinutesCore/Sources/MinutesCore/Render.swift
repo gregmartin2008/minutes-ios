@@ -56,7 +56,7 @@ public enum Render {
         m.speakerLabels.map { m.displayName(for: $0) }.joined(separator: ", ")
     }
 
-    static func crosstalkNote(_ m: Meeting, _ u: Utterance) -> String? {
+    public static func crosstalkNote(_ m: Meeting, _ u: Utterance) -> String? {
         guard u.isCrosstalk else { return nil }
         let names = u.overlapWith.map { m.displayName(for: $0) }
         return names.isEmpty ? "crosstalk" : "talking over \(names.joined(separator: " and "))"
@@ -85,11 +85,20 @@ public enum Render {
         return out.joined(separator: "\n\n")
     }
 
+    /// The lists of the notes, in the order they are shown: next steps first, since they are what
+    /// the reader acts on. The other lists only appear in notes written by earlier versions.
     public static func sections(_ notes: MeetingNotes) -> [(kind: NoteKind, items: [String])] {
         [
-            (.keyPoints, notes.keyPoints), (.decisions, notes.decisions), (.actionItems, notes.actionItems),
+            (.actionItems, notes.actionItems), (.decisions, notes.decisions), (.keyPoints, notes.keyPoints),
             (.openQuestions, notes.openQuestions), (.figures, notes.figures),
         ].filter { !$0.1.isEmpty }
+    }
+
+    /// "Topic (4:36)" for a detail's heading.
+    public static func detailHeading(_ d: NotesDetail) -> String {
+        let topic = d.topic.isEmpty ? "Details" : d.topic
+        guard let at = d.startSeconds else { return topic }
+        return "\(topic) (\(clock(at)))"
     }
 
     /// What to say under the notes when they are not everything they could have been.
@@ -112,7 +121,7 @@ public enum Render {
         return parts.isEmpty ? nil : parts.joined(separator: " ")
     }
 
-    static let notesPendingText =
+    public static let notesPendingText =
         "The notes aren't written yet: iOS limited the language model while this meeting was being processed. Open Minutes and it writes them and sends a second email."
 
     public static func notesText(_ m: Meeting) -> String {
@@ -128,12 +137,20 @@ public enum Render {
             out += items.map { "- \($0)" }
             out.append("")
         }
+        if let details = n.details, !details.isEmpty {
+            out.append("DETAILS")
+            for d in details {
+                out.append(detailHeading(d))
+                out.append(d.text)
+                out.append("")
+            }
+        }
         if let note = remark(n) { out.append("Note: " + note) }
         return out.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     /// How the names in the header came about, when not all were typed by the person.
-    static func namesCaption(_ m: Meeting) -> String {
+    public static func namesCaption(_ m: Meeting) -> String {
         let typed = !(m.typedNamed ?? []).isEmpty
         switch (m.autoNamed.isEmpty, typed) {
         case (false, false): return " (names recognized by voice; check them)"
@@ -217,6 +234,14 @@ public enum Render {
                 for item in items { html += "<li style=\"margin:0 0 6px\">\(e(item))</li>" }
                 html += "</ul>"
             }
+            if let details = n.details, !details.isEmpty {
+                html += h2("Details")
+                for d in details {
+                    html += "<p style=\"margin:12px 0 4px\"><b>\(e(d.topic.isEmpty ? "Details" : d.topic))</b>"
+                    if let at = d.startSeconds { html += " <span style=\"color:#5A6774;font-size:13px\">\(clock(at))</span>" }
+                    html += "</p><p style=\"margin:0\">\(e(d.text))</p>"
+                }
+            }
             if let note = remark(n) {
                 html += "<p style=\"margin:14px 0 0;color:#8A5200\">\(e(note))</p>"
             }
@@ -259,22 +284,28 @@ public enum Render {
         return trimmed.isEmpty ? "Meeting" : trimmed
     }
 
+    /// The file name (without extension) for a meeting's document: "Title 2026-11-03".
+    public static func documentBase(_ m: Meeting, timeZone: TimeZone = .current) -> String {
+        "\(fileSafe(m.title)) \(formatter("yyyy-MM-dd", timeZone).string(from: m.createdAt))"
+    }
+
+    /// The notes and the transcript as one plain-text document.
+    public static func documentText(_ m: Meeting, timeZone: TimeZone = .current) -> Data {
+        Data((fullText(m, timeZone: timeZone)).utf8)
+    }
+
+    /// The email: the notes in the body, and one attached document with the notes and the
+    /// transcript. The app passes a PDF as `document`; without one, the document is plain text.
     public static func email(
-        for m: Meeting, from: String, to: [String], timeZone: TimeZone = .current, now: Date = Date()
+        for m: Meeting, from: String, to: [String], document: EmailMessage.Attachment? = nil,
+        timeZone: TimeZone = .current, now: Date = Date()
     ) -> EmailMessage {
-        let stamp = formatter("yyyy-MM-dd", timeZone).string(from: m.createdAt)
-        let base = "\(fileSafe(m.title)) \(stamp)"
-        let header = headerText(m, timeZone: timeZone)
-        let notes = notesText(m)
-        var attachments: [EmailMessage.Attachment] = []
-        if !notes.isEmpty, m.notes != nil {
-            attachments.append(.init(
-                filename: "\(base) - Notes.txt", mimeType: "text/plain; charset=utf-8",
-                data: Data((header + "\n\n" + notes + "\n").utf8)))
-        }
-        attachments.append(.init(
-            filename: "\(base) - Transcript.txt", mimeType: "text/plain; charset=utf-8",
-            data: Data((header + "\n\n" + transcriptText(m) + "\n").utf8)))
+        let base = documentBase(m, timeZone: timeZone)
+        let attachments: [EmailMessage.Attachment] = [
+            document ?? .init(
+                filename: "\(base) - Notes and Transcript.txt", mimeType: "text/plain; charset=utf-8",
+                data: documentText(m, timeZone: timeZone)),
+        ]
         return EmailMessage(
             from: from, fromName: "Minutes", to: to,
             subject: "Meeting notes: \(m.title) (\(day(m.createdAt, timeZone: timeZone)))",

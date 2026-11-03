@@ -84,11 +84,14 @@ public struct MeetingNotes: Codable, Equatable, Sendable {
     /// Seconds at the end of the meeting that are in the transcript but not in the notes, when
     /// the final pass was skipped before they could be summarized.
     public var missingTailSeconds: Double?
+    /// The meeting told part by part: a heading and a paragraph for each.
+    public var details: [NotesDetail]?
 
     public init(
         title: String = "", summary: String = "", keyPoints: [String] = [], decisions: [String] = [],
         actionItems: [String] = [], openQuestions: [String] = [], figures: [String] = [],
-        skippedSections: Int = 0, totalSections: Int = 0, throttled: Bool? = nil, hot: Bool? = nil
+        skippedSections: Int = 0, totalSections: Int = 0, throttled: Bool? = nil, hot: Bool? = nil,
+        details: [NotesDetail]? = nil
     ) {
         self.title = title
         self.summary = summary
@@ -101,11 +104,25 @@ public struct MeetingNotes: Codable, Equatable, Sendable {
         self.totalSections = totalSections
         self.throttled = throttled
         self.hot = hot
+        self.details = details
     }
 
     public var isEmpty: Bool {
         summary.isEmpty && keyPoints.isEmpty && decisions.isEmpty && actionItems.isEmpty
-            && openQuestions.isEmpty && figures.isEmpty
+            && openQuestions.isEmpty && figures.isEmpty && (details ?? []).isEmpty
+    }
+}
+
+/// One part of the meeting as the notes tell it.
+public struct NotesDetail: Codable, Equatable, Sendable {
+    public var topic: String
+    public var text: String
+    public var startSeconds: Double?
+
+    public init(topic: String, text: String, startSeconds: Double? = nil) {
+        self.topic = topic
+        self.text = text
+        self.startSeconds = startSeconds
     }
 }
 
@@ -447,8 +464,9 @@ public struct CalendarEvent: Codable, Equatable, Sendable {
         self.calendar = calendar
     }
 
-    /// The invited people's names, for the "With" list.
-    public var names: [String] { people.map(\.name).filter { !$0.isEmpty } }
+    /// The invited people's names, for the "With" list. An invitee known only by address is
+    /// left out: no voice will be found for "jcarver@example.com".
+    public var names: [String] { people.map(\.name).filter { !$0.isEmpty && !$0.contains("@") } }
 
     /// Which of `events` a recording started at `now` most likely belongs to, nearest first: meetings
     /// that have begun (or begin within `before` seconds) and have not been over for longer than

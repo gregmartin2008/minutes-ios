@@ -46,6 +46,8 @@ final class FakeNotesModel: NotesModel, @unchecked Sendable {
         lock.unlock()
         let first = section.split(separator: "\n").first.map(String.init) ?? ""
         return NotesFragment(
+            topic: "Topic \(n)",
+            narrative: "The bid stays at 6.5x for now. The top ten customers are 41% of revenue.",
             gist: "Gist \(n).",
             keyPoints: ["- Point from section \(n): \(first.prefix(30))", "Shared point about the working capital peg"],
             decisions: n == 1 ? ["Hold the bid at 6.5x"] : ["None"],
@@ -64,13 +66,16 @@ final class FakeNotesModel: NotesModel, @unchecked Sendable {
         return echoMarkers ? kept.map { "- " + $0 } : kept
     }
 
-    func overview(keyPoints: [String], decisions: [String], gists: [String], titleHint: String?) async throws -> NotesOverview {
+    private(set) var overviewDetails: [String] = []
+
+    func overview(details: [String], decisions: [String], nextSteps: [String], titleHint: String?) async throws -> NotesOverview {
         try gate()
         lock.lock()
         overviewCalls += 1
+        overviewDetails = details
         lock.unlock()
         if failOverview { throw NotesModelError.other("boom") }
-        return NotesOverview(title: "\"Add-on diligence review.\"", summary: "A summary of \(keyPoints.count) points.")
+        return NotesOverview(title: "\"Add-on diligence review.\"", summary: "A summary of \(details.count) parts.")
     }
 }
 
@@ -240,7 +245,29 @@ final class NotesEngineTests: XCTestCase {
         XCTAssertEqual(notes.keyPoints.filter { $0.contains("working capital") }.count, 1)
         XCTAssertEqual(notes.decisions, ["Hold the bid at 6.5x"])      // "None" filler removed
         XCTAssertEqual(notes.actionItems.count, model.sections.count)
-        XCTAssertEqual(notes.summary, "A summary of \(notes.keyPoints.count) points.")
+        XCTAssertEqual(notes.summary, "A summary of \(model.sections.count) parts.")
+        // The details: one heading and paragraph per section, with where each starts, every
+        // sentence of which cites only numbers the section has.
+        let details = try XCTUnwrap(notes.details)
+        XCTAssertEqual(details.map(\.topic), (1...model.sections.count).map { "Topic \($0)" })
+        XCTAssertEqual(details[0].text, "The bid stays at 6.5x for now. The top ten customers are 41% of revenue.")
+        XCTAssertEqual(details.map(\.startSeconds), (0..<model.sections.count).map { _ in nil })
+        XCTAssertTrue(model.overviewDetails[0].hasPrefix("Topic 1: The bid stays"))
+    }
+
+    func testDetailsCarryTheirStartTimesAndDropInventedNumbers() async throws {
+        let model = FakeNotesModel()
+        // The fake's paragraph cites 6.5x and 41%; a section without 41% loses that sentence.
+        let input = ["Dana: the multiple is 6.5x and that is all.", "Lee: fine."]
+        let notes = try await NotesEngine(options: fastOptions()).write(
+            lines: input, titleHint: nil, model: model, starts: [12, 30])
+        let details = try XCTUnwrap(notes.details)
+        XCTAssertEqual(details.count, 1)
+        XCTAssertEqual(details[0].startSeconds, 12)
+        XCTAssertEqual(details[0].text, "The bid stays at 6.5x for now.")
+        XCTAssertEqual(NotesEngine.sentences("Revenue was $3.5 million. Costs rose 4%! Why? Inc. was sold."),
+                       ["Revenue was $3.5 million.", "Costs rose 4%!", "Why?", "Inc. was sold."])
+        XCTAssertEqual(NotesEngine.verifiedParagraph("He said 13 deals. She said 12 deals.", against: ["A: thirteen, 13 deals"]), "He said 13 deals.")
     }
 
     func testInterruptedNotesContinueFromTheNextSection() async throws {

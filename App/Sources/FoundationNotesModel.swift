@@ -7,18 +7,16 @@ import MinutesCore
 
 @Generable(description: "Notes from one part of a meeting transcript")
 struct SectionNotesSchema {
-    @Guide(description: "One sentence: what this part of the meeting covered")
+    @Guide(description: "A heading of 3 to 7 words naming what this part of the meeting was about, e.g. 'Siemens' lending criteria'")
+    var topic: String
+    @Guide(description: "One paragraph of 3 to 6 sentences telling what was said in this part, in your own words, the way a careful note-taker writes it up: who said what, with the names, numbers, dates and terms exactly as in the transcript. Prose, no bullet points, no quotes")
+    var narrative: String
+    @Guide(description: "One sentence: what this part covered")
     var gist: String
-    @Guide(description: "The important points, each one sentence in your own words stating what was said as fact, e.g. 'Dana said the fund targets $3M checks'. Not quotes, not transcript lines, no 'Name:' prefix", .maximumCount(6))
-    var keyPoints: [String]
-    @Guide(description: "Things the group explicitly agreed to do or settled, stated in the transcript. Not opinions, plans one person mentioned, or things still under discussion. Empty if none", .maximumCount(4))
+    @Guide(description: "Things the people explicitly agreed on or settled in this part, each one short sentence. Only real agreements between them, not opinions, plans one person described, or a speaker agreeing to start talking. Empty if none", .maximumCount(3))
     var decisions: [String]
-    @Guide(description: "Tasks a named person agreed to do, as 'Name: task (deadline)'. Empty if none", .maximumCount(5))
-    var actionItems: [String]
-    @Guide(description: "Substantive questions about the business or the deal that were asked and not answered, in your own words. Not small talk or conversational questions. Empty if none", .maximumCount(4))
-    var openQuestions: [String]
-    @Guide(description: "Numbers, prices, percentages, dates and deadlines, each copied exactly as it appears in the transcript, with what it refers to", .maximumCount(8))
-    var figures: [String]
+    @Guide(description: "Follow-ups a named person committed to do after the meeting, as 'Name: what they will do (for whom, by when if said)'. Only commitments stated in this part; not things done during the call, not general intentions. Empty if none", .maximumCount(4))
+    var nextSteps: [String]
 }
 
 @Generable(description: "A cleaned-up list")
@@ -31,7 +29,7 @@ struct MergedListSchema {
 struct OverviewSchema {
     @Guide(description: "A title of 3 to 8 words naming the meeting's subject, without a date")
     var title: String
-    @Guide(description: "A summary of 3 to 5 sentences: what was discussed and where it ended up")
+    @Guide(description: "A summary of 2 to 4 sentences: who met about what, the main things each side said, and where it ended up. Plain prose, specific, no filler")
     var summary: String
 }
 
@@ -76,17 +74,20 @@ struct FoundationNotesModel: NotesModel {
         let session = LanguageModelSession(
             model: model,
             instructions: """
-                You take notes on business meetings. You are given part of a transcript; each line is \
-                "Speaker: what they said". Write notes in your own words, as a careful note-taker would: \
-                condense, do not copy lines. Record only what the transcript says; never add a number, name \
-                or fact that is not in it. Write speakers' names exactly as they appear. Leave a list empty \
-                when the transcript has nothing for it; do not write "no decisions were made".
+                You write up business meetings from transcripts, the way an experienced analyst's \
+                meeting notes read. You are given part of a transcript; each line is "Speaker: what they \
+                said". Tell what was said in your own words, in prose: condense, do not copy lines, and do \
+                not write "the speaker said" for every sentence. Record only what the transcript says; never \
+                add a number, name or fact that is not in it, and keep every number exactly as said. Write \
+                speakers' names exactly as they appear. Leave a list empty when the transcript has nothing \
+                for it; do not write "no decisions were made". Small talk, greetings and connection trouble \
+                are not worth a sentence.
                 """)
         let prompt = "\(context)\n\nTranscript:\n\(section)"
         let notes = try await run { try await session.respond(to: prompt, generating: SectionNotesSchema.self, options: deterministic).content }
         return NotesFragment(
-            gist: notes.gist, keyPoints: notes.keyPoints, decisions: notes.decisions, actionItems: notes.actionItems,
-            openQuestions: notes.openQuestions, figures: notes.figures)
+            topic: notes.topic, narrative: notes.narrative, gist: notes.gist,
+            decisions: notes.decisions, actionItems: notes.nextSteps)
     }
 
     func consolidate(kind: NoteKind, items: [String], limit: Int) async throws -> [String] {
@@ -104,15 +105,15 @@ struct FoundationNotesModel: NotesModel {
         return try await run { try await session.respond(to: prompt, generating: MergedListSchema.self, options: deterministic).content.items }
     }
 
-    func overview(keyPoints: [String], decisions: [String], gists: [String], titleHint: String?) async throws -> NotesOverview {
+    func overview(details: [String], decisions: [String], nextSteps: [String], titleHint: String?) async throws -> NotesOverview {
         let session = LanguageModelSession(
             model: model,
-            instructions: "You write short, factual summaries of business meetings from notes. Use only what the notes say.")
+            instructions: "You write short, factual summaries of business meetings from notes. Use only what the notes say; keep names and numbers exactly as written.")
         var prompt = "Write a title and a summary for this meeting.\n"
         if let hint = titleHint, !hint.isEmpty { prompt += "The meeting was named: \(hint)\n" }
-        if !gists.isEmpty { prompt += "\nWhat was covered, in order:\n" + gists.map { "- \($0)" }.joined(separator: "\n") + "\n" }
-        if !keyPoints.isEmpty { prompt += "\nKey points:\n" + keyPoints.map { "- \($0)" }.joined(separator: "\n") + "\n" }
-        if !decisions.isEmpty { prompt += "\nDecisions:\n" + decisions.map { "- \($0)" }.joined(separator: "\n") + "\n" }
+        if !details.isEmpty { prompt += "\nThe meeting, part by part:\n" + details.map { "- \($0)" }.joined(separator: "\n") + "\n" }
+        if !decisions.isEmpty { prompt += "\nAgreed:\n" + decisions.map { "- \($0)" }.joined(separator: "\n") + "\n" }
+        if !nextSteps.isEmpty { prompt += "\nNext steps:\n" + nextSteps.map { "- \($0)" }.joined(separator: "\n") + "\n" }
         let text = prompt
         let result = try await run { try await session.respond(to: text, generating: OverviewSchema.self, options: deterministic).content }
         return NotesOverview(title: result.title, summary: result.summary)

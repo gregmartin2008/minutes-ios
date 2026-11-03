@@ -7,33 +7,63 @@ public enum NoteKind: String, CaseIterable, Codable, Sendable {
         switch self {
         case .keyPoints: return "Key points"
         case .decisions: return "Decisions"
-        case .actionItems: return "Action items"
+        case .actionItems: return "Next steps"
         case .openQuestions: return "Open questions"
         case .figures: return "Figures and dates"
         }
     }
 }
 
-/// What the language model extracts from one section of the transcript.
+/// What the language model extracts from one section of the transcript: a heading and a
+/// paragraph telling what was said (the "details" of the notes), plus the decisions and next
+/// steps stated in it. The list fields other than those two are kept for notes written by
+/// earlier versions.
 public struct NotesFragment: Codable, Equatable, Sendable {
+    /// A few words naming what this part of the meeting was about.
+    public var topic: String
+    /// What was said in this part, as a paragraph in the note-taker's own words.
+    public var narrative: String
+    /// One sentence: what this part covered. Carried forward for continuity between sections.
     public var gist: String
     public var keyPoints: [String]
     public var decisions: [String]
     public var actionItems: [String]
     public var openQuestions: [String]
     public var figures: [String]
+    /// Where in the meeting this part starts, when known.
+    public var startSeconds: Double?
 
     public init(
+        topic: String = "", narrative: String = "",
         gist: String = "", keyPoints: [String] = [], decisions: [String] = [], actionItems: [String] = [],
-        openQuestions: [String] = [], figures: [String] = []
+        openQuestions: [String] = [], figures: [String] = [], startSeconds: Double? = nil
     ) {
+        self.topic = topic
+        self.narrative = narrative
         self.gist = gist
         self.keyPoints = keyPoints
         self.decisions = decisions
         self.actionItems = actionItems
         self.openQuestions = openQuestions
         self.figures = figures
+        self.startSeconds = startSeconds
     }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        topic = try c.decodeIfPresent(String.self, forKey: .topic) ?? ""
+        narrative = try c.decodeIfPresent(String.self, forKey: .narrative) ?? ""
+        gist = try c.decodeIfPresent(String.self, forKey: .gist) ?? ""
+        keyPoints = try c.decodeIfPresent([String].self, forKey: .keyPoints) ?? []
+        decisions = try c.decodeIfPresent([String].self, forKey: .decisions) ?? []
+        actionItems = try c.decodeIfPresent([String].self, forKey: .actionItems) ?? []
+        openQuestions = try c.decodeIfPresent([String].self, forKey: .openQuestions) ?? []
+        figures = try c.decodeIfPresent([String].self, forKey: .figures) ?? []
+        startSeconds = try c.decodeIfPresent(Double.self, forKey: .startSeconds)
+    }
+
+    /// The paragraph for the details, or the gist when the model wrote none.
+    public var detailText: String { narrative.isEmpty ? gist : narrative }
 
     public func items(_ kind: NoteKind) -> [String] {
         switch kind {
@@ -106,8 +136,9 @@ public protocol NotesModel: Sendable {
     func extract(section: String, context: String) async throws -> NotesFragment
     /// Merge duplicates and keep the most important items, at most `limit`.
     func consolidate(kind: NoteKind, items: [String], limit: Int) async throws -> [String]
-    /// Write a short title and a few-sentence summary from the consolidated notes.
-    func overview(keyPoints: [String], decisions: [String], gists: [String], titleHint: String?) async throws -> NotesOverview
+    /// Write a short title and a few-sentence summary. `details` are the sections' paragraphs in
+    /// order, `nextSteps` and `decisions` the merged lists.
+    func overview(details: [String], decisions: [String], nextSteps: [String], titleHint: String?) async throws -> NotesOverview
 }
 
 /// Writes meeting notes with a small-context model by working through the transcript in sections
@@ -116,7 +147,7 @@ public struct NotesEngine: Sendable {
 
     public struct Options: Sendable {
         /// Tokens set aside in each request for instructions and the output format description.
-        public var promptOverhead = 520
+        public var promptOverhead = 600
         /// Tokens set aside for the model's answer.
         public var responseReserve = 850
         /// Never make a section smaller than this many tokens.
@@ -167,11 +198,20 @@ public struct NotesEngine: Sendable {
         lines: [String], titleHint: String?, model: NotesModel,
         spellings: [String] = [],
         leading: [NotesFragment] = [],
+        starts: [Double]? = nil,
         resume: NotesCheckpoint? = nil,
         checkpoint: (@Sendable (NotesCheckpoint) -> Void)? = nil,
         progress: (@Sendable (Double) -> Void)? = nil
     ) async throws -> MeetingNotes {
-        let cleaned = lines.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
+        var cleaned: [String] = []
+        var cleanedStarts: [Double] = []
+        for (i, raw) in lines.enumerated() {
+            let line = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !line.isEmpty else { continue }
+            cleaned.append(line)
+            if let starts, starts.indices.contains(i) { cleanedStarts.append(starts[i]) }
+        }
+        let lineStarts: [Double]? = cleanedStarts.count == cleaned.count ? cleanedStarts : nil
         guard !cleaned.isEmpty || !leading.isEmpty else { throw NotesModelError.other("The transcript is empty.") }
         if cleaned.isEmpty {
             return try await finish(
@@ -202,7 +242,8 @@ public struct NotesEngine: Sendable {
         }
         let ratio = saved.charactersPerToken
         let sectionBudget = saved.budgetTokens
-        let sections = Self.split(lines: cleaned, budgetTokens: sectionBudget, charactersPerToken: ratio)
+        let indexed = Self.splitIndexed(lines: cleaned, budgetTokens: sectionBudget, charactersPerToken: ratio)
+        let sections = indexed.map { $0.lines }
         if saved.sections.count > sections.count { saved.sections = [] }
 
         // Map: extract from each section, carrying a one-line gist forward for continuity.
@@ -226,8 +267,8 @@ public struct NotesEngine: Sendable {
                     // A figure is only worth listing if its numbers were actually said in the
                     // section it came from. A small model sometimes invents or garbles one, and
                     // a wrong number in the notes is worse than none.
-                    f.figures = Self.verified(figures: f.figures, against: section)
-                    f = Self.unquoted(f, speakers: Self.speakers(in: section))
+                    f = Self.checked(f, against: section)
+                    if f.startSeconds == nil, let lineStarts { f.startSeconds = lineStarts[indexed[index].firstLine] }
                     done.fragments.append(f)
                     if !f.gist.isEmpty { previousGist = f.gist }
                 case .failure(let e):
@@ -296,17 +337,18 @@ public struct NotesEngine: Sendable {
             }
             progress?(0.8 + 0.15 * Double(i + 1) / Double(NoteKind.allCases.count))
         }
-        // Overview: title and summary from the merged notes. Without the model, the summary is
-        // the sections' gists in order, which read as a plain account of the meeting.
-        let gists = fragments.map { $0.gist }.filter { !$0.isEmpty }
+        // The details: each section's heading and paragraph, in order.
+        let details = Self.details(from: fragments)
+        // Overview: title and summary from the details. Without the model, the summary is the
+        // sections' gists in order, which read as a plain account of the meeting.
+        let gists = fragments.map { $0.gist.isEmpty ? Self.firstSentence($0.narrative) : $0.gist }.filter { !$0.isEmpty }
         var overview = NotesOverview(title: titleHint ?? "", summary: Self.gistSummary(gists))
         if !throttled {
             do {
-                let points = merged[.keyPoints] ?? [], decided = merged[.decisions] ?? []
-                let leadGists = Array(gists.prefix(12))
+                let decided = merged[.decisions] ?? [], next = merged[.actionItems] ?? []
+                let shown = Self.detailsForOverview(details, maxCharacters: 3200)
                 let o = try await withBackoff(until: giveUpAt) {
-                    try await model.overview(
-                        keyPoints: points, decisions: decided, gists: leadGists, titleHint: titleHint)
+                    try await model.overview(details: shown, decisions: decided, nextSteps: next, titleHint: titleHint)
                 }
                 if !o.summary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { overview.summary = o.summary }
                 if !o.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { overview.title = o.title }
@@ -329,7 +371,49 @@ public struct NotesEngine: Sendable {
             skippedSections: skipped,
             totalSections: total,
             throttled: throttled ? true : nil,
-            hot: hot ? true : nil)
+            hot: hot ? true : nil,
+            details: details)
+    }
+
+    /// The details of the notes: one heading and paragraph per section, consecutive halves of
+    /// one section joined, sections without a paragraph left out.
+    static func details(from fragments: [NotesFragment]) -> [NotesDetail] {
+        var out: [NotesDetail] = []
+        for f in fragments {
+            let text = f.detailText.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !text.isEmpty else { continue }
+            let topic = tidyTopic(f.topic)
+            if let last = out.last, last.topic.isEmpty || topic.isEmpty || last.topic == topic {
+                // The second half of a section the model could not take whole.
+                out[out.count - 1].text += " " + text
+                if out[out.count - 1].topic.isEmpty { out[out.count - 1].topic = topic }
+                continue
+            }
+            out.append(NotesDetail(topic: topic, text: text, startSeconds: f.startSeconds))
+        }
+        return out
+    }
+
+    /// The details as the overview request sees them, trimmed to fit the model's window.
+    static func detailsForOverview(_ details: [NotesDetail], maxCharacters: Int) -> [String] {
+        guard !details.isEmpty else { return [] }
+        let each = max(160, maxCharacters / details.count)
+        return details.map { d in
+            let text = d.text.count <= each ? d.text : String(d.text.prefix(each)).trimmingCharacters(in: .whitespaces) + "…"
+            return d.topic.isEmpty ? text : "\(d.topic): \(text)"
+        }
+    }
+
+    static func firstSentence(_ text: String) -> String {
+        let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let end = t.firstIndex(where: { ".!?".contains($0) }) else { return t }
+        return String(t[...end])
+    }
+
+    static func tidyTopic(_ raw: String) -> String {
+        var s = raw.trimmingCharacters(in: .whitespacesAndNewlines).trimmingCharacters(in: CharacterSet(charactersIn: "\"'“”:-– "))
+        while s.hasSuffix(".") { s.removeLast() }
+        return String(s.prefix(80))
     }
 
     /// The gists joined into one paragraph, kept to a readable length by dropping from the
@@ -410,21 +494,32 @@ public struct NotesEngine: Sendable {
             }
         }
         guard !fragments.isEmpty else { throw firstError ?? NotesModelError.other("The language model returned nothing.") }
-        var merged = Self.merge(fragments)
-        merged.figures = Self.verified(figures: merged.figures, against: section)
-        return Self.unquoted(merged, speakers: Self.speakers(in: section))
+        return Self.checked(Self.merge(fragments), against: section)
     }
 
-    /// One fragment from several (the halves of a section): lists joined, gists joined.
+    /// A fragment with its figures and its paragraph checked against the section: a figure whose
+    /// numbers were not said is dropped, and so is a sentence of the paragraph with such a number;
+    /// transcript habits ("Name: ...") are taken out of the lists.
+    static func checked(_ f: NotesFragment, against section: [String]) -> NotesFragment {
+        var out = f
+        out.figures = verified(figures: f.figures, against: section)
+        out.narrative = verifiedParagraph(f.narrative, against: section)
+        return unquoted(out, speakers: speakers(in: section))
+    }
+
+    /// One fragment from several (the halves of a section): lists joined, paragraphs joined.
     static func merge(_ fragments: [NotesFragment]) -> NotesFragment {
         guard fragments.count > 1 else { return fragments.first ?? NotesFragment() }
         return NotesFragment(
+            topic: fragments.map { $0.topic }.first { !$0.isEmpty } ?? "",
+            narrative: fragments.map { $0.narrative }.filter { !$0.isEmpty }.joined(separator: " "),
             gist: fragments.map { $0.gist }.filter { !$0.isEmpty }.joined(separator: " "),
             keyPoints: dedupe(fragments.flatMap { $0.keyPoints }),
             decisions: dedupe(fragments.flatMap { $0.decisions }),
             actionItems: dedupe(fragments.flatMap { $0.actionItems }),
             openQuestions: dedupe(fragments.flatMap { $0.openQuestions }),
-            figures: dedupe(fragments.flatMap { $0.figures }))
+            figures: dedupe(fragments.flatMap { $0.figures }),
+            startSeconds: fragments.compactMap { $0.startSeconds }.first)
     }
 
     static let cancelledMarker = "Cancelled."
@@ -543,30 +638,37 @@ public struct NotesEngine: Sendable {
 
     /// Packs lines into sections of at most `budgetTokens`, splitting any single oversized line.
     static func split(lines: [String], budgetTokens: Int, charactersPerToken: Double) -> [[String]] {
-        var sections: [[String]] = []
+        splitIndexed(lines: lines, budgetTokens: budgetTokens, charactersPerToken: charactersPerToken).map { $0.lines }
+    }
+
+    /// `split`, with the index (into `lines`) of the line each section starts with.
+    static func splitIndexed(lines: [String], budgetTokens: Int, charactersPerToken: Double) -> [(lines: [String], firstLine: Int)] {
+        var sections: [(lines: [String], firstLine: Int)] = []
         var current: [String] = []
+        var currentFirst = 0
         var used = 0
         let maxChars = max(200, Int(Double(budgetTokens) * charactersPerToken))
 
-        func push(_ line: String) {
+        func push(_ line: String, from index: Int) {
             let cost = estimateTokens(line, ratio: charactersPerToken) + 2
             if used + cost > budgetTokens, !current.isEmpty {
-                sections.append(current)
+                sections.append((current, currentFirst))
                 current = []
                 used = 0
             }
+            if current.isEmpty { currentFirst = index }
             current.append(line)
             used += cost
         }
 
-        for line in lines {
+        for (index, line) in lines.enumerated() {
             if line.count <= maxChars {
-                push(line)
+                push(line, from: index)
             } else {
-                for piece in splitLong(line, maxChars: maxChars) { push(piece) }
+                for piece in splitLong(line, maxChars: maxChars) { push(piece, from: index) }
             }
         }
-        if !current.isEmpty { sections.append(current) }
+        if !current.isEmpty { sections.append((current, currentFirst)) }
         return sections
     }
 
@@ -615,9 +717,11 @@ public struct NotesEngine: Sendable {
 
     static func clean(_ f: NotesFragment) -> NotesFragment {
         return NotesFragment(
+            topic: tidyTopic(f.topic),
+            narrative: f.narrative.replacingOccurrences(of: "\n", with: " ").trimmingCharacters(in: .whitespacesAndNewlines),
             gist: f.gist.trimmingCharacters(in: .whitespacesAndNewlines),
             keyPoints: tidy(f.keyPoints), decisions: tidy(f.decisions), actionItems: tidy(f.actionItems),
-            openQuestions: tidy(f.openQuestions), figures: tidy(f.figures))
+            openQuestions: tidy(f.openQuestions), figures: tidy(f.figures), startSeconds: f.startSeconds)
     }
 
     /// The speaker names a section's lines carry ("Name: what they said").
@@ -690,6 +794,39 @@ public struct NotesEngine: Sendable {
             let found = numbers(item)
             return found.isEmpty || found.allSatisfy { said.contains($0) }
         }
+    }
+
+    /// The paragraph without any sentence whose numbers were not said in the section. Written-out
+    /// numbers ("three to eight") are not checked; a sentence with a digit that the transcript does
+    /// not have anywhere in the section is the model's invention or garbling.
+    static func verifiedParagraph(_ text: String, against lines: [String]) -> String {
+        let said = Set(lines.flatMap(numbers))
+        let kept = sentences(text).filter { sentence in
+            numbers(sentence).allSatisfy { said.contains($0) }
+        }
+        return kept.joined(separator: " ")
+    }
+
+    /// A paragraph as sentences, each with its end mark. "$3.5 million" and "Inc." do not split.
+    static func sentences(_ text: String) -> [String] {
+        var out: [String] = []
+        var current = ""
+        let chars = Array(text)
+        for (i, ch) in chars.enumerated() {
+            current.append(ch)
+            guard ".!?".contains(ch) else { continue }
+            let next = i + 1 < chars.count ? chars[i + 1] : " "
+            let after = i + 2 < chars.count ? chars[i + 2] : " "
+            // An end mark followed by a space and a capital (or the end) ends a sentence.
+            guard next == " " || next == "\n", after.isUppercase || after == "\"" || i + 2 >= chars.count else { continue }
+            if ch == ".", let last = current.dropLast().last, last.isNumber { continue }
+            let trimmed = current.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmed.isEmpty { out.append(trimmed) }
+            current = ""
+        }
+        let rest = current.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !rest.isEmpty { out.append(rest) }
+        return out
     }
 
     /// Numbers in a text, normalized: "$12,500" is "12500", "4.8%" is "4.8", "1,750,000" is "1750000".

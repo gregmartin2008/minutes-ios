@@ -608,6 +608,31 @@ private struct NotesTab: View {
                         }
                     }
                 }
+                if let details = notes.details, !details.isEmpty {
+                    VStack(alignment: .leading, spacing: 14) {
+                        Eyebrow(text: "Details")
+                        ForEach(Array(details.enumerated()), id: \.offset) { _, d in
+                            VStack(alignment: .leading, spacing: 4) {
+                                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                                    Text(d.topic.isEmpty ? "Details" : d.topic)
+                                        .font(Theme.document(17, weight: .semibold))
+                                        .foregroundStyle(Theme.ink)
+                                    if let at = d.startSeconds {
+                                        Text(Render.clock(at))
+                                            .font(.footnote)
+                                            .foregroundStyle(Theme.muted)
+                                    }
+                                }
+                                Text(d.text)
+                                    .font(Theme.document(17))
+                                    .foregroundStyle(Theme.ink)
+                                    .lineSpacing(3)
+                                    .fixedSize(horizontal: false, vertical: true)
+                                    .textSelection(.enabled)
+                            }
+                        }
+                    }
+                }
                 if let remark = Render.remark(notes) {
                     Text(remark + " The transcript is complete.")
                         .font(.footnote)

@@ -73,6 +73,8 @@ public struct LiveWork: Sendable {
                 mapping.reduce(s) { text, pair in Meeting.replacingName(pair.key, with: pair.value, in: text) }
             }
             var f = section.fragment
+            f.topic = fix(f.topic)
+            f.narrative = fix(f.narrative)
             f.gist = fix(f.gist)
             f.keyPoints = f.keyPoints.map(fix)
             f.decisions = f.decisions.map(fix)
@@ -176,7 +178,8 @@ public actor LiveNoteTaker {
             if let gist = sections.last?.fragment.gist, !gist.isEmpty { context += " Just before this: \(gist)" }
             if !spellings.isEmpty { context += "\n" + NotesEngine.spellingNote(spellings) }
             do {
-                let fragment = try await engine.extractOnce(section: piece, context: context, model: model)
+                var fragment = try await engine.extractOnce(section: piece, context: context, model: model)
+                fragment.startSeconds = start
                 // The turns are kept under the names the model saw, so they can be matched later.
                 let named = turns.filter { $0.end > start && $0.start < end }.map { t in
                     SpeakerTurn(speaker: Self.name(for: t.speaker, among: labels), start: t.start, end: t.end)

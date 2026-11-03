@@ -1062,8 +1062,11 @@ final class AppModel: ObservableObject {
     // MARK: Sharing and diagnostics
 
     /// Writes the notes and transcript to a text file that can be shared.
+    /// The meeting's document (notes and transcript) as a PDF to share, or as text if the PDF
+    /// cannot be drawn.
     func exportText(_ id: String) -> URL? {
         guard let m = meeting(id) else { return nil }
+        if let pdf = MeetingDocument.temporaryFile(m) { return pdf }
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("\(Render.fileSafe(m.title)).txt")
         do {
             try Data(Render.fullText(m).utf8).write(to: url, options: .atomic)

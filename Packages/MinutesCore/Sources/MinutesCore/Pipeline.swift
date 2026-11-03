@@ -258,6 +258,7 @@ public final class MeetingPipeline: @unchecked Sendable {
             // Sections extracted during the recording cover the meeting up to their last `end`;
             // only what came after is extracted now.
             var lines = Render.modelLines(m)
+            var starts = (m.utterances ?? []).map { $0.start }
             var leading: [NotesFragment] = []
             var coveredThrough: Double?
             if let live = services.liveWork(m.id), !live.noteSections.isEmpty, let last = live.noteSections.last {
@@ -268,6 +269,7 @@ public final class MeetingPipeline: @unchecked Sendable {
                 // paragraph straddling the seam is taken whole rather than lost.
                 let rest = (m.utterances ?? []).filter { $0.end > last.end }
                 lines = rest.map { "\(m.displayName(for: $0.speaker)): \($0.text)" }
+                starts = rest.map { $0.start }
                 log.info("meeting \(m.id): \(leading.count) note sections from the recording, \(lines.count) lines left to extract")
             }
             switch await services.notesModel() {
@@ -286,6 +288,7 @@ public final class MeetingPipeline: @unchecked Sendable {
                         lines: lines, titleHint: m.titleIsAuto ? nil : m.title, model: model,
                         spellings: services.vocabulary().spellings,
                         leading: leading,
+                        starts: starts,
                         resume: m.notesCheckpoint,
                         checkpoint: { checkpoint in
                             saved.set(checkpoint)

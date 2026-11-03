@@ -74,8 +74,19 @@ final class MeetingCalendar {
             default: break
             }
             let email = Self.email(of: participant)
-            let name = participant.name?.trimmingCharacters(in: .whitespaces) ?? ""
-            let shown = name.isEmpty ? (email ?? "") : name
+            var name = participant.name?.trimmingCharacters(in: .whitespaces) ?? ""
+            // Google calendars often list an invitee by address only. The People list knows
+            // some of them; "first.last@" gives a name; a bare address stays an address.
+            if name.isEmpty || name.contains("@") {
+                if let email, let known = AppSettings.shared.directory.first(where: { $0.email?.lowercased() == email.lowercased() }) {
+                    name = known.name
+                } else if let email, let derived = Self.nameFromAddress(email) {
+                    name = derived
+                } else {
+                    name = email ?? ""
+                }
+            }
+            let shown = name
             guard !shown.isEmpty else { return }
             if let i = people.firstIndex(where: { Self.same($0, name: shown, email: email) }) {
                 if organizer { people[i].organizer = true }
@@ -90,6 +101,17 @@ final class MeetingCalendar {
         return CalendarEvent(
             id: event.eventIdentifier ?? UUID().uuidString, title: title.isEmpty ? "Calendar meeting" : title,
             start: event.startDate, end: event.endDate, people: people, calendar: event.calendar?.title)
+    }
+
+    /// "paul.demarco@northwind.example" → "Paul Demarco"; "jcarver@…" → nil (no telling where the
+    /// first name ends). Only addresses with a separator between two name parts are read.
+    static func nameFromAddress(_ email: String) -> String? {
+        guard let at = email.firstIndex(of: "@") else { return nil }
+        let local = email[..<at].lowercased()
+        let parts = local.split(whereSeparator: { "._-".contains($0) }).map(String.init)
+            .filter { !$0.isEmpty && $0.allSatisfy(\.isLetter) }
+        guard parts.count >= 2, parts.count <= 3, parts.allSatisfy({ $0.count >= 2 }) else { return nil }
+        return parts.map { $0.prefix(1).uppercased() + $0.dropFirst() }.joined(separator: " ")
     }
 
     private static func same(_ p: Person, name: String, email: String?) -> Bool {
