@@ -141,6 +141,11 @@ final class HubSpotTests: XCTestCase {
         XCTAssertNil(Meeting.personFromTitle("Weekly pipeline review"))
         XCTAssertNil(Meeting.personFromTitle("Notes - the usual"))
         XCTAssertEqual(Meeting.personFromTitle("Call with Halden - Clark Yardley")?.company, "Halden")
+        let jack = Meeting.personFromTitle("Intro Call: Greg Martin (Meridyan) - Jack Dalton (Harlow Credit)")
+        XCTAssertEqual(jack, Person(name: "Jack Dalton", company: "Harlow Credit"))
+        XCTAssertEqual(Person.naturalName("Dalton, Jack"), "Jack Dalton")
+        XCTAssertEqual(Person.naturalName("DALTON, JACK"), "Jack Dalton")
+        XCTAssertEqual(Person.naturalName("Jack Dalton"), "Jack Dalton")
     }
 
     func testDirectoryFillsInWhatIsMissing() {

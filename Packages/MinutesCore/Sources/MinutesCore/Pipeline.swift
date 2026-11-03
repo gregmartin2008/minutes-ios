@@ -403,8 +403,10 @@ public final class MeetingPipeline: @unchecked Sendable {
         // recognized by voice) is not looking for another voice.
         var taken = Set(m.speakerNames.values.map { $0.lowercased() })
         if let own, let ownName = store.loadProfiles().first(where: { $0.id == own })?.name { taken.insert(ownName.lowercased()) }
-        let typed = (m.attendees ?? []).map { $0.trimmingCharacters(in: .whitespaces) }
-            .filter { !$0.isEmpty && !taken.contains($0.lowercased()) }
+        var given = (m.attendees ?? []).map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+        // Nothing typed and no calendar: a meeting named "Firm - First Last" says who the other person is.
+        if given.isEmpty, let fromTitle = Meeting.personFromTitle(m.title) { given = [fromTitle.name] }
+        let typed = given.filter { !taken.contains($0.lowercased()) }
         guard !typed.isEmpty else { return }
         let unnamed = m.speakerLabels.filter { m.speakerNames[$0] == nil }
         let ownRecognized = m.speakerProfiles.values.contains { $0 == own }

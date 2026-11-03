@@ -287,6 +287,26 @@ final class PipelineTests: XCTestCase {
         XCTAssertFalse(out.remarks.contains { $0.contains("were not applied") })
     }
 
+    /// With nothing typed, a meeting named "Firm - First Last" names the one unknown voice.
+    func testTheMeetingNameNamesTheOtherVoiceWhenNothingWasTyped() async throws {
+        let own = SpeakerMatcher.makeProfile(name: "Greg", embedding: [1, 0.05, 0])
+        try store.saveProfiles([own])
+        var m = try newMeeting()
+        m.title = "Intro Call: Greg (Meridyan) - Jack Dalton (Harlow Credit)"
+        m.titleIsAuto = false
+        try store.save(m)
+        let result = modelResult!
+        var options = NotesEngine.Options()
+        options.rateLimitBackoff = [0.01]
+        options.rateLimitPatience = 0.05
+        let services = PipelineServices(
+            separator: separator, transcriber: transcriber, notesModel: { result }, mailer: mailer,
+            notesOptions: options, ownProfileID: { own.id })
+        let out = await MeetingPipeline(store: store, services: services, log: Log()).run(m) { _, _ in }
+        XCTAssertEqual(out.speakerNames["S2"], "Jack Dalton")
+        XCTAssertEqual(out.typedNamed, ["S2"])
+    }
+
     /// With more unnamed voices than typed names and no recognized own voice, the names are left
     /// for the person rather than guessed, and the meeting says so.
     func testTypedNamesAreHeldBackWhenTheCountsDoNotMatch() async throws {

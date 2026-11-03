@@ -732,10 +732,74 @@ public struct NotesEngine: Sendable {
     static func clean(_ f: NotesFragment) -> NotesFragment {
         return NotesFragment(
             topic: tidyTopic(f.topic),
-            narrative: f.narrative.replacingOccurrences(of: "\n", with: " ").trimmingCharacters(in: .whitespacesAndNewlines),
+            narrative: unstammered(f.narrative.replacingOccurrences(of: "\n", with: " ")).trimmingCharacters(in: .whitespacesAndNewlines),
             gist: f.gist.trimmingCharacters(in: .whitespacesAndNewlines),
-            keyPoints: tidy(f.keyPoints), decisions: tidy(f.decisions), actionItems: tidy(f.actionItems),
+            keyPoints: tidy(f.keyPoints),
+            decisions: tidy(f.decisions).map(unstammered).filter(isDecision),
+            actionItems: tidy(f.actionItems).map(unstammered).filter(isNextStep),
             openQuestions: tidy(f.openQuestions), figures: tidy(f.figures), startSeconds: f.startSeconds)
+    }
+
+    /// Verbs that report or hedge rather than commit: "Greg: continue exploring…" is not a next step.
+    static let weakVerbs: Set<String> = [
+        "continue", "continues", "continued", "consider", "considers", "monitor", "monitors", "explore", "explores",
+        "exploring", "assess", "assesses", "acknowledged", "acknowledges", "noted", "notes", "suggests", "suggested",
+        "wants", "wanted", "hopes", "hoped", "emphasized", "emphasizes", "expressed", "expresses", "highlighted",
+        "highlights", "described", "describes", "discussed", "discusses", "mentioned", "mentions", "confirmed",
+        "confirms", "stated", "states", "said", "says", "believes", "thinks", "prefers", "preferred", "questioned",
+        "focused", "focuses", "asked", "inquired", "explained", "explains", "agreed", "agrees", "is", "was", "are",
+        "were", "has", "have", "likes", "liked", "feels", "felt", "sees", "saw", "indicated", "indicates",
+    ]
+    /// Phrases that mark the model filling a list it should have left empty.
+    static let nonItems = [
+        "no specific", "no formal", "no single", "no agreement", "not committed", "beyond observation", "no decision",
+        "no action", "nothing was", "were not reached", "was not reached", "no commitment", "not specified",
+        "unspecified", "n/a",
+    ]
+
+    /// "Name: what they will do" with a verb of action; not a report of what someone said or thinks.
+    static func isNextStep(_ item: String) -> Bool {
+        let lowered = item.lowercased()
+        if nonItems.contains(where: { lowered.contains($0) }) { return false }
+        guard let colon = item.firstIndex(of: ":") else { return false }
+        let owner = item[..<colon].trimmingCharacters(in: .whitespaces)
+        guard !owner.isEmpty, owner.split(separator: " ").count <= 4 else { return false }
+        let body = item[item.index(after: colon)...].trimmingCharacters(in: .whitespaces).lowercased()
+        var words = body.split(separator: " ").map { $0.trimmingCharacters(in: .punctuationCharacters) }
+        while let first = words.first, ["will", "to", "should", "plans", "agreed", "is", "going", "would"].contains(first) {
+            words.removeFirst()
+        }
+        guard let verb = words.first, !verb.isEmpty else { return false }
+        return !weakVerbs.contains(verb)
+    }
+
+    /// Something settled between the people, not one person's view or a report that nothing was.
+    static func isDecision(_ item: String) -> Bool {
+        let lowered = item.lowercased()
+        if nonItems.contains(where: { lowered.contains($0) }) { return false }
+        let starts = ["the discussion", "discussion", "the meeting", "the conversation", "they discussed", "both parties discussed"]
+        if starts.contains(where: { lowered.hasPrefix($0) }) { return false }
+        // "Tess Stanton acknowledged…", "Jordan Carver hopes…": a person reporting, not a decision.
+        let words = lowered.split(separator: " ").map { $0.trimmingCharacters(in: .punctuationCharacters) }
+        let reporting: Set<String> = [
+            "acknowledged", "noted", "expressed", "confirmed", "stated", "said", "mentioned", "suggests", "suggested",
+            "highlighted", "described", "hopes", "hoped", "emphasized", "explained", "discussed", "believes", "thinks",
+            "wants", "asked", "inquired", "prefers", "preferred", "indicated", "questioned", "focused",
+        ]
+        for (i, w) in words.prefix(4).enumerated() where i >= 1 && reporting.contains(w) { return false }
+        return true
+    }
+
+    /// Takes "uh", "um" and a stammered "kind of to kind of" out of text the model copied too closely.
+    static func unstammered(_ text: String) -> String {
+        var out = text
+        for filler in [" uh ", " um ", " uh, ", " um, "] {
+            while let r = out.range(of: filler, options: .caseInsensitive) { out.replaceSubrange(r, with: " ") }
+        }
+        for pair in ["kind of to kind of", "kind of kind of", "sort of sort of", "you know, you know,"] {
+            while let r = out.range(of: pair, options: .caseInsensitive) { out.replaceSubrange(r, with: String(pair.split(separator: " ").prefix(2).joined(separator: " "))) }
+        }
+        return out.replacingOccurrences(of: "  ", with: " ")
     }
 
     /// The speaker names a section's lines carry ("Name: what they said").

@@ -154,8 +154,8 @@ public enum Render {
         let typed = !(m.typedNamed ?? []).isEmpty
         switch (m.autoNamed.isEmpty, typed) {
         case (false, false): return " (names recognized by voice; check them)"
-        case (true, true): return " (names from what was typed before the meeting; check them)"
-        case (false, true): return " (names recognized by voice or from what was typed; check them)"
+        case (true, true): return " (names from the calendar, the meeting's name or from what was typed; check them)"
+        case (false, true): return " (names recognized by voice, or from the calendar, the meeting's name or from what was typed; check them)"
         case (true, false): return ""
         }
     }

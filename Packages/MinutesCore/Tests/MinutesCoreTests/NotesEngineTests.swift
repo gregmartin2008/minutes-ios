@@ -624,4 +624,21 @@ final class RefusalTests: XCTestCase {
         XCTAssertFalse(fragment.keyPoints.isEmpty)
         XCTAssertTrue(model.sections.contains { $0.contains("line 7 ") })
     }
+
+    func testReportsAndHedgesAreNotNextStepsOrDecisions() {
+        XCTAssertTrue(NotesEngine.isNextStep("Jordan Carver: send the quarterly pipeline update to Paul Demarco"))
+        XCTAssertTrue(NotesEngine.isNextStep("Paul Demarco: will add Jordan and Greg to the quarterly email blast"))
+        XCTAssertFalse(NotesEngine.isNextStep("Tess Stanton: continue exploring multiple deal partners and models"))
+        XCTAssertFalse(NotesEngine.isNextStep("Jordan Carver wants to know how to crack the nut of high-quality assets"))
+        XCTAssertFalse(NotesEngine.isNextStep("Jordan Carver: monitor performance of the telecom roll-up"))
+        XCTAssertFalse(NotesEngine.isNextStep("Some current platform holders are looking to get more aggressive, but no specific actions were committed beyond observation."))
+        XCTAssertFalse(NotesEngine.isNextStep("Greg Martin noted the unsuccessful LOI deal"))
+        XCTAssertTrue(NotesEngine.isDecision("Hold the bid at 6.5x until the customer reference calls are done."))
+        XCTAssertTrue(NotesEngine.isDecision("Meridyan will send its pipeline quarterly and Siemens will respond pre-LOI."))
+        XCTAssertFalse(NotesEngine.isDecision("Tess Stanton acknowledged that the model varies wildly depending on deal volume."))
+        XCTAssertFalse(NotesEngine.isDecision("Jordan Carver hopes to sign a proprietary deal under LOI in the next few weeks."))
+        XCTAssertFalse(NotesEngine.isDecision("The discussion included consideration of board presence."))
+        XCTAssertFalse(NotesEngine.isDecision("No agreements on pricing thresholds or capital deployment strategies were reached."))
+        XCTAssertEqual(NotesEngine.unstammered("to kind of to kind of preview uh kind of what our offer, um, is"), "to kind of preview kind of what our offer, is")
+    }
 }

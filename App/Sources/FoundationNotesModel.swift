@@ -9,13 +9,13 @@ import MinutesCore
 struct SectionNotesSchema {
     @Guide(description: "A heading of 3 to 7 words naming what this part of the meeting was about, e.g. 'Siemens' lending criteria'")
     var topic: String
-    @Guide(description: "One paragraph of 3 to 6 sentences telling what was said in this part, in your own words, the way a careful note-taker writes it up: who said what, with the names, numbers, dates and terms exactly as in the transcript. Prose, no bullet points, no quotes")
+    @Guide(description: "One paragraph of 3 to 6 short sentences telling what was said in this part, in your own words, the way an analyst writes up a call: the substance, with the names, numbers, dates and terms exactly as in the transcript. State what each person said as fact ('Harlow's checks run $3M to $15M'), not 'X asked and Y responded'. One idea per sentence; do not chain clauses with 'noting that', 'while' or 'with'. No bullet points, no quotes")
     var narrative: String
     @Guide(description: "One sentence: what this part covered")
     var gist: String
-    @Guide(description: "Things the people explicitly agreed on or settled in this part, each one short sentence. Only real agreements between them, not opinions, plans one person described, or a speaker agreeing to start talking. Empty if none", .maximumCount(3))
+    @Guide(description: "Only something the people settled between them in this part, as one short sentence: a price, a plan, who does what. Not one person's opinion, preference or hope, not 'X acknowledged', and never a sentence saying nothing was decided. Most parts have none: then empty", .maximumCount(2))
     var decisions: [String]
-    @Guide(description: "Follow-ups a named person committed to do after the meeting, as 'Name: what they will do (for whom, by when if said)'. Only commitments stated in this part; not things done during the call, not general intentions. Empty if none", .maximumCount(4))
+    @Guide(description: "Only a concrete thing a named person said they will do after the call, as 'Name: will send/schedule/introduce/review/call/add… (what, for whom, by when if said)'. Not continuing, exploring, considering or monitoring, not opinions, not things done during the call. Most parts have none: then empty", .maximumCount(3))
     var nextSteps: [String]
 }
 
@@ -29,7 +29,7 @@ struct MergedListSchema {
 struct OverviewSchema {
     @Guide(description: "A title of 3 to 8 words naming the meeting's subject, without a date")
     var title: String
-    @Guide(description: "A summary of 2 to 4 sentences: who met about what, the main things each side said, and where it ended up. Plain prose, specific, no filler")
+    @Guide(description: "A summary of 2 to 4 short sentences: who met about what, the one or two most important things each side said, and where it ended up. Specific; not a list of the topics covered; no filler such as 'met to discuss'")
     var summary: String
 }
 
