@@ -86,7 +86,7 @@ final class MeetingCalendar {
                     name = email ?? ""
                 }
             }
-            let shown = name
+            let shown = Person.naturalName(name)
             guard !shown.isEmpty else { return }
             if let i = people.firstIndex(where: { Self.same($0, name: shown, email: email) }) {
                 if organizer { people[i].organizer = true }

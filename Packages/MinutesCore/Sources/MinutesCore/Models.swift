@@ -369,22 +369,46 @@ extension Meeting {
         return out
     }
 
-    /// "MWISC Florac - Dov Herzberg" → Dov Herzberg at Florac; "Florac (Dov Herzberg)" is not read.
+    /// "MWISC Florac - Dov Herzberg" → Dov Herzberg at Florac; "Intro Call: Greg (Soterra) - Jack
+    /// Davis (Harbert Credit)" → Jack Davis at Harbert Credit. "Florac (Dov Herzberg)" is not read.
     public static func personFromTitle(_ title: String) -> Person? {
         let parts = title.components(separatedBy: " - ")
         guard parts.count == 2 else { return nil }
-        let name = parts[1].trimmingCharacters(in: .whitespaces)
+        var name = parts[1].trimmingCharacters(in: .whitespaces)
+        var company: String?
+        if let open = name.firstIndex(of: "("), name.hasSuffix(")") {
+            company = String(name[name.index(after: open)...].dropLast()).trimmingCharacters(in: .whitespaces)
+            name = String(name[..<open]).trimmingCharacters(in: .whitespaces)
+        }
         let words = name.split(separator: " ")
         guard (2...3).contains(words.count), words.allSatisfy({ $0.first?.isUppercase == true }) else { return nil }
-        var company = parts[0].trimmingCharacters(in: .whitespaces)
-        for prefix in ["MWISC ", "Meeting with ", "Call with "] where company.hasPrefix(prefix) {
-            company = String(company.dropFirst(prefix.count))
+        if company == nil {
+            var left = parts[0].trimmingCharacters(in: .whitespaces)
+            for prefix in ["MWISC ", "Meeting with ", "Call with "] where left.hasPrefix(prefix) {
+                left = String(left.dropFirst(prefix.count))
+            }
+            // "Intro Call: Greg Martin (Soterra)" names the person's own side, not the visitor's firm.
+            company = left.contains(":") || left.contains("(") ? nil : left
         }
-        return Person(name: name, company: company.isEmpty ? nil : company)
+        return Person(name: name, company: (company?.isEmpty ?? true) ? nil : company)
     }
 }
 
 extension Person {
+    /// "Davis, Jack" → "Jack Davis"; "DAVIS, JACK" → "Jack Davis". Calendars from corporate
+    /// directories list people last name first; the "With" list and the voices need first-last.
+    public static func naturalName(_ raw: String) -> String {
+        var name = raw.trimmingCharacters(in: .whitespaces)
+        let parts = name.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
+        if parts.count == 2, !parts[0].isEmpty, !parts[1].isEmpty, !parts[1].contains(" ") || parts[1].split(separator: " ").count <= 2 {
+            name = parts[1] + " " + parts[0]
+        }
+        if name == name.uppercased(), name.contains(where: \.isLetter) {
+            name = name.lowercased().split(separator: " ").map { $0.prefix(1).uppercased() + $0.dropFirst() }.joined(separator: " ")
+        }
+        return name
+    }
+
     /// Fills what this person is missing from a directory entry with the same name (or email).
     public func completed(from directory: [Person]) -> Person {
         let name = self.name.lowercased()
