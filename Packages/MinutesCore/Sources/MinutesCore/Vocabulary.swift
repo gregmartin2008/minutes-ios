@@ -34,7 +34,8 @@ public struct Vocabulary: Codable, Equatable, Sendable {
     public static let builtIn: [VocabularyTerm] = [
         VocabularyTerm(term: "EBITDA", heardAs: [
             "EVITA", "EBIDA", "EBITA", "E-BITDA", "EBIT DA", "E BIT DA", "Eibit", "EIBIT", "Aibida", "eBayDA", "ebitdah", "even dah",
-            "EPATA", "evitaz", "ebitop", "ibada", "eBay da", "ubita", "ubitda", "ebitah",
+            "EPATA", "evitaz", "ebitop", "ibada", "eBay da", "ubita", "ubitda", "ebitah", "Ibata", "V baton", "VBit Dodds",
+            "V bit", "ebit dodds", "even dodds",
         ]),
         VocabularyTerm(term: "McGuireWoods", heardAs: ["Maguire Woods", "Aguire Woods", "McGuire Woods", "Mcguire Woods", "Maguirewoods", "McGwire Woods"]),
         VocabularyTerm(term: "EBITDA", heardAs: ["Eibit debt", "EIBIT debt", "Aibida debt", "EBITDA debt"]),
