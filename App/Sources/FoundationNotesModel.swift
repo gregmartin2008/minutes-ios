@@ -9,9 +9,9 @@ import MinutesCore
 struct SectionNotesSchema {
     @Guide(description: "A heading of 3 to 7 words naming what this part of the meeting was about, e.g. 'Siemens' lending criteria'")
     var topic: String
-    @Guide(description: "One paragraph of 3 to 6 short sentences telling what was said in this part, in your own words, the way an analyst writes up a call: the substance, with the names, numbers, dates and terms exactly as in the transcript. State what each person said as fact ('Harbert's checks run $3M to $15M'), not 'X asked and Y responded'. One idea per sentence; do not chain clauses with 'noting that', 'while' or 'with'. No bullet points, no quotes")
+    @Guide(description: "One paragraph of 3 to 6 short sentences telling what was said in this part, in your own words, the way an analyst writes up a call: the substance, with the names, numbers, dates and terms exactly as in the transcript. State what each person said as fact ('Harbert's checks run $3M to $15M'), not 'X asked and Y responded' and not 'X explained that' before every sentence. Third person only: never 'we', 'our' or 'I'. One idea per sentence; do not chain clauses with 'noting that', 'while' or 'with'. No bullet points, no quotes")
     var narrative: String
-    @Guide(description: "One sentence: what this part covered")
+    @Guide(description: "One sentence stating the main point of this part as a fact, e.g. 'The fund lends $20M to $100M to sponsors on deals with some hair on them.' Not 'Discussion on…'")
     var gist: String
     @Guide(description: "Only something the people settled between them in this part, as one short sentence: a price, a plan, who does what. Not one person's opinion, preference or hope, not 'X acknowledged', and never a sentence saying nothing was decided. Most parts have none: then empty", .maximumCount(2))
     var decisions: [String]

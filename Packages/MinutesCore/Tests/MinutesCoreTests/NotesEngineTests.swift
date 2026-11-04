@@ -641,4 +641,21 @@ final class RefusalTests: XCTestCase {
         XCTAssertFalse(NotesEngine.isDecision("No agreements on pricing thresholds or capital deployment strategies were reached."))
         XCTAssertEqual(NotesEngine.unstammered("to kind of to kind of preview uh kind of what our offer, um, is"), "to kind of preview kind of what our offer, is")
     }
+
+    func testCopiedSpeechIsNotWrittenUp() {
+        let lines = [
+            "Greg Martin: We just closed a packaging company in December where there's an SBIC lender in there that owns 30, 35 percent.",
+            "Alex Steren: The fund is based in New York and manages a $2 billion third fund.",
+        ]
+        let speakers = NotesEngine.speakers(in: lines)
+        XCTAssertTrue(NotesEngine.isWrittenUp("O'Connor's third fund, run from New York, is $2 billion.", speakers: speakers, lines: lines))
+        XCTAssertFalse(NotesEngine.isWrittenUp("Greg Martin: yeah, look, I mean, if you've got a business that's doing that.", speakers: speakers, lines: lines))
+        XCTAssertFalse(NotesEngine.isWrittenUp("We just closed a packaging company in December.", speakers: speakers, lines: lines))
+        XCTAssertFalse(NotesEngine.isWrittenUp("Soterra closed a packaging company in December where there's an SBIC lender in there that owns 30, 35 percent of it.", speakers: speakers, lines: lines))
+        XCTAssertFalse(NotesEngine.isWrittenUp("There's a president who owns, let's call it 15.", speakers: speakers, lines: lines))
+        XCTAssertEqual(
+            NotesEngine.verifiedParagraph("Soterra closed a packaging deal in December. We like it. Greg Martin: yeah, look.", against: lines),
+            "Soterra closed a packaging deal in December.")
+        XCTAssertEqual(NotesEngine.gistSummary(["Discussion on the fund.", "Discussion on the fund.", "A discussion about leverage."]), "The fund. Leverage.")
+    }
 }
