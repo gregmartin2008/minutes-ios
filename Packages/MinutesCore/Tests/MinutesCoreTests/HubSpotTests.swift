@@ -146,6 +146,10 @@ final class HubSpotTests: XCTestCase {
         XCTAssertEqual(Person.naturalName("Davis, Jack"), "Jack Davis")
         XCTAssertEqual(Person.naturalName("DAVIS, JACK"), "Jack Davis")
         XCTAssertEqual(Person.naturalName("Jack Davis"), "Jack Davis")
+        XCTAssertTrue(Person.sameName("J. Carter", "Jeremy Carter"))
+        XCTAssertTrue(Person.sameName("jeremy carter", "Jeremy Carter"))
+        XCTAssertFalse(Person.sameName("J. Carter", "Greg Carter"))
+        XCTAssertFalse(Person.sameName("Jeremy Carter", "Jeremy Martin"))
     }
 
     func testDirectoryFillsInWhatIsMissing() {

@@ -110,8 +110,19 @@ final class MeetingCalendar {
         let local = email[..<at].lowercased()
         let parts = local.split(whereSeparator: { "._-".contains($0) }).map(String.init)
             .filter { !$0.isEmpty && $0.allSatisfy(\.isLetter) }
-        guard parts.count >= 2, parts.count <= 3, parts.allSatisfy({ $0.count >= 2 }) else { return nil }
-        return parts.map { $0.prefix(1).uppercased() + $0.dropFirst() }.joined(separator: " ")
+        if parts.count >= 2, parts.count <= 3, parts.allSatisfy({ $0.count >= 2 }) {
+            return parts.map { $0.prefix(1).uppercased() + $0.dropFirst() }.joined(separator: " ")
+        }
+        // "rspearin@monroecap.com": a first initial and a last name, the common corporate form.
+        // Read as "R. Spearin", which the person can correct; better than an unnamed voice.
+        let generic: Set<String> = [
+            "info", "sales", "hello", "admin", "contact", "office", "team", "support", "invest", "deals", "ir",
+            "investors", "mail", "email", "noreply", "calendar", "meetings", "events", "press", "legal",
+        ]
+        if parts.count == 1, let word = parts.first, (5...8).contains(word.count), !generic.contains(word) {
+            return word.prefix(1).uppercased() + ". " + word.dropFirst().prefix(1).uppercased() + word.dropFirst(2)
+        }
+        return nil
     }
 
     private static func same(_ p: Person, name: String, email: String?) -> Bool {
