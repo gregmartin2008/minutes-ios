@@ -657,5 +657,15 @@ final class RefusalTests: XCTestCase {
             NotesEngine.verifiedParagraph("Meridyan closed a packaging deal in December. We like it. Greg Martin: yeah, look.", against: lines),
             "Meridyan closed a packaging deal in December.")
         XCTAssertEqual(NotesEngine.gistSummary(["Discussion on the fund.", "Discussion on the fund.", "A discussion about leverage."]), "The fund. Leverage.")
+        let f = NotesFragment(
+            decisions: ["Hold the bid.", "Greg Martin: yeah, look, we will."],
+            actionItems: [
+                "Greg Martin: will send the one-pager and an NDA.",
+                "Greg Martin: will exchange those and as soon as we get this one signed up, it'll it'll be a longer process because there's not a bank involved, so we'll have to generate the materials for you guys.",
+                "Alex Sterling: will add Greg to the quarterly email.",
+            ])
+        let c = NotesEngine.checked(f, against: lines)
+        XCTAssertEqual(c.decisions, ["Hold the bid."])
+        XCTAssertEqual(c.actionItems, ["Greg Martin: will send the one-pager and an NDA.", "Alex Sterling: will add Greg to the quarterly email."])
     }
 }

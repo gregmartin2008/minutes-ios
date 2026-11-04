@@ -537,9 +537,17 @@ public struct NotesEngine: Sendable {
     /// transcript habits ("Name: ...") are taken out of the lists.
     static func checked(_ f: NotesFragment, against section: [String]) -> NotesFragment {
         var out = f
+        let names = speakers(in: section)
         out.figures = verified(figures: f.figures, against: section)
         out.narrative = verifiedParagraph(f.narrative, against: section)
-        return unquoted(out, speakers: speakers(in: section))
+        // A next step or decision that is a stretch of transcript ("Greg: will exchange those and
+        // as soon as we get this one signed up, it'll it'll be…") is not a note of one.
+        out.actionItems = f.actionItems.filter { item in
+            let body = item.firstIndex(of: ":").map { String(item[item.index(after: $0)...]) } ?? item
+            return item.count <= 220 && isWrittenUp(body, speakers: [], lines: section)
+        }
+        out.decisions = f.decisions.filter { $0.count <= 220 && isWrittenUp($0, speakers: names, lines: section) }
+        return unquoted(out, speakers: names)
     }
 
     /// One fragment from several (the halves of a section): lists joined, paragraphs joined.

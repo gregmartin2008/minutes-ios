@@ -409,6 +409,17 @@ extension Person {
         return name
     }
 
+    /// Whether two names are the same person: equal ignoring case, or one is the initial form
+    /// of the other ("J. Carver" and "Jordan Carver").
+    public static func sameName(_ a: String, _ b: String) -> Bool {
+        let x = a.lowercased().trimmingCharacters(in: .whitespaces), y = b.lowercased().trimmingCharacters(in: .whitespaces)
+        if x == y { return true }
+        let xw = x.split(separator: " ").map { $0.trimmingCharacters(in: .punctuationCharacters) }
+        let yw = y.split(separator: " ").map { $0.trimmingCharacters(in: .punctuationCharacters) }
+        guard xw.count >= 2, yw.count >= 2, xw.last == yw.last, let xf = xw.first, let yf = yw.first else { return false }
+        return (xf.count == 1 && yf.hasPrefix(xf)) || (yf.count == 1 && xf.hasPrefix(yf))
+    }
+
     /// Fills what this person is missing from a directory entry with the same name (or email).
     public func completed(from directory: [Person]) -> Person {
         let name = self.name.lowercased()

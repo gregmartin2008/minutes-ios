@@ -1003,6 +1003,14 @@ private struct NameSpeakerSheet: View {
         return model.profiles.filter { !taken.contains($0.name.lowercased()) }
     }
 
+    /// The people the calendar or the "With" list says were in the meeting and no voice carries yet.
+    private var invited: [String] {
+        let taken = meeting.speakerNames.filter { $0.key != label }.values
+        return model.people(in: meeting).map(\.name).filter { candidate in
+            !candidate.contains("@") && !taken.contains { Person.sameName($0, candidate) }
+        }
+    }
+
     var body: some View {
         NavigationStack {
             Form {
@@ -1026,6 +1034,18 @@ private struct NameSpeakerSheet: View {
                                 .font(Theme.document(15))
                                 .foregroundStyle(Theme.muted)
                                 .lineLimit(3)
+                        }
+                    }
+                }
+
+                if !invited.isEmpty {
+                    Section("Invited to this meeting") {
+                        ForEach(invited, id: \.self) { person in
+                            Button(person) {
+                                name = person
+                                save()
+                            }
+                            .foregroundStyle(Theme.ink)
                         }
                     }
                 }
