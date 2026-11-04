@@ -358,18 +358,28 @@ public struct NotesEngine: Sendable {
         let gists = fragments.map { $0.gist.isEmpty ? Self.firstSentence($0.narrative) : $0.gist }.filter { !$0.isEmpty }
         var overview = NotesOverview(title: titleHint ?? "", summary: Self.gistSummary(gists))
         if !throttled {
-            do {
-                let decided = merged[.decisions] ?? [], next = merged[.actionItems] ?? []
-                let shown = Self.detailsForOverview(details, maxCharacters: 3200)
-                let o = try await withBackoff(until: giveUpAt) {
-                    try await model.overview(details: shown, decisions: decided, nextSteps: next, titleHint: titleHint)
+            let decided = merged[.decisions] ?? [], next = merged[.actionItems] ?? []
+            // The details may not fit the model's window with the prompt; try shorter.
+            var budgets = [3200, 1600, 800]
+            while let budget = budgets.first {
+                budgets.removeFirst()
+                do {
+                    let shown = Self.detailsForOverview(details, maxCharacters: budget)
+                    let o = try await withBackoff(until: giveUpAt) {
+                        try await model.overview(details: shown, decisions: decided, nextSteps: next, titleHint: titleHint)
+                    }
+                    if !o.summary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { overview.summary = o.summary }
+                    if !o.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { overview.title = o.title }
+                    break
+                } catch let e as NotesModelError where e == .rateLimited {
+                    if withoutModelIfThrottled { throttled = true; break } else { throw e }
+                } catch let e as NotesModelError where e == .contextExceeded && !budgets.isEmpty {
+                    Log.shared.warn("notes: the overview did not fit the model's window at \(budget) characters; trying shorter")
+                } catch {
+                    // Keep the stitched-together gists as the summary.
+                    Log.shared.warn("notes: the overview could not be written (\(error)); using the sections' gists")
+                    break
                 }
-                if !o.summary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { overview.summary = o.summary }
-                if !o.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { overview.title = o.title }
-            } catch let e as NotesModelError where e == .rateLimited {
-                if withoutModelIfThrottled { throttled = true } else { throw e }
-            } catch {
-                // Keep the stitched-together gists as the summary.
             }
         }
         progress?(1)
@@ -433,7 +443,18 @@ public struct NotesEngine: Sendable {
     /// The gists joined into one paragraph, kept to a readable length by dropping from the
     /// middle: the opening and the close of a meeting say the most about it.
     static func gistSummary(_ gists: [String], maxCharacters: Int = 1100) -> String {
-        var kept = gists
+        // The model echoes the previous gist now and then; the same sentence twice says nothing.
+        var seen = Set<String>()
+        var kept: [String] = []
+        for sentence in gists {
+            var s = sentence.trimmingCharacters(in: .whitespacesAndNewlines)
+            for prefix in ["Discussion on ", "Discussion of ", "Discussion about ", "A discussion about ", "A discussion of "] where s.hasPrefix(prefix) {
+                s = String(s.dropFirst(prefix.count))
+                s = s.prefix(1).uppercased() + s.dropFirst()
+            }
+            guard !s.isEmpty, seen.insert(s.lowercased()).inserted else { continue }
+            kept.append(s)
+        }
         while kept.count > 2, kept.joined(separator: " ").count > maxCharacters {
             kept.remove(at: kept.count / 2)
         }
@@ -879,10 +900,38 @@ public struct NotesEngine: Sendable {
     /// not have anywhere in the section is the model's invention or garbling.
     static func verifiedParagraph(_ text: String, against lines: [String]) -> String {
         let said = Set(lines.flatMap(numbers))
+        let speakers = speakers(in: lines)
         let kept = sentences(text).filter { sentence in
-            numbers(sentence).allSatisfy { said.contains($0) }
+            numbers(sentence).allSatisfy { said.contains($0) } && isWrittenUp(sentence, speakers: speakers, lines: lines)
         }
         return kept.joined(separator: " ")
+    }
+
+    /// Whether a sentence reads as a note rather than as transcript copied through: no run of
+    /// ten words lifted from a line, no "Name: …" prefix, not in the first person, no "yeah, look,
+    /// I mean" speech.
+    static func isWrittenUp(_ sentence: String, speakers: Set<String>, lines: [String]) -> Bool {
+        if let colon = sentence.firstIndex(of: ":"), speakers.contains(sentence[..<colon].trimmingCharacters(in: .whitespaces)) {
+            return false
+        }
+        let lowered = " " + sentence.lowercased() + " "
+        let speech = [
+            " i mean", " yeah", " gonna", " you know", " let's call it", " i guess", " kind of", " sort of", " like,", " look,",
+            " if that makes sense", " uh ", " um ", " okay.", " all right", " for sure",
+        ]
+        if speech.contains(where: { lowered.contains($0) }) { return false }
+        let firstPerson: Set<String> = ["i", "we", "we're", "we've", "we'd", "we'll", "our", "us", "i'm", "i'll", "i've", "my"]
+        let words = lowered.split(whereSeparator: { !$0.isLetter && $0 != "'" }).map(String.init)
+        if words.contains(where: { firstPerson.contains($0) }) { return false }
+        // Ten words in a row that a transcript line has: copied, not written up.
+        if words.count >= 10 {
+            let text = lines.joined(separator: " ").lowercased()
+            for start in 0...(words.count - 10) {
+                let run = words[start..<(start + 10)].joined(separator: " ")
+                if text.contains(run) { return false }
+            }
+        }
+        return true
     }
 
     /// A paragraph as sentences, each with its end mark. "$3.5 million" and "Inc." do not split.
