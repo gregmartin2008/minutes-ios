@@ -37,7 +37,7 @@ public struct GeminiNotesWriter: CloudNotesWriting {
     public var model: String
     public var base = URL(string: "https://generativelanguage.googleapis.com")!
     public var transport: Transport
-    public static let defaultModel = "gemini-2.5-flash"
+    public static let defaultModel = "gemini-3.8-flash"
 
     public var name: String {
         var parts = model.split(separator: "-").map(String.init)

@@ -56,10 +56,10 @@ final class CloudNotesTests: XCTestCase {
         XCTAssertEqual(details[0].startSeconds, 206)
         XCTAssertEqual(details[1].startSeconds, 3735)
         XCTAssertEqual(details[1].text, "Option one carries a $5 million earnout.")   // the $99M sentence was never said
-        XCTAssertEqual(writer.name, "Gemini 2.5 Flash")
+        XCTAssertEqual(writer.name, "Gemini 3.8 Flash")
 
         let request = fake.requests[0]
-        XCTAssertEqual(request.url?.path, "/v1beta/models/gemini-2.5-flash:generateContent")
+        XCTAssertEqual(request.url?.path, "/v1beta/models/gemini-3.8-flash:generateContent")
         XCTAssertEqual(request.value(forHTTPHeaderField: "x-goog-api-key"), "k")
         let body = try JSONSerialization.jsonObject(with: request.httpBody!) as! [String: Any]
         let config = body["generationConfig"] as! [String: Any]
@@ -84,6 +84,6 @@ final class CloudNotesTests: XCTestCase {
 
     func testTheModelNameIsRenderedForPeople() {
         XCTAssertEqual(GeminiNotesWriter(apiKey: "k", model: "gemini-2.5-pro").name, "Gemini 2.5 Pro")
-        XCTAssertEqual(GeminiNotesWriter(apiKey: "k", model: "").model, "gemini-2.5-flash")
+        XCTAssertEqual(GeminiNotesWriter(apiKey: "k", model: "").model, "gemini-3.8-flash")
     }
 }
