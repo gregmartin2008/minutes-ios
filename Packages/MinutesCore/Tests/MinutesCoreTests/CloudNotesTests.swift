@@ -15,6 +15,7 @@ final class CloudNotesTests: XCTestCase {
             "nextSteps": [
                 ["owner": "Jeremy Carter", "action": "update the option 1 scenario to 49% ownership", "when": "tonight"],
                 ["owner": "Mark Franco", "action": "post the deal summary on the Soterra General channel"],
+                ["owner": "Greg", "action": "submit an offer by December 4th", "when": "December 4th"],
             ],
             "decisions": ["Present option one at 49% as the primary proposal."],
             "details": [
@@ -57,12 +58,13 @@ final class CloudNotesTests: XCTestCase {
     func testNotesComeBackStructuredWithNumbersChecked() async throws {
         let fake = Fake()
         let writer = GeminiNotesWriter(apiKey: "k", transport: { try fake.handle($0) })
-        let notes = try await writer.write(transcript: transcript, title: nil, spellings: ["Soterra"])
+        let notes = try await writer.write(transcript: transcript, title: nil, spellings: ["Soterra"], recorder: "Greg Martin")
         XCTAssertEqual(notes.title, "Vortala offer options")
         XCTAssertEqual(notes.summary, "Soterra settled the two options for Vortala.")
         XCTAssertEqual(notes.actionItems, [
             "Jeremy Carter: update the option 1 scenario to 49% ownership (tonight)",
             "Mark Franco: post the deal summary on the Soterra General channel",
+            "Greg: submit an offer by December 4th",
         ])
         XCTAssertEqual(notes.decisions, ["Present option one at 49% as the primary proposal."])
         let details = try XCTUnwrap(notes.details)
@@ -80,6 +82,7 @@ final class CloudNotesTests: XCTestCase {
         XCTAssertEqual(config["responseMimeType"] as? String, "application/json")
         let prompt = (((body["contents"] as! [[String: Any]])[0]["parts"] as! [[String: Any]])[0]["text"] as! String)
         XCTAssertTrue(prompt.contains("Spell these exactly as written: Soterra."))
+        XCTAssertTrue(prompt.contains("The meeting was recorded by Greg Martin, whose firm these notes are for"))
         XCTAssertTrue(prompt.hasSuffix(transcript))
     }
 

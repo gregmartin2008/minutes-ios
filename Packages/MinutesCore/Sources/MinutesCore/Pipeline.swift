@@ -265,9 +265,10 @@ public final class MeetingPipeline: @unchecked Sendable {
             if let cloud = services.cloudNotes() {
                 let started = Date()
                 do {
+                    let own = services.ownProfileID().flatMap { id in store.loadProfiles().first { $0.id == id }?.name }
                     var notes = try await cloud.write(
                         transcript: Render.cloudTranscript(m), title: m.titleIsAuto ? nil : m.title,
-                        spellings: services.vocabulary().spellings)
+                        spellings: services.vocabulary().spellings, recorder: own)
                     notes.writer = cloud.name
                     m.notes = notes
                     m.notesError = nil

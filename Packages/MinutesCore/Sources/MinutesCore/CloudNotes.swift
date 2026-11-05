@@ -9,7 +9,13 @@ import FoundationNetworking
 public protocol CloudNotesWriting: Sendable {
     /// A short name for the email's footer: "Gemini 2.5 Flash".
     var name: String { get }
-    func write(transcript: String, title: String?, spellings: [String]) async throws -> MeetingNotes
+    func write(transcript: String, title: String?, spellings: [String], recorder: String?) async throws -> MeetingNotes
+}
+
+extension CloudNotesWriting {
+    public func write(transcript: String, title: String?, spellings: [String]) async throws -> MeetingNotes {
+        try await write(transcript: transcript, title: title, spellings: spellings, recorder: nil)
+    }
 }
 
 public struct CloudNotesError: LocalizedError, Equatable {
@@ -107,15 +113,15 @@ public struct GeminiNotesWriter: CloudNotesWriting {
         throw CloudNotesError(status: 404, message: "The key works, but \"\(model)\" is not a model it can use.\(suggestion) Available: \(shown).")
     }
 
-    public func write(transcript: String, title: String?, spellings: [String]) async throws -> MeetingNotes {
-        let prompt = Self.prompt(transcript: transcript, title: title, spellings: spellings)
+    public func write(transcript: String, title: String?, spellings: [String], recorder: String?) async throws -> MeetingNotes {
+        let prompt = Self.prompt(transcript: transcript, title: title, spellings: spellings, recorder: recorder)
         let json = try await generate(prompt: prompt, schema: Self.schema)
         return try Self.notes(from: json, transcript: transcript)
     }
 
     // MARK: Prompt and schema
 
-    static func prompt(transcript: String, title: String?, spellings: [String]) -> String {
+    static func prompt(transcript: String, title: String?, spellings: [String], recorder: String? = nil) -> String {
         var p = """
         You write meeting notes for a private equity firm from a transcript. Each transcript line is \
         "Name [m:ss]: what they said"; the names are the people in the meeting (a "Speaker N" is a \
@@ -140,6 +146,11 @@ public struct GeminiNotesWriter: CloudNotesWriting {
         Small talk gets one sentence at most, or nothing.
         - title: 3 to 8 words naming the meeting's subject, no date.
         """
+        if let recorder, !recorder.isEmpty {
+            p += "\nThe meeting was recorded by \(recorder), whose firm these notes are for; the other participants are the other side "
+                + "(a seller, a lender, an investor, an advisor), unless the transcript shows they are \(recorder)'s colleagues. "
+                + "A firm named in the meeting's title is not necessarily the firm the other participants are from."
+        }
         if let title, !title.isEmpty { p += "\nThe meeting was named \"\(title)\"; keep that as the title unless it is only a date." }
         if !spellings.isEmpty { p += "\nSpell these exactly as written: " + spellings.prefix(60).joined(separator: ", ") + "." }
         p += "\n\nTranscript:\n" + transcript
@@ -175,8 +186,12 @@ public struct GeminiNotesWriter: CloudNotesWriting {
         var next: [String] = []
         for item in json["nextSteps"] as? [[String: Any]] ?? [] {
             guard let owner = item["owner"] as? String, let action = item["action"] as? String else { continue }
-            var line = "\(owner.trimmingCharacters(in: .whitespaces)): \(action.trimmingCharacters(in: .whitespaces))"
-            if let when = item["when"] as? String, !when.trimmingCharacters(in: .whitespaces).isEmpty { line += " (\(when))" }
+            let actionText = action.trimmingCharacters(in: .whitespaces)
+            var line = "\(owner.trimmingCharacters(in: .whitespaces)): \(actionText)"
+            if let when = (item["when"] as? String)?.trimmingCharacters(in: .whitespaces), !when.isEmpty,
+               !actionText.lowercased().contains(when.lowercased()) {
+                line += " (\(when))"
+            }
             next.append(line)
         }
         let decisions = (json["decisions"] as? [String] ?? []).map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }

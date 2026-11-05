@@ -198,7 +198,7 @@ final class AppModel: ObservableObject {
             do {
                 var notes = try await cloud.write(
                     transcript: Render.cloudTranscript(m), title: m.titleIsAuto ? nil : m.title,
-                    spellings: AppSettings.shared.vocabulary.spellings)
+                    spellings: AppSettings.shared.vocabulary.spellings, recorder: ownName)
                 notes.writer = cloud.name
                 guard var fresh = self.meeting(m.id) else { continue }
                 fresh.notes = notes
