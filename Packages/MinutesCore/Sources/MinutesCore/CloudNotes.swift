@@ -24,6 +24,7 @@ public struct CloudNotesError: LocalizedError, Equatable {
         case 400 where message.lowercased().contains("api key"), 401, 403:
             return "Gemini did not accept the API key. Check it in Settings."
         case 429: return "Gemini's free allowance for the moment is used up: \(message)"
+        case 503: return "Gemini is overloaded right now (\(message)). Try again in a minute."
         case 0: return message
         default: return "Gemini answered \(status): \(message)"
         }
@@ -37,6 +38,8 @@ public struct GeminiNotesWriter: CloudNotesWriting {
     public var model: String
     public var base = URL(string: "https://generativelanguage.googleapis.com")!
     public var transport: Transport
+    /// Waits before trying again when the service is overloaded (503) or rate-limited (429).
+    public var retryWaits: [Double] = [5, 15, 30]
     public static let defaultModel = "gemini-3.8-flash"
 
     public var name: String {
@@ -163,6 +166,19 @@ public struct GeminiNotesWriter: CloudNotesWriting {
     // MARK: Plumbing
 
     private func generate(prompt: String, schema: [String: Any]?) async throws -> [String: Any] {
+        var attempt = 0
+        while true {
+            do {
+                return try await generateOnce(prompt: prompt, schema: schema)
+            } catch let e as CloudNotesError where (e.status == 503 || e.status == 429) && attempt < retryWaits.count {
+                Log.shared.warn("gemini: \(e.status), trying again in \(Int(retryWaits[attempt]))s")
+                try await Task.sleep(nanoseconds: UInt64(retryWaits[attempt] * 1_000_000_000))
+                attempt += 1
+            }
+        }
+    }
+
+    private func generateOnce(prompt: String, schema: [String: Any]?) async throws -> [String: Any] {
         var config: [String: Any] = ["temperature": 0.2]
         if let schema {
             config["responseMimeType"] = "application/json"
