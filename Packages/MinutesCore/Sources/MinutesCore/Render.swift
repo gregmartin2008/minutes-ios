@@ -69,6 +69,25 @@ public enum Render {
         (m.utterances ?? []).map { "\(m.displayName(for: $0.speaker)): \($0.text)" }
     }
 
+    /// The transcript for a large model: "Name [m:ss]: words" lines, with the gaps noted.
+    public static func cloudTranscript(_ m: Meeting) -> String {
+        var out: [String] = []
+        var gaps = m.gaps.sorted { $0.at < $1.at }[...]
+        for u in m.utterances ?? [] {
+            while let g = gaps.first, g.at <= u.start {
+                out.append("[Recording paused for \(span(g.duration))]")
+                gaps = gaps.dropFirst()
+            }
+            out.append("\(m.displayName(for: u.speaker)) [\(clock(u.start))]: \(u.text)")
+        }
+        return out.joined(separator: "\n")
+    }
+
+    /// How the notes were written, for the foot of the notes.
+    public static func writerLine(_ n: MeetingNotes) -> String {
+        n.writer.map { "Notes written by \($0) from the transcript." } ?? "Notes written on this iPhone by Apple's language model."
+    }
+
     public static func transcriptText(_ m: Meeting) -> String {
         var out: [String] = []
         var gaps = m.gaps.sorted { $0.at < $1.at }[...]
@@ -245,6 +264,7 @@ public enum Render {
             if let note = remark(n) {
                 html += "<p style=\"margin:14px 0 0;color:#8A5200\">\(e(note))</p>"
             }
+            html += "<p style=\"margin:14px 0 0;color:#5A6774;font-size:13px\">\(e(writerLine(n))) Check names, numbers and dates against the transcript before relying on them.</p>"
         } else {
             if m.notesPending == true {
                 html += "<p style=\"margin:18px 0 0;color:#8A5200\">\(e(notesPendingText)) The full transcript is below.</p>"

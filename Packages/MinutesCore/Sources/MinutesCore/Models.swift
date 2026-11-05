@@ -86,12 +86,14 @@ public struct MeetingNotes: Codable, Equatable, Sendable {
     public var missingTailSeconds: Double?
     /// The meeting told part by part: a heading and a paragraph for each.
     public var details: [NotesDetail]?
+    /// Which model wrote the notes when it was not the on-device one ("Gemini 2.5 Flash").
+    public var writer: String?
 
     public init(
         title: String = "", summary: String = "", keyPoints: [String] = [], decisions: [String] = [],
         actionItems: [String] = [], openQuestions: [String] = [], figures: [String] = [],
         skippedSections: Int = 0, totalSections: Int = 0, throttled: Bool? = nil, hot: Bool? = nil,
-        details: [NotesDetail]? = nil
+        details: [NotesDetail]? = nil, writer: String? = nil
     ) {
         self.title = title
         self.summary = summary
@@ -105,6 +107,7 @@ public struct MeetingNotes: Codable, Equatable, Sendable {
         self.throttled = throttled
         self.hot = hot
         self.details = details
+        self.writer = writer
     }
 
     public var isEmpty: Bool {

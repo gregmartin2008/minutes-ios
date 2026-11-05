@@ -95,6 +95,22 @@ final class AppSettings {
         set { defaults.set(try? JSONEncoder().encode(newValue), forKey: "directory") }
     }
 
+    static let geminiKey = "gemini-key"
+
+    /// The Gemini API key, in the Keychain. Empty means the notes are written on the phone.
+    var geminiKey: String {
+        get { Keychain.get(Self.geminiKey) ?? "" }
+        set {
+            if newValue.isEmpty { Keychain.delete(Self.geminiKey) } else { Keychain.set(newValue, for: Self.geminiKey) }
+        }
+    }
+
+    /// The Gemini model name; empty means the default.
+    var geminiModel: String {
+        get { defaults.string(forKey: "geminiModel") ?? "" }
+        set { defaults.set(newValue, forKey: "geminiModel") }
+    }
+
     static let hubspotKey = "hubspot-token"
 
     /// The HubSpot private-app access token, in the Keychain. Empty means HubSpot is not set up.

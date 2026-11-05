@@ -639,7 +639,7 @@ private struct NotesTab: View {
                         .foregroundStyle(Theme.warn)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                Text("Written on this iPhone by Apple's language model. Check names, numbers and dates against the transcript before relying on them.")
+                Text(Render.writerLine(notes) + " Check names, numbers and dates against the transcript before relying on them.")
                     .font(.footnote)
                     .foregroundStyle(Theme.muted)
                     .fixedSize(horizontal: false, vertical: true)

@@ -61,6 +61,9 @@ public struct PipelineServices: Sendable {
     /// The voice profile of the person using the app, if the app can tell (the one heard in the
     /// most meetings). It is matched a little more readily, and never given a typed name.
     public var ownProfileID: @Sendable () -> String?
+    /// A large model over the network to write the notes from the whole transcript, when the
+    /// person has set one up. Nil means the on-device model; a failure falls back to it too.
+    public var cloudNotes: @Sendable () -> CloudNotesWriting?
 
     public init(
         separator: SpeakerSeparating, transcriber: Transcribing,
@@ -70,6 +73,7 @@ public struct PipelineServices: Sendable {
         vocabulary: @escaping @Sendable () -> Vocabulary = { Vocabulary() },
         liveWork: @escaping @Sendable (String) -> LiveWork? = { _ in nil },
         ownProfileID: @escaping @Sendable () -> String? = { nil },
+        cloudNotes: @escaping @Sendable () -> CloudNotesWriting? = { nil },
         stageWillStart: (@Sendable (Stage, String) async -> Void)? = nil,
         stageDidFinish: (@Sendable (Stage) async -> Void)? = nil
     ) {
@@ -82,6 +86,7 @@ public struct PipelineServices: Sendable {
         self.vocabulary = vocabulary
         self.liveWork = liveWork
         self.ownProfileID = ownProfileID
+        self.cloudNotes = cloudNotes
         self.stageWillStart = stageWillStart
         self.stageDidFinish = stageDidFinish
     }
@@ -255,6 +260,34 @@ public final class MeetingPipeline: @unchecked Sendable {
             logSpeakerLevels(m, audio: try? audioURL(for: m))
 
         case .writeNotes:
+            // A large model over the network, when set up, writes from the whole transcript at
+            // once; the on-device path below is the fallback (offline, quota, a bad key).
+            if let cloud = services.cloudNotes() {
+                let started = Date()
+                do {
+                    var notes = try await cloud.write(
+                        transcript: Render.cloudTranscript(m), title: m.titleIsAuto ? nil : m.title,
+                        spellings: services.vocabulary().spellings)
+                    notes.writer = cloud.name
+                    m.notes = notes
+                    m.notesError = nil
+                    m.notesCheckpoint = nil
+                    m.notesPending = nil
+                    m.notesRetries = nil
+                    if m.titleIsAuto, !notes.title.isEmpty {
+                        m.title = notes.title
+                        m.titleIsAuto = false
+                    }
+                    log.info(String(format: "meeting %@: notes written by %@ in %.1fs (%d parts, %d next steps)",
+                                    m.id, cloud.name, Date().timeIntervalSince(started), notes.details?.count ?? 0, notes.actionItems.count))
+                    break
+                } catch is CancellationError {
+                    throw CancellationError()
+                } catch {
+                    log.warn("meeting \(m.id): \(cloud.name) could not write the notes (\(error.localizedDescription)); using the on-device model")
+                    m.remarks.append("\(cloud.name) could not write these notes (\(Self.describe(error))); they were written on the iPhone instead.")
+                }
+            }
             // Sections extracted during the recording cover the meeting up to their last `end`;
             // only what came after is extracted now.
             var lines = Render.modelLines(m)

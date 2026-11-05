@@ -686,6 +686,10 @@ final class AppModel: ObservableObject {
             vocabulary: { AppSettings.shared.vocabulary },
             liveWork: { [liveWork] id in liveWork.get(id) },
             ownProfileID: { [own] in own },
+            cloudNotes: {
+                let key = AppSettings.shared.geminiKey
+                return key.isEmpty ? nil : GeminiNotesWriter(apiKey: key, model: AppSettings.shared.geminiModel)
+            },
             stageWillStart: { [liveWork] stage, id in
                 // For an imported recording, load the transcription model while the speakers are
                 // being separated. A recorded meeting was transcribed as it went.
