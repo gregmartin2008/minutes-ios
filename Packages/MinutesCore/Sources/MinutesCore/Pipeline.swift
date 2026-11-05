@@ -284,8 +284,10 @@ public final class MeetingPipeline: @unchecked Sendable {
                 } catch is CancellationError {
                     throw CancellationError()
                 } catch {
-                    log.warn("meeting \(m.id): \(cloud.name) could not write the notes (\(error.localizedDescription)); using the on-device model")
-                    m.remarks.append("\(cloud.name) could not write these notes (\(Self.describe(error))); they were written on the iPhone instead.")
+                    let transient = (error as? CloudNotesError)?.isTransient ?? false
+                    log.warn("meeting \(m.id): \(cloud.name) could not write the notes (\(error.localizedDescription)); using the on-device model\(transient ? "; will try again later" : "")")
+                    m.remarks.append(Self.cloudFallbackRemark(cloud.name, error: error, willRetry: transient))
+                    m.cloudPending = transient ? true : nil
                 }
             }
             // Sections extracted during the recording cover the meeting up to their last `end`;
@@ -504,6 +506,17 @@ public final class MeetingPipeline: @unchecked Sendable {
 
     private func persist(_ m: Meeting) {
         do { try store.save(m) } catch { log.error("could not save meeting \(m.id): \(error)") }
+    }
+
+    /// The line the notes carry when the large model could not write them.
+    public static func cloudFallbackRemark(_ name: String, error: Error, willRetry: Bool) -> String {
+        "\(name) could not write these notes (\(describe(error))); they were written on the iPhone instead."
+            + (willRetry ? " Minutes tries \(name) again for a while and sends its notes if it gets through." : "")
+    }
+
+    /// Whether a remark is the one `cloudFallbackRemark` wrote.
+    public static func isCloudFallbackRemark(_ remark: String) -> Bool {
+        remark.contains(" could not write these notes (")
     }
 
     public static func describe(_ error: Error) -> String {

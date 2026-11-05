@@ -179,6 +179,60 @@ final class AppModel: ObservableObject {
         finishPendingNotes()
         kick()
         warmModels()
+        Task { await retryCloudNotes() }
+    }
+
+    private var cloudRetryTask: Task<Void, Never>?
+
+    /// Notes that Gemini could not write at the time (overloaded) are tried again every few
+    /// minutes for about half an hour, and sent again when it gets through. Runs while the app
+    /// is open; a retry also happens whenever it comes to the foreground.
+    func retryCloudNotes() async {
+        guard !isDemo else { return }
+        let pending = meetings.filter { $0.status == .done && $0.cloudPending == true && ($0.cloudRetries ?? 0) < 8 }
+        if pending.isEmpty { cloudRetryTask?.cancel(); cloudRetryTask = nil; return }
+        guard runningID == nil, let cloud = services().cloudNotes() else { return }
+        for m in pending {
+            var meeting = m
+            meeting.cloudRetries = (m.cloudRetries ?? 0) + 1
+            do {
+                var notes = try await cloud.write(
+                    transcript: Render.cloudTranscript(m), title: m.titleIsAuto ? nil : m.title,
+                    spellings: AppSettings.shared.vocabulary.spellings)
+                notes.writer = cloud.name
+                guard var fresh = self.meeting(m.id) else { continue }
+                fresh.notes = notes
+                fresh.cloudPending = nil
+                fresh.cloudRetries = meeting.cloudRetries
+                fresh.remarks.removeAll(where: MeetingPipeline.isCloudFallbackRemark)
+                if fresh.titleIsAuto, !notes.title.isEmpty { fresh.title = notes.title; fresh.titleIsAuto = false }
+                save(fresh)
+                Log.shared.info("meeting \(m.id): \(cloud.name) wrote the notes on try \(meeting.cloudRetries ?? 0); sending them")
+                if mailReady, fresh.emailedAt != nil {
+                    if let problem = await sendEmail(m.id) { Log.shared.warn("meeting \(m.id): the second email failed: \(problem)") }
+                }
+            } catch {
+                let transient = (error as? CloudNotesError)?.isTransient ?? false
+                if !transient || (meeting.cloudRetries ?? 0) >= 8 { meeting.cloudPending = nil }
+                Log.shared.warn("meeting \(m.id): \(cloud.name) still could not write the notes (try \(meeting.cloudRetries ?? 0)): \(error.localizedDescription)")
+                if let fresh = self.meeting(m.id) {
+                    var copy = fresh
+                    copy.cloudPending = meeting.cloudPending
+                    copy.cloudRetries = meeting.cloudRetries
+                    save(copy)
+                }
+            }
+        }
+        // Keep trying every four minutes while something is still pending and the app is open.
+        if meetings.contains(where: { $0.cloudPending == true && ($0.cloudRetries ?? 0) < 8 }), cloudRetryTask == nil {
+            cloudRetryTask = Task { [weak self] in
+                while !Task.isCancelled {
+                    try? await Task.sleep(nanoseconds: 240_000_000_000)
+                    guard !Task.isCancelled, AppState.shared.isActive else { continue }
+                    await self?.retryCloudNotes()
+                }
+            }
+        }
     }
 
     /// Notes that iOS wouldn't let the app write earlier are tried again now that it is open.
@@ -766,6 +820,7 @@ final class AppModel: ObservableObject {
 
     private func announce(_ m: Meeting) {
         Log.shared.info("meeting \(m.id) ended run as \(m.status.rawValue) at \(m.stage.rawValue)")
+        if m.cloudPending == true { Task { await retryCloudNotes() } }
         guard !isDemo, UIApplication.shared.applicationState != .active else { return }
         switch m.status {
         case .done:
