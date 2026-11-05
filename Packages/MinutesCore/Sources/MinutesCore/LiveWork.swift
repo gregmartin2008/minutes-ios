@@ -37,11 +37,38 @@ public struct LiveWork: Sendable {
     /// Note sections already extracted, in order. The meeting after the last one's `end` has not
     /// been covered.
     public var noteSections: [LiveNoteSection]
+    /// A title and summary written during the meeting from the sections so far, used when the
+    /// pass after the meeting cannot reach the model (the phone was locked right after End).
+    public var overview: NotesOverview?
 
-    public init(words: [Word], separation: SeparationAnalysis?, noteSections: [LiveNoteSection]) {
+    public init(words: [Word], separation: SeparationAnalysis?, noteSections: [LiveNoteSection], overview: NotesOverview? = nil) {
         self.words = words
         self.separation = separation
         self.noteSections = noteSections
+        self.overview = overview
+    }
+
+    /// The running overview with the provisional labels rewritten as the final names, using the
+    /// same matching as `resolveNames` across all sections.
+    public static func resolveNames(
+        in overview: NotesOverview, sections: [LiveNoteSection], finalTurns: [SpeakerTurn], displayName: (String) -> String
+    ) -> NotesOverview {
+        var overlap: [String: [String: Double]] = [:]
+        for section in sections {
+            for t in section.turns {
+                for f in finalTurns where f.end > t.start && f.start < t.end {
+                    overlap[t.speaker, default: [:]][f.speaker, default: 0] += min(t.end, f.end) - max(t.start, f.start)
+                }
+            }
+        }
+        var out = overview
+        for (label, scores) in overlap {
+            guard let best = scores.max(by: { $0.value < $1.value }), best.value > 0 else { continue }
+            let name = displayName(best.key)
+            out.title = Meeting.replacingName(label, with: name, in: out.title)
+            out.summary = Meeting.replacingName(label, with: name, in: out.summary)
+        }
+        return out
     }
 
     /// Rewrites the provisional speaker labels in the extracted sections as the final names.
@@ -109,6 +136,9 @@ public actor LiveNoteTaker {
     public private(set) var sections: [LiveNoteSection] = []
     /// Every section so far, for the pipeline.
     public var done: [LiveNoteSection] { sections }
+    /// The summary of the meeting so far, rewritten after each section (one more model call).
+    public private(set) var overview: NotesOverview?
+    private var overviewAt = 0
     public private(set) var lastError: String?
 
     private let model: NotesModel
@@ -193,7 +223,34 @@ public actor LiveNoteTaker {
             }
             cursor += count
         }
+        if extractedAny { await updateOverview() }
         return extractedAny
+    }
+
+    /// Rewrites the running summary from the sections so far. Skipped when the model is throttled
+    /// or the sections do not fit; the last good one stands. The names in it are provisional
+    /// ("Voice 2"), which the pipeline rewrites with the final ones.
+    private func updateOverview() async {
+        guard sections.count > overviewAt else { return }
+        let fragments = sections.map { $0.fragment }
+        let details = NotesEngine.details(from: fragments)
+        let decisions = Array(NotesEngine.dedupe(fragments.flatMap { $0.decisions }).prefix(10))
+        let next = Array(NotesEngine.dedupe(fragments.flatMap { $0.actionItems }).prefix(15))
+        for budget in [3200, 1600] {
+            do {
+                let shown = NotesEngine.detailsForOverview(details, maxCharacters: budget)
+                let o = try await model.overview(details: shown, decisions: decisions, nextSteps: next, titleHint: nil)
+                if !o.summary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    overview = o
+                    overviewAt = sections.count
+                }
+                return
+            } catch let e as NotesModelError where e == .contextExceeded {
+                continue
+            } catch {
+                return
+            }
+        }
     }
 
     static func labelOrder(_ utterances: [Utterance]) -> [String] {

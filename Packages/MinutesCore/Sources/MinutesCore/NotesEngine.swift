@@ -213,6 +213,7 @@ public struct NotesEngine: Sendable {
         spellings: [String] = [],
         leading: [NotesFragment] = [],
         starts: [Double]? = nil,
+        fallbackOverview: NotesOverview? = nil,
         resume: NotesCheckpoint? = nil,
         checkpoint: (@Sendable (NotesCheckpoint) -> Void)? = nil,
         progress: (@Sendable (Double) -> Void)? = nil
@@ -232,7 +233,7 @@ public struct NotesEngine: Sendable {
                 fragments: leading, skipped: 0, titleHint: titleHint, model: model,
                 budgetTokens: max(options.minimumSectionTokens, (await model.contextSize()) - options.promptOverhead - options.responseReserve),
                 ratio: options.charactersPerToken, giveUpAt: Date().addingTimeInterval(options.livePatience),
-                withoutModelIfThrottled: true, progress: progress)
+                withoutModelIfThrottled: true, fallbackOverview: fallbackOverview, progress: progress)
         }
 
         let fingerprint = Self.fingerprint(cleaned)
@@ -311,7 +312,7 @@ public struct NotesEngine: Sendable {
         var notes = try await finish(
             fragments: fragments, skipped: skipped, titleHint: titleHint, model: model,
             budgetTokens: sectionBudget, ratio: ratio, giveUpAt: giveUpAt,
-            withoutModelIfThrottled: afterLive, progress: progress)
+            withoutModelIfThrottled: afterLive, fallbackOverview: fallbackOverview, progress: progress)
         if throttled { notes.throttled = true }
         return notes
     }
@@ -322,6 +323,7 @@ public struct NotesEngine: Sendable {
         fragments: [NotesFragment], skipped: Int, titleHint: String?, model: NotesModel,
         budgetTokens sectionBudget: Int, ratio: Double, giveUpAt: Date,
         withoutModelIfThrottled: Bool,
+        fallbackOverview: NotesOverview? = nil,
         progress: (@Sendable (Double) -> Void)?
     ) async throws -> MeetingNotes {
         let total = fragments.count + skipped
@@ -356,7 +358,14 @@ public struct NotesEngine: Sendable {
         // Overview: title and summary from the details. Without the model, the summary is the
         // sections' gists in order, which read as a plain account of the meeting.
         let gists = fragments.map { $0.gist.isEmpty ? Self.firstSentence($0.narrative) : $0.gist }.filter { !$0.isEmpty }
+        // Without the model, the summary written during the meeting (all but the last few
+        // minutes) beats the sections' gists strung together.
         var overview = NotesOverview(title: titleHint ?? "", summary: Self.gistSummary(gists))
+        if let live = fallbackOverview, !live.summary.isEmpty {
+            overview.summary = live.summary
+            if (titleHint ?? "").isEmpty, !live.title.isEmpty { overview.title = live.title }
+        }
+        var usedModel = false
         if !throttled {
             let decided = merged[.decisions] ?? [], next = merged[.actionItems] ?? []
             // The details may not fit the model's window with the prompt; try shorter.
@@ -368,7 +377,7 @@ public struct NotesEngine: Sendable {
                     let o = try await withBackoff(until: giveUpAt) {
                         try await model.overview(details: shown, decisions: decided, nextSteps: next, titleHint: titleHint)
                     }
-                    if !o.summary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { overview.summary = o.summary }
+                    if !o.summary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { overview.summary = o.summary; usedModel = true }
                     if !o.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { overview.title = o.title }
                     break
                 } catch let e as NotesModelError where e == .rateLimited {
@@ -383,6 +392,9 @@ public struct NotesEngine: Sendable {
             }
         }
         progress?(1)
+        if !usedModel, fallbackOverview != nil, !overview.summary.isEmpty {
+            Log.shared.info("notes: the summary is the one written during the meeting")
+        }
 
         return MeetingNotes(
             title: Self.tidyTitle(overview.title),
@@ -802,10 +814,24 @@ public struct NotesEngine: Sendable {
         return !weakVerbs.contains(verb)
     }
 
+    /// Verbs a decision is made of. A line without one ("Jeremy owns half of Patch", "49% as the
+    /// primary option") is a fact or a fragment the model put in the wrong list.
+    static let decisionVerbs: Set<String> = [
+        "agreed", "agree", "decided", "decide", "set", "go", "going", "proceed", "adopt", "adopted", "keep", "hold",
+        "submit", "submitting", "limit", "present", "use", "choose", "chose", "pursue", "pass", "accept", "accepted",
+        "reject", "rejected", "approve", "approved", "target", "offer", "offering", "create", "send", "move", "stay",
+        "stick", "bid", "price", "priced", "structure", "split", "drop", "add", "remove", "cap", "raise", "lower",
+        "will", "won't", "should", "shall", "settled", "aligned", "confirmed", "commit", "committed", "pick", "picked",
+        "select", "selected", "prefer", "propose", "proposed", "put", "take", "make", "run", "schedule", "wait", "defer",
+        "deferred", "table", "tabled", "include", "exclude", "sign", "close", "launch", "start", "stop", "continue",
+    ]
+
     /// Something settled between the people, not one person's view or a report that nothing was.
     static func isDecision(_ item: String) -> Bool {
         let lowered = item.lowercased()
         if nonItems.contains(where: { lowered.contains($0) }) { return false }
+        let all = wordsOf(item)
+        guard all.count >= 5, all.contains(where: { decisionVerbs.contains($0) }) else { return false }
         let starts = ["the discussion", "discussion", "the meeting", "the conversation", "they discussed", "both parties discussed"]
         if starts.contains(where: { lowered.hasPrefix($0) }) { return false }
         // "Tye Stebbins acknowledged…", "Jeremy Carter hopes…": a person reporting, not a decision.
@@ -922,24 +948,36 @@ public struct NotesEngine: Sendable {
         if let colon = sentence.firstIndex(of: ":"), speakers.contains(sentence[..<colon].trimmingCharacters(in: .whitespaces)) {
             return false
         }
+        // A "Name:" that the model dropped mid-sentence ("…a six-month program. So Speaker 1: the…").
+        for name in speakers where sentence.contains(" \(name): ") { return false }
         let lowered = " " + sentence.lowercased() + " "
         let speech = [
             " i mean", " yeah", " gonna", " you know", " let's call it", " i guess", " kind of", " sort of", " like,", " look,",
-            " if that makes sense", " uh ", " um ", " okay.", " all right", " for sure",
+            " if that makes sense", " uh ", " um ", " okay.", " all right", " for sure", " right?", " let's say", " right.",
+            " here's how", " here's what", " that's like", " you'll ", " you're ", " you ", " your ",
         ]
         if speech.contains(where: { lowered.contains($0) }) { return false }
         let firstPerson: Set<String> = ["i", "we", "we're", "we've", "we'd", "we'll", "our", "us", "i'm", "i'll", "i've", "my"]
-        let words = lowered.split(whereSeparator: { !$0.isLetter && $0 != "'" }).map(String.init)
+        let words = wordsOf(sentence)
         if words.contains(where: { firstPerson.contains($0) }) { return false }
+        // "he he he was he was": a stammer copied through.
+        if words.count >= 3 {
+            for i in 0..<(words.count - 2) where words[i] == words[i + 1] && words[i] == words[i + 2] { return false }
+        }
         // Ten words in a row that a transcript line has: copied, not written up.
         if words.count >= 10 {
-            let text = lines.joined(separator: " ").lowercased()
+            let text = " " + lines.flatMap(wordsOf).joined(separator: " ") + " "
             for start in 0...(words.count - 10) {
-                let run = words[start..<(start + 10)].joined(separator: " ")
+                let run = " " + words[start..<(start + 10)].joined(separator: " ") + " "
                 if text.contains(run) { return false }
             }
         }
         return true
+    }
+
+    /// Lowercase words, punctuation dropped (apostrophes kept), so copied text matches the line it came from.
+    static func wordsOf(_ text: String) -> [String] {
+        text.lowercased().split(whereSeparator: { !$0.isLetter && !$0.isNumber && $0 != "'" }).map(String.init)
     }
 
     /// A paragraph as sentences, each with its end mark. "$3.5 million" and "Inc." do not split.

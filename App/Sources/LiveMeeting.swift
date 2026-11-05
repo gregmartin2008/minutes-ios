@@ -125,10 +125,11 @@ final class LiveMeeting {
         // One last section for the end of the meeting, from the provisional grouping.
         await tick(force: true)
         let sections = await notes?.done ?? []
+        let overview = await notes?.overview
         Log.shared.info(String(
             format: "live work handed over in %.1fs: %d words, voices %@, %d note sections",
             Date().timeIntervalSince(started), words.count, analysis == nil ? "not analyzed" : "analyzed", sections.count))
-        return LiveWork(words: words, separation: analysis, noteSections: sections)
+        return LiveWork(words: words, separation: analysis, noteSections: sections, overview: overview)
     }
 }
 

@@ -114,6 +114,38 @@ final class NotesEngineTests: XCTestCase {
     /// The notes are then finished from the sections drafted during the meeting, without
     /// waiting: lists merged as they are, summary from the gists, the last stretch left out and
     /// said so. The email must not wait on the model.
+    func testTheSummaryWrittenDuringTheMeetingStandsInWhenTheModelIsOut() async throws {
+        let model = FakeNotesModel()
+        model.alwaysRateLimit = true
+        let drafted = (1...3).map { n in NotesFragment(topic: "Topic \(n)", narrative: "Point \(n) was made.", gist: "Gist \(n).") }
+        let live = NotesOverview(title: "Vortala offer", summary: "The group settled the two options for Vortala.")
+        let notes = try await NotesEngine(options: fastOptions(patience: 0.05)).write(
+            lines: [], titleHint: nil, model: model, leading: drafted, fallbackOverview: live)
+        XCTAssertEqual(notes.throttled, true)
+        XCTAssertEqual(notes.summary, "The group settled the two options for Vortala.")
+        XCTAssertEqual(notes.title, "Vortala offer")
+        XCTAssertEqual(model.overviewCalls, 0)
+
+        // With the model available, its summary wins.
+        model.alwaysRateLimit = false
+        let fresh = try await NotesEngine(options: fastOptions()).write(
+            lines: [], titleHint: nil, model: model, leading: drafted, fallbackOverview: live)
+        XCTAssertEqual(fresh.summary, "A summary of 3 parts.")
+    }
+
+    func testCopiedTextIsCaughtDespitePunctuation() {
+        let lines = ["Speaker 1: That's a grind, right? That's like eight hours a day, hands-on people doing the whole thing."]
+        XCTAssertFalse(NotesEngine.isWrittenUp("That's like eight hours a day hands on people doing the whole thing.", speakers: ["Speaker 1"], lines: lines))
+        XCTAssertFalse(NotesEngine.isWrittenUp("So he he he was procreating during his day job.", speakers: [], lines: []))
+        XCTAssertFalse(NotesEngine.isWrittenUp("These guys put you through a six-month program.", speakers: [], lines: []))
+        XCTAssertTrue(NotesEngine.isWrittenUp("PT Biz runs a six-month program covering onboarding, insurance and office space.", speakers: [], lines: lines))
+        XCTAssertFalse(NotesEngine.isDecision("Jeremy owns half of Patch"))
+        XCTAssertFalse(NotesEngine.isDecision("49% as primary option"))
+        XCTAssertFalse(NotesEngine.isDecision("Danny does the podcast"))
+        XCTAssertTrue(NotesEngine.isDecision("Set ownership at 49% as option one."))
+        XCTAssertTrue(NotesEngine.isDecision("Submit the indication of interest at a flat $20 million."))
+    }
+
     func testAHotPhoneFinishesWithoutTheModelsFinalPass() async throws {
         let model = FakeNotesModel()
         let drafted = (1...3).map { n in
@@ -571,6 +603,11 @@ final class LiveNoteTakerTests: XCTestCase {
         let again = await taker.offer(utterances: m.utterances, turns: m.turns, latest: 600)
         XCTAssertFalse(again)
         XCTAssertEqual(model.sections.count, count)
+
+        // A running summary is kept from the sections so far, under the provisional names.
+        let running = await taker.overview
+        XCTAssertEqual(running?.summary, "A summary of \(sections.count) parts.")
+        XCTAssertEqual(model.overviewCalls, 1)
 
         // At the end, `force` takes the remainder.
         let forced = await taker.offer(utterances: m.utterances, turns: m.turns, latest: 600, force: true)

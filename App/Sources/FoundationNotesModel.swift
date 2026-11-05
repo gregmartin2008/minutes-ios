@@ -147,7 +147,7 @@ struct FoundationNotesModel: NotesModel {
                 // iOS 27 reports "SensitiveContentAnalysisML error 15" from an app in the
                 // background: the model's content check won't run there. Same handling as
                 // throttling, which is what it amounts to.
-                if String(describing: error).contains("SensitiveContentAnalysis") { throw NotesModelError.rateLimited }
+                if String(reflecting: error).contains("SensitiveContentAnalysis") { throw NotesModelError.rateLimited }
                 throw NotesModelError.other(Self.plain(error, "it reported an error Minutes doesn't recognize"))
             }
         } catch let error as NotesModelError {
@@ -156,7 +156,8 @@ struct FoundationNotesModel: NotesModel {
             throw CancellationError()
         } catch {
             // Newer iOS versions report some of these conditions with different error types.
-            let text = String(describing: error).lowercased()
+            let text = String(reflecting: error).lowercased()
+            if text.contains("sensitivecontentanalysis") { throw NotesModelError.rateLimited }
             if text.contains("ratelimit") || text.contains("rate limit") { throw NotesModelError.rateLimited }
             if text.contains("context") && (text.contains("exceed") || text.contains("window")) { throw NotesModelError.contextExceeded }
             if text.contains("guardrail") || text.contains("refus") { throw NotesModelError.refused("The model declined this part of the transcript.") }
