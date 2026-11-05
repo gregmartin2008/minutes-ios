@@ -500,6 +500,10 @@ struct SettingsView: View {
 
     // MARK: Voices
 
+    @State private var showVoices = false
+
+    /// Collapsed by default: the list grows with every person met, and the version and the
+    /// diagnostics sit below it.
     private var voicesSection: some View {
         Section {
             if model.profiles.isEmpty {
@@ -507,6 +511,21 @@ struct SettingsView: View {
                     .font(.subheadline)
                     .foregroundStyle(Theme.muted)
             } else {
+                Button {
+                    withAnimation { showVoices.toggle() }
+                } label: {
+                    HStack {
+                        Text(showVoices ? "Hide the list" : "Show the \(model.profiles.count) voices")
+                            .foregroundStyle(Theme.ink)
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.footnote.weight(.semibold))
+                            .foregroundStyle(Theme.muted)
+                            .rotationEffect(.degrees(showVoices ? 90 : 0))
+                    }
+                }
+            }
+            if showVoices {
                 ForEach(model.profiles) { profile in
                     HStack {
                         Text(profile.name)
@@ -525,7 +544,7 @@ struct SettingsView: View {
         } header: {
             Text("Voices Minutes knows")
         } footer: {
-            if !model.profiles.isEmpty {
+            if showVoices {
                 Text("Swipe a name to forget that voice.")
             }
         }
