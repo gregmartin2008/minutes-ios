@@ -26,7 +26,7 @@ final class CloudNotesTests: XCTestCase {
         /// Statuses to answer with before `status`, one per request, for overload tests.
         var first: [Int] = []
 
-        var models = ["gemini-3.8-flash", "gemini-3.8-flash-lite", "gemini-3.8-pro", "embedding-001"]
+        var models = ["gemini-3.5-flash-lite", "gemini-3.8-flash", "gemini-3.8-pro", "embedding-001"]
 
         func handle(_ request: URLRequest) throws -> (Data, Int) {
             requests.append(request)
@@ -70,10 +70,10 @@ final class CloudNotesTests: XCTestCase {
         XCTAssertEqual(details[0].startSeconds, 206)
         XCTAssertEqual(details[1].startSeconds, 3735)
         XCTAssertEqual(details[1].text, "Option one carries a $5 million earnout.")   // the $99M sentence was never said
-        XCTAssertEqual(writer.name, "Gemini 3.8 Flash")
+        XCTAssertEqual(writer.name, "Gemini 3.5 Flash Lite")
 
         let request = fake.requests[0]
-        XCTAssertEqual(request.url?.path, "/v1beta/models/gemini-3.8-flash:generateContent")
+        XCTAssertEqual(request.url?.path, "/v1beta/models/gemini-3.5-flash-lite:generateContent")
         XCTAssertEqual(request.value(forHTTPHeaderField: "x-goog-api-key"), "k")
         let body = try JSONSerialization.jsonObject(with: request.httpBody!) as! [String: Any]
         let config = body["generationConfig"] as! [String: Any]
@@ -118,13 +118,13 @@ final class CloudNotesTests: XCTestCase {
     func testTheCheckListsModelsRatherThanGenerating() async throws {
         let fake = Fake()
         let ok = try await GeminiNotesWriter(apiKey: "k", transport: { try fake.handle($0) }).check()
-        XCTAssertEqual(ok, "Key accepted; Gemini 3.8 Flash is available. The next meeting's notes come from it.")
+        XCTAssertEqual(ok, "Key accepted; Gemini 3.5 Flash Lite is available. The next meeting's notes come from it.")
         XCTAssertEqual(fake.requests.map { $0.url!.path }, ["/v1beta/models"])
         do {
             _ = try await GeminiNotesWriter(apiKey: "k", model: "gemini-2.5-flash", transport: { try fake.handle($0) }).check()
             XCTFail("expected an error")
         } catch {
-            XCTAssertEqual(error.localizedDescription, "The key works, but \"gemini-2.5-flash\" is not a model it can use. Try \"gemini-3.8-flash\". Available: gemini-3.8-flash, gemini-3.8-flash-lite.")
+            XCTAssertEqual(error.localizedDescription, "The key works, but \"gemini-2.5-flash\" is not a model it can use. Try \"gemini-3.5-flash-lite\". Available: gemini-3.5-flash-lite, gemini-3.8-flash.")
         }
         fake.status = 400
         do {
@@ -137,6 +137,6 @@ final class CloudNotesTests: XCTestCase {
 
     func testTheModelNameIsRenderedForPeople() {
         XCTAssertEqual(GeminiNotesWriter(apiKey: "k", model: "gemini-2.5-pro").name, "Gemini 2.5 Pro")
-        XCTAssertEqual(GeminiNotesWriter(apiKey: "k", model: "").model, "gemini-3.8-flash")
+        XCTAssertEqual(GeminiNotesWriter(apiKey: "k", model: "").model, "gemini-3.5-flash-lite")
     }
 }
