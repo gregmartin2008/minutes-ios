@@ -26,8 +26,15 @@ final class CloudNotesTests: XCTestCase {
         /// Statuses to answer with before `status`, one per request, for overload tests.
         var first: [Int] = []
 
+        var models = ["gemini-3.8-flash", "gemini-3.8-flash-lite", "gemini-3.8-pro", "embedding-001"]
+
         func handle(_ request: URLRequest) throws -> (Data, Int) {
             requests.append(request)
+            if request.url!.path == "/v1beta/models" {
+                if status != 200 { return (try JSONSerialization.data(withJSONObject: ["error": ["message": "API key not valid"]]), status) }
+                let list = models.map { ["name": "models/\($0)", "supportedGenerationMethods": $0.contains("embedding") ? ["embedContent"] : ["generateContent"]] }
+                return (try JSONSerialization.data(withJSONObject: ["models": list]), 200)
+            }
             if !first.isEmpty {
                 let code = first.removeFirst()
                 return (try JSONSerialization.data(withJSONObject: ["error": ["message": "This model is currently experiencing high demand."]]), code)
@@ -106,6 +113,26 @@ final class CloudNotesTests: XCTestCase {
             XCTAssertTrue(error.localizedDescription.hasPrefix("Gemini is overloaded right now"), error.localizedDescription)
         }
         XCTAssertEqual(fake.requests.count, 7)
+    }
+
+    func testTheCheckListsModelsRatherThanGenerating() async throws {
+        let fake = Fake()
+        let ok = try await GeminiNotesWriter(apiKey: "k", transport: { try fake.handle($0) }).check()
+        XCTAssertEqual(ok, "Key accepted; Gemini 3.8 Flash is available. The next meeting's notes come from it.")
+        XCTAssertEqual(fake.requests.map { $0.url!.path }, ["/v1beta/models"])
+        do {
+            _ = try await GeminiNotesWriter(apiKey: "k", model: "gemini-2.5-flash", transport: { try fake.handle($0) }).check()
+            XCTFail("expected an error")
+        } catch {
+            XCTAssertEqual(error.localizedDescription, "The key works, but \"gemini-2.5-flash\" is not a model it can use. Try \"gemini-3.8-flash\". Available: gemini-3.8-flash, gemini-3.8-flash-lite.")
+        }
+        fake.status = 400
+        do {
+            _ = try await GeminiNotesWriter(apiKey: "bad", transport: { try fake.handle($0) }).check()
+            XCTFail("expected an error")
+        } catch {
+            XCTAssertEqual(error.localizedDescription, "Gemini did not accept the API key. Check it in Settings.")
+        }
     }
 
     func testTheModelNameIsRenderedForPeople() {

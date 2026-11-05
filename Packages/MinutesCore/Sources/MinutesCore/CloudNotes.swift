@@ -25,6 +25,7 @@ public struct CloudNotesError: LocalizedError, Equatable {
             return "Gemini did not accept the API key. Check it in Settings."
         case 429: return "Gemini's free allowance for the moment is used up: \(message)"
         case 503: return "Gemini is overloaded right now (\(message)). Try again in a minute."
+        case 404: return message
         case 0: return message
         default: return "Gemini answered \(status): \(message)"
         }
@@ -61,9 +62,46 @@ public struct GeminiNotesWriter: CloudNotesWriting {
         }
     }
 
-    /// A tiny request that fails if the key is wrong or the model name is not available.
-    public func check() async throws {
-        _ = try await generate(prompt: "Reply with the single word OK.", schema: nil)
+    /// Checks the key by listing the models it can use, and returns the names of those that can
+    /// write notes ("gemini-3.8-flash", …), newest first as Google lists them. Throws if the key is
+    /// refused. This call is not subject to the overload a busy model answers with.
+    public func availableModels() async throws -> [String] {
+        guard let url = URL(string: "/v1beta/models?pageSize=100", relativeTo: base)?.absoluteURL else { return [] }
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 60
+        request.setValue(apiKey, forHTTPHeaderField: "x-goog-api-key")
+        let (data, status): (Data, Int)
+        do {
+            (data, status) = try await transport(request)
+        } catch {
+            throw CloudNotesError(status: 0, message: "No connection to Gemini: \(error.localizedDescription)")
+        }
+        let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] ?? [:]
+        guard (200..<300).contains(status) else {
+            let message = ((json["error"] as? [String: Any])?["message"] as? String) ?? String(decoding: data.prefix(300), as: UTF8.self)
+            throw CloudNotesError(status: status, message: message)
+        }
+        let models = json["models"] as? [[String: Any]] ?? []
+        return models.compactMap { m -> String? in
+            guard let name = m["name"] as? String else { return nil }
+            let methods = m["supportedGenerationMethods"] as? [String] ?? []
+            guard methods.contains("generateContent") else { return nil }
+            let short = name.hasPrefix("models/") ? String(name.dropFirst("models/".count)) : name
+            return short.hasPrefix("gemini") ? short : nil
+        }
+    }
+
+    /// Checks the key and that the chosen model is among those it can use. Returns a sentence for
+    /// the settings screen.
+    public func check() async throws -> String {
+        let models = try await availableModels()
+        let flash = models.filter { $0.contains("flash") }
+        if models.contains(model) {
+            return "Key accepted; \(name) is available. The next meeting's notes come from it."
+        }
+        let suggestion = flash.first.map { " Try \"\($0)\"." } ?? ""
+        let shown = (flash.isEmpty ? models : flash).prefix(6).joined(separator: ", ")
+        throw CloudNotesError(status: 404, message: "The key works, but \"\(model)\" is not a model it can use.\(suggestion) Available: \(shown).")
     }
 
     public func write(transcript: String, title: String?, spellings: [String]) async throws -> MeetingNotes {
