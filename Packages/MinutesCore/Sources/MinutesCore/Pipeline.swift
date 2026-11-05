@@ -260,11 +260,15 @@ public final class MeetingPipeline: @unchecked Sendable {
             var lines = Render.modelLines(m)
             var starts = (m.utterances ?? []).map { $0.start }
             var leading: [NotesFragment] = []
+            var liveOverview: NotesOverview?
             var coveredThrough: Double?
             if let live = services.liveWork(m.id), !live.noteSections.isEmpty, let last = live.noteSections.last {
                 coveredThrough = last.end
                 let snapshot = m
                 leading = LiveWork.resolveNames(in: live.noteSections, finalTurns: m.turns ?? []) { snapshot.displayName(for: $0) }
+                if let o = live.overview {
+                    liveOverview = LiveWork.resolveNames(in: o, sections: live.noteSections, finalTurns: m.turns ?? []) { snapshot.displayName(for: $0) }
+                }
                 // A term added to the vocabulary during the meeting reaches the sections drafted before it.
                 let corrector = VocabularyCorrector(services.vocabulary())
                 leading = leading.map { $0.corrected(by: corrector) }
@@ -292,6 +296,7 @@ public final class MeetingPipeline: @unchecked Sendable {
                         spellings: services.vocabulary().spellings,
                         leading: leading,
                         starts: starts,
+                        fallbackOverview: liveOverview,
                         resume: m.notesCheckpoint,
                         checkpoint: { checkpoint in
                             saved.set(checkpoint)

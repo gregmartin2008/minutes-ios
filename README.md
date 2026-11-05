@@ -131,6 +131,9 @@ it, Minutes still emails the full transcript and says why there are no notes.
   part by part, each with a heading, the time it starts and a paragraph in the note-taker's own
   words with the names and numbers as said. A sentence whose number was never said in that part
   of the transcript is dropped rather than trusted.
+- The summary is also written and rewritten during the meeting, so a phone locked the moment
+  the meeting ends (which keeps the language model from running) still gets a real summary
+  rather than the sections' one-liners strung together.
 - **One document.** The email carries the notes in its body and one attachment, a PDF with the
   notes followed by the full transcript; *Share* hands out the same PDF.
 - The email arrives when that finishes. Leaving Minutes open on the screen is no longer needed.
