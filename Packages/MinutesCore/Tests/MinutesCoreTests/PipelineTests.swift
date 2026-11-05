@@ -287,6 +287,43 @@ final class PipelineTests: XCTestCase {
         XCTAssertFalse(out.remarks.contains { $0.contains("were not applied") })
     }
 
+    /// A cloud writer, when set up, writes the notes from the whole transcript; when it fails,
+    /// the on-device model writes them and the meeting says so.
+    func testCloudNotesAreUsedWhenSetUpAndFallBackWhenTheyFail() async throws {
+        struct Cloud: CloudNotesWriting {
+            var fail: Bool
+            var name: String { "Gemini 2.5 Flash" }
+            func write(transcript: String, title: String?, spellings: [String]) async throws -> MeetingNotes {
+                if fail { throw CloudNotesError(status: 429, message: "quota") }
+                XCTAssertTrue(transcript.contains("Speaker 1 [0:00]: Hold the bid.") || transcript.contains("[0:0"), transcript)
+                return MeetingNotes(title: "Bid review", summary: "From the cloud.", actionItems: ["Dana: call the customer"],
+                                    details: [NotesDetail(topic: "Bid", text: "They held the bid.", startSeconds: 0)])
+            }
+        }
+        let m = try newMeeting()
+        let result = modelResult!
+        var options = NotesEngine.Options()
+        options.rateLimitBackoff = [0.01]
+        options.rateLimitPatience = 0.05
+        let services = PipelineServices(
+            separator: separator, transcriber: transcriber, notesModel: { result }, mailer: mailer,
+            notesOptions: options, cloudNotes: { Cloud(fail: false) })
+        let out = await MeetingPipeline(store: store, services: services, log: Log()).run(m) { _, _ in }
+        XCTAssertEqual(out.notes?.summary, "From the cloud.")
+        XCTAssertEqual(out.notes?.writer, "Gemini 2.5 Flash")
+        XCTAssertEqual(out.title, "Bid review")
+        XCTAssertEqual(model.sections.count, 0, "the on-device model was not asked")
+        XCTAssertTrue(Render.emailHTML(out).contains("Notes written by Gemini 2.5 Flash from the transcript."))
+
+        let failing = PipelineServices(
+            separator: separator, transcriber: transcriber, notesModel: { result }, mailer: mailer,
+            notesOptions: options, cloudNotes: { Cloud(fail: true) })
+        let second = await MeetingPipeline(store: store, services: failing, log: Log()).run(try newMeeting()) { _, _ in }
+        XCTAssertNil(second.notes?.writer)
+        XCTAssertGreaterThan(model.sections.count, 0)
+        XCTAssertTrue(second.remarks.contains { $0.contains("Gemini 2.5 Flash could not write these notes") }, second.remarks.description)
+    }
+
     /// With nothing typed, a meeting named "Firm - First Last" names the one unknown voice.
     func testTheMeetingNameNamesTheOtherVoiceWhenNothingWasTyped() async throws {
         let own = SpeakerMatcher.makeProfile(name: "Greg", embedding: [1, 0.05, 0])

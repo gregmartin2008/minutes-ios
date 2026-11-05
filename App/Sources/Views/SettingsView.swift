@@ -31,6 +31,7 @@ struct SettingsView: View {
             speechSection
             vocabularySection
             calendarSection
+            notesSection
             peopleSection
             hubspotSection
             microphoneSection
@@ -236,6 +237,77 @@ struct SettingsView: View {
         } footer: {
             Text("Standard lets iOS adjust the microphone as it does for calls. Raw turns that off and records the room as it is, which may keep a quieter voice across the table from being flattened in a loud room. Try Raw for one noisy meeting and compare.")
         }
+    }
+
+    // MARK: Notes model
+
+    @State private var geminiKey = ""
+    @State private var geminiSaved = !AppSettings.shared.geminiKey.isEmpty
+    @State private var geminiModel = AppSettings.shared.geminiModel
+    @State private var geminiChecking = false
+    @State private var geminiResult: String?
+    @State private var geminiFailed = false
+
+    private var notesSection: some View {
+        Section {
+            SecureField(geminiSaved ? "Gemini API key (saved)" : "Gemini API key", text: $geminiKey)
+                .textContentType(.password)
+                .autocorrectionDisabled()
+            TextField("Model", text: $geminiModel, prompt: Text(GeminiNotesWriter.defaultModel))
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .onChange(of: geminiModel) { _, value in AppSettings.shared.geminiModel = value.trimmingCharacters(in: .whitespaces) }
+            Button {
+                Task { await saveAndCheckGemini() }
+            } label: {
+                HStack(spacing: 10) {
+                    if geminiChecking { ProgressView() }
+                    Text(geminiChecking ? "Checking" : "Save and check the key")
+                }
+            }
+            .disabled(geminiChecking || (geminiKey.isEmpty && !geminiSaved))
+            if let geminiResult {
+                Label(geminiResult, systemImage: geminiFailed ? "exclamationmark.triangle" : "checkmark.circle")
+                    .font(.subheadline)
+                    .foregroundStyle(geminiFailed ? Theme.record : Theme.ok)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if geminiSaved {
+                Button("Remove the key (write notes on the iPhone)", role: .destructive) {
+                    AppSettings.shared.geminiKey = ""
+                    geminiSaved = false
+                    geminiKey = ""
+                    geminiResult = nil
+                }
+            }
+        } header: {
+            Text("Notes")
+        } footer: {
+            Text(geminiSaved
+                ? "The notes are written by Google's Gemini from the whole transcript, which is sent as text after each meeting (never the audio). If Gemini can't be reached, the iPhone writes them instead and the email says so. The key is kept in this iPhone's Keychain."
+                : "By default the notes are written on this iPhone by Apple's model, which runs short on long meetings. A Gemini API key (free at aistudio.google.com) has Google's model write them from the whole transcript instead; the transcript text is sent after each meeting, never the audio.")
+        }
+    }
+
+    private func saveAndCheckGemini() async {
+        geminiChecking = true
+        geminiResult = nil
+        let key = geminiKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !key.isEmpty {
+            AppSettings.shared.geminiKey = key
+            geminiSaved = true
+            geminiKey = ""
+        }
+        do {
+            let writer = GeminiNotesWriter(apiKey: AppSettings.shared.geminiKey, model: AppSettings.shared.geminiModel)
+            try await writer.check()
+            geminiFailed = false
+            geminiResult = "\(writer.name) answered. The next meeting's notes come from it."
+        } catch {
+            geminiFailed = true
+            geminiResult = error.localizedDescription
+        }
+        geminiChecking = false
     }
 
     // MARK: People
