@@ -299,7 +299,8 @@ struct SettingsView: View {
             geminiKey = ""
         }
         do {
-            let writer = GeminiNotesWriter(apiKey: AppSettings.shared.geminiKey, model: AppSettings.shared.geminiModel)
+            var writer = GeminiNotesWriter(apiKey: AppSettings.shared.geminiKey, model: AppSettings.shared.geminiModel)
+            writer.retryWaits = [3, 6]   // a quick check; the meeting path waits longer
             try await writer.check()
             geminiFailed = false
             geminiResult = "\(writer.name) answered. The next meeting's notes come from it."

@@ -23,8 +23,15 @@ final class CloudNotesTests: XCTestCase {
             ],
         ]
 
+        /// Statuses to answer with before `status`, one per request, for overload tests.
+        var first: [Int] = []
+
         func handle(_ request: URLRequest) throws -> (Data, Int) {
             requests.append(request)
+            if !first.isEmpty {
+                let code = first.removeFirst()
+                return (try JSONSerialization.data(withJSONObject: ["error": ["message": "This model is currently experiencing high demand."]]), code)
+            }
             if status != 200 {
                 return (try JSONSerialization.data(withJSONObject: ["error": ["message": "API key not valid", "status": "INVALID_ARGUMENT"]]), status)
             }
@@ -80,6 +87,25 @@ final class CloudNotesTests: XCTestCase {
         }
         XCTAssertEqual(GeminiNotesWriter.seconds("12:43"), 763)
         XCTAssertNil(GeminiNotesWriter.seconds("noon"))
+    }
+
+    func testOverloadIsRetriedThenGivenUpOn() async throws {
+        let fake = Fake()
+        fake.first = [503, 503]
+        var writer = GeminiNotesWriter(apiKey: "k", transport: { try fake.handle($0) })
+        writer.retryWaits = [0.01, 0.01, 0.01]
+        let notes = try await writer.write(transcript: transcript, title: nil, spellings: [])
+        XCTAssertEqual(notes.title, "Veltrona offer options")
+        XCTAssertEqual(fake.requests.count, 3)
+
+        fake.first = [503, 503, 503, 503]
+        do {
+            _ = try await writer.write(transcript: transcript, title: nil, spellings: [])
+            XCTFail("expected an error")
+        } catch {
+            XCTAssertTrue(error.localizedDescription.hasPrefix("Gemini is overloaded right now"), error.localizedDescription)
+        }
+        XCTAssertEqual(fake.requests.count, 7)
     }
 
     func testTheModelNameIsRenderedForPeople() {
