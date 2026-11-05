@@ -41,7 +41,7 @@ public struct GeminiNotesWriter: CloudNotesWriting {
     public var transport: Transport
     /// Waits before trying again when the service is overloaded (503) or rate-limited (429).
     public var retryWaits: [Double] = [5, 15, 30]
-    public static let defaultModel = "gemini-3.8-flash"
+    public static let defaultModel = "gemini-3.5-flash-lite"
 
     public var name: String {
         var parts = model.split(separator: "-").map(String.init)
