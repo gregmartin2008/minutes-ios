@@ -19,6 +19,9 @@ public struct CloudNotesError: LocalizedError, Equatable {
         self.status = status
         self.message = message
     }
+    /// Overloaded, rate-limited or unreachable: worth trying again later. A bad key or a
+    /// declined transcript is not.
+    public var isTransient: Bool { status == 503 || status == 429 || status == 500 || status == 502 || status == 504 || (status == 0 && message.hasPrefix("No connection")) }
     public var errorDescription: String? {
         switch status {
         case 400 where message.lowercased().contains("api key"), 401, 403:

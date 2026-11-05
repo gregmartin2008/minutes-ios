@@ -292,9 +292,10 @@ final class PipelineTests: XCTestCase {
     func testCloudNotesAreUsedWhenSetUpAndFallBackWhenTheyFail() async throws {
         struct Cloud: CloudNotesWriting {
             var fail: Bool
+            var status = 429
             var name: String { "Gemini 2.5 Flash" }
             func write(transcript: String, title: String?, spellings: [String]) async throws -> MeetingNotes {
-                if fail { throw CloudNotesError(status: 429, message: "quota") }
+                if fail { throw CloudNotesError(status: status, message: "quota") }
                 XCTAssertTrue(transcript.contains("Speaker 1 [0:00]: Hold the bid.") || transcript.contains("[0:0"), transcript)
                 return MeetingNotes(title: "Bid review", summary: "From the cloud.", actionItems: ["Dana: call the customer"],
                                     details: [NotesDetail(topic: "Bid", text: "They held the bid.", startSeconds: 0)])
@@ -322,6 +323,18 @@ final class PipelineTests: XCTestCase {
         XCTAssertNil(second.notes?.writer)
         XCTAssertGreaterThan(model.sections.count, 0)
         XCTAssertTrue(second.remarks.contains { $0.contains("Gemini 2.5 Flash could not write these notes") }, second.remarks.description)
+        // Overloaded or rate-limited: the app tries again later and the remark says so.
+        XCTAssertEqual(second.cloudPending, true)
+        XCTAssertTrue(second.remarks.contains { $0.contains("tries Gemini 2.5 Flash again") })
+        XCTAssertTrue(second.remarks.allSatisfy(MeetingPipeline.isCloudFallbackRemark))
+
+        // A bad key is not worth retrying.
+        let badKey = PipelineServices(
+            separator: separator, transcriber: transcriber, notesModel: { result }, mailer: mailer,
+            notesOptions: options, cloudNotes: { Cloud(fail: true, status: 403) })
+        let third = await MeetingPipeline(store: store, services: badKey, log: Log()).run(try newMeeting()) { _, _ in }
+        XCTAssertNil(third.cloudPending)
+        XCTAssertFalse(third.remarks.contains { $0.contains("tries Gemini") })
     }
 
     /// With nothing typed, a meeting named "Firm - First Last" names the one unknown voice.

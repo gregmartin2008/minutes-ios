@@ -260,6 +260,10 @@ public struct Meeting: Codable, Equatable, Identifiable, Sendable {
     public var contacts: [Person]?
     /// What the last push to HubSpot did.
     public var hubspot: HubSpotRecord?
+    /// The large model could not be reached when the notes were written (overloaded, offline);
+    /// the app tries it again later and sends the notes again when it gets through.
+    public var cloudPending: Bool?
+    public var cloudRetries: Int?
 
     // Notes and delivery
     public var notes: MeetingNotes?
@@ -305,6 +309,8 @@ public struct Meeting: Codable, Equatable, Identifiable, Sendable {
         self.calendarEvent = nil
         self.contacts = nil
         self.hubspot = nil
+        self.cloudPending = nil
+        self.cloudRetries = nil
         self.notes = nil
         self.notesError = nil
         self.notesCheckpoint = nil

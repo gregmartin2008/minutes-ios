@@ -137,8 +137,10 @@ it, Minutes still emails the full transcript and says why there are no notes.
 - **A larger model for the notes, optional.** The on-device model runs short on long meetings.
   With a Gemini API key saved in Settings (free at aistudio.google.com), Google's model writes
   the notes from the whole transcript after each meeting: the transcript text is sent, never the
-  audio, and the key stays in the Keychain. If Gemini can't be reached, the iPhone writes the
-  notes as before and the email says so. The foot of the notes names which model wrote them.
+  audio, and the key stays in the Keychain. If Gemini is overloaded or unreachable at the time, the iPhone writes
+  the notes as before and the email says so; Minutes then keeps trying Gemini for about half an
+  hour and sends a second email with its notes when it gets through. The foot of the notes
+  names which model wrote them.
 - **One document.** The email carries the notes in its body and one attachment, a PDF with the
   notes followed by the full transcript; *Share* hands out the same PDF.
 - The email arrives when that finishes. Leaving Minutes open on the screen is no longer needed.
