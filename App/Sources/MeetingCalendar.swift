@@ -119,11 +119,30 @@ final class MeetingCalendar {
             "info", "sales", "hello", "admin", "contact", "office", "team", "support", "invest", "deals", "ir",
             "investors", "mail", "email", "noreply", "calendar", "meetings", "events", "press", "legal",
         ]
-        if parts.count == 1, let word = parts.first, (5...8).contains(word.count), !generic.contains(word) {
+        if parts.count == 1, let word = parts.first, word.count >= 3, !generic.contains(word) {
+            // "jacob@": a first name. "jcarter@": an initial and a surname. Short words and common
+            // first names are read as names; the rest as initial plus surname.
+            if word.count <= 6 || firstNames.contains(word) {
+                return word.prefix(1).uppercased() + word.dropFirst()
+            }
             return word.prefix(1).uppercased() + ". " + word.dropFirst().prefix(1).uppercased() + word.dropFirst(2)
         }
         return nil
     }
+
+    /// Common first names of seven letters or more, which would otherwise read as "M. Ichael".
+    static let firstNames: Set<String> = [
+        "michael", "william", "jessica", "jennifer", "matthew", "anthony", "charles", "jonathan", "christopher",
+        "elizabeth", "patrick", "nicholas", "benjamin", "samantha", "kimberly", "stephanie", "rebecca", "melissa",
+        "timothy", "gregory", "jeffrey", "kenneth", "richard", "douglas", "raymond", "zachary", "brandon", "bradley",
+        "cameron", "spencer", "preston", "lindsay", "lindsey", "madison", "heather", "allison", "natalie", "vanessa",
+        "victoria", "abigail", "katherine", "margaret", "courtney", "kristen", "kristin", "kathryn", "caroline",
+        "dominic", "russell", "derrick", "desmond", "everett", "garrett", "phillip", "franklin", "harrison", "maxwell",
+        "nathaniel", "sebastian", "tristan", "vincent", "brittany", "danielle", "michelle", "nicole", "kristina",
+        "christina", "christine", "alexander", "alexandra", "andrew", "stephen", "mitchell", "marissa", "kendall",
+        "brendan", "brennan", "colleen", "shannon", "clayton", "whitney", "lauren", "bridget", "frederick", "theodore",
+        "lawrence", "terrence", "clifford", "bernard", "leonard", "malcolm", "marshall", "randall", "sheldon", "wallace",
+    ]
 
     private static func same(_ p: Person, name: String, email: String?) -> Bool {
         if let email, let known = p.email { return email.lowercased() == known.lowercased() }

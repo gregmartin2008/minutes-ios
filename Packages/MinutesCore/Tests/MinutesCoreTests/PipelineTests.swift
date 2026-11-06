@@ -337,6 +337,27 @@ final class PipelineTests: XCTestCase {
         XCTAssertFalse(third.remarks.contains { $0.contains("tries Gemini") })
     }
 
+    /// An invitee who never spoke, with every voice already named, gets no remark.
+    func testALeftoverInviteeWithEveryVoiceNamedIsNotRemarkedOn() async throws {
+        let own = SpeakerMatcher.makeProfile(name: "Greg", embedding: [1, 0.05, 0])
+        let dana = SpeakerMatcher.makeProfile(name: "Dana Lee", embedding: [0, 1, 0.05])
+        try store.saveProfiles([own, dana])
+        var m = try newMeeting()
+        m.attendees = ["Dana Lee", "Jacob"]
+        try store.save(m)
+        let result = modelResult!
+        var options = NotesEngine.Options()
+        options.rateLimitBackoff = [0.01]
+        options.rateLimitPatience = 0.05
+        let services = PipelineServices(
+            separator: separator, transcriber: transcriber, notesModel: { result }, mailer: mailer,
+            notesOptions: options, ownProfileID: { own.id })
+        let out = await MeetingPipeline(store: store, services: services, log: Log()).run(m) { _, _ in }
+        XCTAssertEqual(out.speakerNames["S1"], "Greg")
+        XCTAssertEqual(out.speakerNames["S2"], "Dana Lee")
+        XCTAssertFalse(out.remarks.contains { $0.contains("were not applied") }, out.remarks.description)
+    }
+
     /// With nothing typed, a meeting named "Firm - First Last" names the one unknown voice.
     func testTheMeetingNameNamesTheOtherVoiceWhenNothingWasTyped() async throws {
         let own = SpeakerMatcher.makeProfile(name: "Greg", embedding: [1, 0.05, 0])

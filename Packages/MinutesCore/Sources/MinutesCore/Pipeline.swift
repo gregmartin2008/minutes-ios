@@ -450,6 +450,11 @@ public final class MeetingPipeline: @unchecked Sendable {
         let typed = given.filter { name in !taken.contains { Person.sameName($0, name) } }
         guard !typed.isEmpty else { return }
         let unnamed = m.speakerLabels.filter { m.speakerNames[$0] == nil }
+        // Every voice already has a name: a leftover invitee did not speak (or did not join).
+        guard !unnamed.isEmpty else {
+            log.info("meeting \(m.id): every voice is named; \(typed.joined(separator: ", ")) not heard")
+            return
+        }
         let ownRecognized = m.speakerProfiles.values.contains { $0 == own }
         // Without the person's own voice recognized, one more voice than names is expected: theirs.
         let spare = ownRecognized ? 0 : 1
