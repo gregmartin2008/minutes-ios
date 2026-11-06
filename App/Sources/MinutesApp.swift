@@ -27,6 +27,8 @@ enum Route: Hashable {
     case settings
     case vocabulary
     case people
+    /// The second page of a meeting's PDF, drawn on screen: the screenshot run looks at it.
+    case documentPage(String)
 }
 
 struct RootView: View {
@@ -42,6 +44,7 @@ struct RootView: View {
                     case .settings: SettingsView()
                     case .vocabulary: VocabularyView()
                     case .people: PeopleView()
+                    case .documentPage(let id): DocumentPageView(meetingID: id)
                     }
                 }
         }

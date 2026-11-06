@@ -31,7 +31,11 @@ enum MeetingDocument {
                 let frame = CTFramesetterCreateFrame(framesetter, CFRange(location: start, length: 0), path, nil)
                 let cg = context.cgContext
                 cg.saveGState()
-                // Core Text draws with the origin at the bottom; flip the page.
+                // Core Text keeps its own text matrix, which is not part of the saved state and
+                // survives from one page to the next; left as it was, every page after the first
+                // comes out mirrored. Reset it, then flip the page: Core Text draws with the
+                // origin at the bottom.
+                cg.textMatrix = .identity
                 cg.translateBy(x: 0, y: page.height)
                 cg.scaleBy(x: 1, y: -1)
                 CTFrameDraw(frame, cg)
