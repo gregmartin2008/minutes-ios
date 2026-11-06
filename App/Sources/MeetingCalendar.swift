@@ -45,6 +45,20 @@ final class MeetingCalendar {
         }
     }
 
+    /// Whether any invitee of a meeting on now is listed by address alone, which Contacts may resolve.
+    func hasAddressOnlyInvitee(at now: Date = Date()) -> Bool {
+        guard access == .granted else { return false }
+        let predicate = store.predicateForEvents(
+            withStart: now.addingTimeInterval(-6 * 3600), end: now.addingTimeInterval(3600), calendars: nil)
+        let events = store.events(matching: predicate).filter { !$0.isAllDay && !Self.declined($0) }
+        return events.contains { event in
+            (event.attendees ?? []).contains { p in
+                let name = p.name?.trimmingCharacters(in: .whitespaces) ?? ""
+                return !p.isCurrentUser && (name.isEmpty || name.contains("@"))
+            }
+        }
+    }
+
     /// The meetings on now or about to start, nearest first. Empty when access is off.
     func currentEvents(at now: Date = Date()) -> [CalendarEvent] {
         guard access == .granted else {
@@ -77,9 +91,14 @@ final class MeetingCalendar {
             var name = participant.name?.trimmingCharacters(in: .whitespaces) ?? ""
             // Google calendars often list an invitee by address only. The People list knows
             // some of them; "first.last@" gives a name; a bare address stays an address.
+            var card: Person?
             if name.isEmpty || name.contains("@") {
                 if let email, let known = AppSettings.shared.directory.first(where: { $0.email?.lowercased() == email.lowercased() }) {
                     name = known.name
+                } else if let email, let fromContacts = ContactsLookup.shared.person(for: email) {
+                    name = fromContacts.name
+                    card = fromContacts
+                    Log.shared.info("calendar: \(email) is \(fromContacts.name) in Contacts")
                 } else if let email, let derived = Self.nameFromAddress(email) {
                     name = derived
                 } else {
@@ -93,7 +112,8 @@ final class MeetingCalendar {
                 if people[i].email == nil { people[i].email = email }
                 return
             }
-            people.append(Person(name: shown, email: email, organizer: organizer ? true : nil))
+            people.append(Person(
+                name: shown, email: email, organizer: organizer ? true : nil, company: card?.company, title: card?.title))
         }
         add(event.organizer, organizer: true)
         for participant in event.attendees ?? [] { add(participant, organizer: false) }

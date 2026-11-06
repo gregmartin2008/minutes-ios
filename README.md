@@ -109,6 +109,10 @@ it, Minutes still emails the full transcript and says why there are no notes.
 - **Record meeting** starts immediately. The whole screen is red while it records, so the state is
   readable from across the table. You can name the meeting and say how many people are in the room
   while it records; both are optional.
+- **Invitees listed by address alone** (Google often syncs only the email) are named from the
+  People list, then from the iPhone's Contacts (one permission prompt, nothing written), then
+  from the address itself ("first.last@" → First Last; "jacob@" → Jacob; "jcarver@" → J. Carver).
+  Naming such a voice on the Speakers tab ties the name to the address in People for next time.
 - **Calendar meetings name themselves.** When a recording starts during a meeting on the
   iPhone's calendar (Google and other calendars added to iOS count), the meeting takes that name
   and the people invited fill the *With* list, so the voices that are not recognized get their
