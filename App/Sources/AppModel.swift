@@ -283,6 +283,10 @@ final class AppModel: ObservableObject {
         var status = RecordingStatus(meetingID: m.id, title: m.title)
         if !isDemo, AppSettings.shared.usesCalendar {
             if MeetingCalendar.shared.access == .notAsked { _ = await MeetingCalendar.shared.requestAccess() }
+            // An invitee the calendar lists by address alone may be in Contacts under a name.
+            if MeetingCalendar.shared.hasAddressOnlyInvitee(at: now), !ContactsLookup.shared.allowed {
+                _ = await ContactsLookup.shared.requestAccess()
+            }
             status.calendarChoices = MeetingCalendar.shared.currentEvents(at: now)
             status.calendarOff = MeetingCalendar.shared.access != .granted
             if typed.isEmpty, let first = status.calendarChoices.first {
@@ -935,6 +939,29 @@ final class AppModel: ObservableObject {
             meeting.setName(name, for: label)
             if let profileID { meeting.speakerProfiles[label] = profileID }
         }
+        learnInvitee(named: trimmed, in: id)
+    }
+
+    /// Naming a voice on a meeting whose calendar listed one invitee by address alone ties that
+    /// name to the address in People, so the next invite with it comes in named.
+    private func learnInvitee(named name: String, in id: String) {
+        guard !name.isEmpty, let m = meeting(id), let event = m.calendarEvent else { return }
+        let unresolved = event.people.filter { p in
+            guard let email = p.email else { return false }
+            return p.name == email || p.name.contains("@") || (MeetingCalendar.nameFromAddress(email) == p.name)
+        }
+        guard unresolved.count == 1, let p = unresolved.first, let email = p.email else { return }
+        // Not if the name belongs to another invitee or to the person recording.
+        if event.people.contains(where: { $0.email != email && Person.sameName($0.name, name) }) { return }
+        if let own = ownName, Person.sameName(own, name) { return }
+        remember(Person(name: name, email: email, company: p.company, title: p.title))
+        edit(id) { meeting in
+            if var e = meeting.calendarEvent, let i = e.people.firstIndex(where: { $0.email == email }) {
+                e.people[i].name = name
+                meeting.calendarEvent = e
+            }
+        }
+        Log.shared.info("people: \(email) is \(name), from the Speakers tab")
     }
 
     func forgetVoice(_ profileID: String) {
