@@ -144,7 +144,11 @@ it, Minutes still emails the full transcript and says why there are no notes.
   audio, and the key stays in the Keychain. If Gemini is overloaded or unreachable at the time, the iPhone writes
   the notes as before and the email says so; Minutes then keeps trying Gemini for about half an
   hour and sends a second email with its notes when it gets through. The foot of the notes
-  names which model wrote them.
+  names which model wrote them. A line about you and your firm, typed once in Settings, goes
+  with every transcript so the notes know which side of the table you sit on; the people
+  invited go along by name and firm or email domain (never the address), so colleagues and
+  counterparties are told apart. Naming a voice in the Speakers tab afterward renames it in the
+  notes too.
 - **One document.** The email carries the notes in its body and one attachment, a PDF with the
   notes followed by the full transcript; *Share* hands out the same PDF.
 - The email arrives when that finishes. Leaving Minutes open on the screen is no longer needed.
@@ -269,8 +273,9 @@ locked, and not the notes, which need Apple Intelligence and cannot run in a sim
   the people met and the notes of that meeting, sent to HubSpot's API with your own token.
 - The Gmail app password is kept in the iPhone's Keychain.
 - The calendar is only read, on the phone, to find the meeting on now; nothing is written to it.
-- With a Gemini API key saved, the transcript text (not the audio) is sent to Google to write
-  the notes; without one, nothing about the meeting leaves the phone except the email.
+- With a Gemini API key saved, the transcript text (not the audio), the line about you from
+  Settings and the invitees' names with firm or email domain are sent to Google to write the
+  notes; without a key, nothing about the meeting leaves the phone except the email.
 - Audio is erased 30 days after its email was sent (adjustable); transcripts and notes stay until
   you delete the meeting.
 

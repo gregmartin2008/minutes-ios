@@ -144,7 +144,7 @@ public enum Render {
         "The notes aren't written yet: iOS limited the language model while this meeting was being processed. Open Minutes and it writes them and sends a second email."
 
     public static func notesText(_ m: Meeting) -> String {
-        guard let n = m.notes, !n.isEmpty else {
+        guard let n = m.shownNotes, !n.isEmpty else {
             if m.notesPending == true { return notesPendingText + " The full transcript follows." }
             if let e = m.notesError { return "Notes could not be written: \(sentence(e)) The full transcript follows." }
             return ""
@@ -246,7 +246,7 @@ public enum Render {
         }
         for r in m.remarks { html += "<p style=\"margin:10px 0 0;color:#8A5200\">\(e(r))</p>" }
 
-        if let n = m.notes, !n.isEmpty {
+        if let n = m.shownNotes, !n.isEmpty {
             if !n.summary.isEmpty { html += h2("Summary") + "<p style=\"margin:0\">\(e(n.summary))</p>" }
             for (kind, items) in sections(n) {
                 html += h2(kind.title) + "<ul style=\"margin:0;padding:0 0 0 20px\">"

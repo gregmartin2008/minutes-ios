@@ -9,13 +9,52 @@ import FoundationNetworking
 public protocol CloudNotesWriting: Sendable {
     /// A short name for the email's footer: "Gemini 2.5 Flash".
     var name: String { get }
-    func write(transcript: String, title: String?, spellings: [String], recorder: String?) async throws -> MeetingNotes
+    func write(transcript: String, title: String?, spellings: [String], brief: NotesBrief) async throws -> MeetingNotes
 }
 
 extension CloudNotesWriting {
     public func write(transcript: String, title: String?, spellings: [String]) async throws -> MeetingNotes {
-        try await write(transcript: transcript, title: title, spellings: spellings, recorder: nil)
+        try await write(transcript: transcript, title: title, spellings: spellings, brief: NotesBrief())
     }
+}
+
+/// What the writer is told about the meeting beyond the transcript, so it knows which side is
+/// which: who recorded it, who they are, and who was invited. Participants are described by
+/// name and firm or email domain, never by full address.
+public struct NotesBrief: Equatable, Sendable {
+    /// The person recording, as named in the transcript: "Greg Martin".
+    public var recorder: String?
+    /// The line typed in Settings about the person and their firm, sent with every meeting:
+    /// "Dana Lee is a partner at Larkfield Capital (larkfield.example), a private equity firm that buys
+    /// founder-led companies."
+    public var about: String?
+    /// The people invited or met, with company or email where known.
+    public var people: [Person]
+
+    public init(recorder: String? = nil, about: String? = nil, people: [Person] = []) {
+        self.recorder = recorder
+        self.about = about
+        self.people = people
+    }
+
+    /// "Jordan Carver (meridyancap.example), Steve (veltrona.example), Lee Park" — one entry per person,
+    /// with the company when known, else the domain of their address.
+    public var peopleLine: String {
+        people.compactMap { p -> String? in
+            let name = p.name.trimmingCharacters(in: .whitespaces)
+            guard !name.isEmpty, !name.contains("@") else { return nil }
+            if let company = p.company, !company.isEmpty { return "\(name) (\(company))" }
+            if let email = p.email, let at = email.firstIndex(of: "@") {
+                let domain = email[email.index(after: at)...].lowercased()
+                if !domain.isEmpty, !Self.personalDomains.contains(String(domain)) { return "\(name) (\(domain))" }
+            }
+            return name
+        }.joined(separator: ", ")
+    }
+
+    static let personalDomains: Set<String> = [
+        "gmail.com", "yahoo.com", "hotmail.com", "outlook.com", "icloud.com", "me.com", "aol.com", "live.com", "msn.com",
+    ]
 }
 
 public struct CloudNotesError: LocalizedError, Equatable {
@@ -113,15 +152,15 @@ public struct GeminiNotesWriter: CloudNotesWriting {
         throw CloudNotesError(status: 404, message: "The key works, but \"\(model)\" is not a model it can use.\(suggestion) Available: \(shown).")
     }
 
-    public func write(transcript: String, title: String?, spellings: [String], recorder: String?) async throws -> MeetingNotes {
-        let prompt = Self.prompt(transcript: transcript, title: title, spellings: spellings, recorder: recorder)
+    public func write(transcript: String, title: String?, spellings: [String], brief: NotesBrief) async throws -> MeetingNotes {
+        let prompt = Self.prompt(transcript: transcript, title: title, spellings: spellings, brief: brief)
         let json = try await generate(prompt: prompt, schema: Self.schema)
         return try Self.notes(from: json, transcript: transcript)
     }
 
     // MARK: Prompt and schema
 
-    static func prompt(transcript: String, title: String?, spellings: [String], recorder: String? = nil) -> String {
+    static func prompt(transcript: String, title: String?, spellings: [String], brief: NotesBrief = NotesBrief()) -> String {
         var p = """
         You write meeting notes for a private equity firm from a transcript. Each transcript line is \
         "Name [m:ss]: what they said"; the names are the people in the meeting (a "Speaker N" is a \
@@ -146,10 +185,15 @@ public struct GeminiNotesWriter: CloudNotesWriting {
         Small talk gets one sentence at most, or nothing.
         - title: 3 to 8 words naming the meeting's subject, no date.
         """
-        if let recorder, !recorder.isEmpty {
-            p += "\nThe meeting was recorded by \(recorder), whose firm these notes are for; the other participants are the other side "
-                + "(a seller, a lender, an investor, an advisor), unless the transcript shows they are \(recorder)'s colleagues. "
-                + "A firm named in the meeting's title is not necessarily the firm the other participants are from."
+        if let recorder = brief.recorder, !recorder.isEmpty {
+            p += "\nThe notes are for \(recorder), who recorded the meeting."
+            if let about = brief.about?.trimmingCharacters(in: .whitespacesAndNewlines), !about.isEmpty { p += " \(about)" }
+            let people = brief.peopleLine
+            if !people.isEmpty { p += "\nInvited: \(people)." }
+            p += "\nPeople at \(recorder)'s firm (the same company, or an email domain that is its name) are colleagues on \(recorder)'s side. "
+                + "The other participants are the other side: a seller, a lender, an investor or an advisor. "
+                + "Get the sides right: \(recorder)'s firm is the one making the offer, lending or investing unless the transcript plainly says otherwise, "
+                + "and is never called the seller when it is buying. A firm named in the meeting's title is not necessarily the firm the other participants are from."
         }
         if let title, !title.isEmpty { p += "\nThe meeting was named \"\(title)\"; keep that as the title unless it is only a date." }
         if !spellings.isEmpty { p += "\nSpell these exactly as written: " + spellings.prefix(60).joined(separator: ", ") + "." }

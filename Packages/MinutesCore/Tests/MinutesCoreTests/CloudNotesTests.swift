@@ -58,7 +58,7 @@ final class CloudNotesTests: XCTestCase {
     func testNotesComeBackStructuredWithNumbersChecked() async throws {
         let fake = Fake()
         let writer = GeminiNotesWriter(apiKey: "k", transport: { try fake.handle($0) })
-        let notes = try await writer.write(transcript: transcript, title: nil, spellings: ["Meridyan"], recorder: "Greg Martin")
+        let notes = try await writer.write(transcript: transcript, title: nil, spellings: ["Meridyan"], brief: NotesBrief(recorder: "Greg Martin"))
         XCTAssertEqual(notes.title, "Veltrona offer options")
         XCTAssertEqual(notes.summary, "Meridyan settled the two options for Veltrona.")
         XCTAssertEqual(notes.actionItems, [
@@ -82,7 +82,7 @@ final class CloudNotesTests: XCTestCase {
         XCTAssertEqual(config["responseMimeType"] as? String, "application/json")
         let prompt = (((body["contents"] as! [[String: Any]])[0]["parts"] as! [[String: Any]])[0]["text"] as! String)
         XCTAssertTrue(prompt.contains("Spell these exactly as written: Meridyan."))
-        XCTAssertTrue(prompt.contains("The meeting was recorded by Greg Martin, whose firm these notes are for"))
+        XCTAssertTrue(prompt.contains("The notes are for Greg Martin, who recorded the meeting."))
         XCTAssertTrue(prompt.hasSuffix(transcript))
     }
 
@@ -141,5 +141,25 @@ final class CloudNotesTests: XCTestCase {
     func testTheModelNameIsRenderedForPeople() {
         XCTAssertEqual(GeminiNotesWriter(apiKey: "k", model: "gemini-2.5-pro").name, "Gemini 2.5 Pro")
         XCTAssertEqual(GeminiNotesWriter(apiKey: "k", model: "").model, "gemini-3.5-flash-lite")
+    }
+
+    /// The writer is told who recorded, what they typed about themselves, and who was invited
+    /// by name and firm or domain, never by full address, so it can tell the sides apart.
+    func testThePromptSaysWhoIsOnWhichSide() {
+        let brief = NotesBrief(
+            recorder: "Greg Martin", about: "Greg Martin is a director at Meridyan Capital (meridyancap.example), a private equity firm.",
+            people: [
+                Person(name: "Jordan Carver", email: "jcarver@meridyancap.example"), Person(name: "Steve", email: "steve@veltrona.example"),
+                Person(name: "Lee Park", email: "lee@gmail.com"), Person(name: "Dana Ortiz", email: "d@x.com", company: "Harlow Credit"),
+                Person(name: "bill@veltrona.example", email: "bill@veltrona.example"),
+            ])
+        let p = GeminiNotesWriter.prompt(transcript: "Greg Martin [0:00]: Hi.", title: "Veltrona-Meridyan Offer Review", spellings: [], brief: brief)
+        XCTAssertTrue(p.contains("The notes are for Greg Martin, who recorded the meeting. Greg Martin is a director at Meridyan Capital"), p)
+        XCTAssertTrue(p.contains("Invited: Jordan Carver (meridyancap.example), Steve (veltrona.example), Lee Park, Dana Ortiz (Harlow Credit)."), p)
+        XCTAssertFalse(p.contains("jcarver@"), "full addresses are not sent")
+        XCTAssertFalse(p.contains("bill@"), "an invitee known by address alone is left out")
+        XCTAssertTrue(p.contains("never called the seller when it is buying"), p)
+        let bare = GeminiNotesWriter.prompt(transcript: "x", title: nil, spellings: [])
+        XCTAssertFalse(bare.contains("Invited:"))
     }
 }

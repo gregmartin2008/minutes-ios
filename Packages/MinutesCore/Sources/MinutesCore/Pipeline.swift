@@ -64,6 +64,9 @@ public struct PipelineServices: Sendable {
     /// A large model over the network to write the notes from the whole transcript, when the
     /// person has set one up. Nil means the on-device model; a failure falls back to it too.
     public var cloudNotes: @Sendable () -> CloudNotesWriting?
+    /// What the person typed in Settings about themselves and their firm, told to the cloud
+    /// writer with every meeting so it knows which side is which.
+    public var aboutRecorder: @Sendable () -> String?
 
     public init(
         separator: SpeakerSeparating, transcriber: Transcribing,
@@ -74,6 +77,7 @@ public struct PipelineServices: Sendable {
         liveWork: @escaping @Sendable (String) -> LiveWork? = { _ in nil },
         ownProfileID: @escaping @Sendable () -> String? = { nil },
         cloudNotes: @escaping @Sendable () -> CloudNotesWriting? = { nil },
+        aboutRecorder: @escaping @Sendable () -> String? = { nil },
         stageWillStart: (@Sendable (Stage, String) async -> Void)? = nil,
         stageDidFinish: (@Sendable (Stage) async -> Void)? = nil
     ) {
@@ -87,6 +91,7 @@ public struct PipelineServices: Sendable {
         self.liveWork = liveWork
         self.ownProfileID = ownProfileID
         self.cloudNotes = cloudNotes
+        self.aboutRecorder = aboutRecorder
         self.stageWillStart = stageWillStart
         self.stageDidFinish = stageDidFinish
     }
@@ -268,7 +273,8 @@ public final class MeetingPipeline: @unchecked Sendable {
                     let own = services.ownProfileID().flatMap { id in store.loadProfiles().first { $0.id == id }?.name }
                     var notes = try await cloud.write(
                         transcript: Render.cloudTranscript(m), title: m.titleIsAuto ? nil : m.title,
-                        spellings: services.vocabulary().spellings, recorder: own)
+                        spellings: services.vocabulary().spellings,
+                        brief: NotesBrief(recorder: own, about: services.aboutRecorder(), people: m.people(excluding: own)))
                     notes.writer = cloud.name
                     m.notes = notes
                     m.notesError = nil
@@ -518,6 +524,12 @@ public final class MeetingPipeline: @unchecked Sendable {
     public static func cloudFallbackRemark(_ name: String, error: Error, willRetry: Bool) -> String {
         "\(name) could not write these notes (\(describe(error))); they were written on the iPhone instead."
             + (willRetry ? " Minutes tries \(name) again for a while and sends its notes if it gets through." : "")
+    }
+
+    /// Whether a remark is the one `applyTypedNames` leaves when the typed names could not be
+    /// placed; it is dropped once the person names a voice themselves.
+    public static func isTypedNamesRemark(_ remark: String) -> Bool {
+        remark.hasPrefix("The names typed for this meeting (")
     }
 
     /// Whether a remark is the one `cloudFallbackRemark` wrote.

@@ -198,7 +198,8 @@ final class AppModel: ObservableObject {
             do {
                 var notes = try await cloud.write(
                     transcript: Render.cloudTranscript(m), title: m.titleIsAuto ? nil : m.title,
-                    spellings: AppSettings.shared.vocabulary.spellings, recorder: ownName)
+                    spellings: AppSettings.shared.vocabulary.spellings,
+                    brief: NotesBrief(recorder: ownName, about: AppSettings.shared.aboutRecorder, people: m.people(excluding: ownName)))
                 notes.writer = cloud.name
                 guard var fresh = self.meeting(m.id) else { continue }
                 fresh.notes = notes
@@ -748,6 +749,7 @@ final class AppModel: ObservableObject {
                 let key = AppSettings.shared.geminiKey
                 return key.isEmpty ? nil : GeminiNotesWriter(apiKey: key, model: AppSettings.shared.geminiModel)
             },
+            aboutRecorder: { AppSettings.shared.aboutRecorder },
             stageWillStart: { [liveWork] stage, id in
                 // For an imported recording, load the transcription model while the speakers are
                 // being separated. A recorded meeting was transcribed as it went.
@@ -938,6 +940,8 @@ final class AppModel: ObservableObject {
         edit(id) { meeting in
             meeting.setName(name, for: label)
             if let profileID { meeting.speakerProfiles[label] = profileID }
+            // The person is naming voices themselves now; the hint to do so has done its job.
+            if !trimmed.isEmpty { meeting.remarks.removeAll(where: MeetingPipeline.isTypedNamesRemark) }
         }
         learnInvitee(named: trimmed, in: id)
     }

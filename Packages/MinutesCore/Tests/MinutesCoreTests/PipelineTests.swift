@@ -294,7 +294,7 @@ final class PipelineTests: XCTestCase {
             var fail: Bool
             var status = 429
             var name: String { "Gemini 2.5 Flash" }
-            func write(transcript: String, title: String?, spellings: [String], recorder: String?) async throws -> MeetingNotes {
+            func write(transcript: String, title: String?, spellings: [String], brief: NotesBrief) async throws -> MeetingNotes {
                 if fail { throw CloudNotesError(status: status, message: "quota") }
                 XCTAssertTrue(transcript.contains("Speaker 1 [0:00]: Hold the bid.") || transcript.contains("[0:0"), transcript)
                 return MeetingNotes(title: "Bid review", summary: "From the cloud.", actionItems: ["Dana: call the customer"],

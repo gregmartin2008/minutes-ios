@@ -49,6 +49,26 @@ final class RenderTests: XCTestCase {
         XCTAssertEqual(Render.speakersLine(m), "Greg, Speaker 2, Speaker 3")
     }
 
+    /// Naming a voice after the notes were written renames it in the notes too, everywhere the
+    /// notes are shown, without touching "Speaker 12" when "Speaker 1" is named.
+    func testNotesShowTheNamesGivenSinceTheyWereWritten() {
+        var m = sample()
+        m.notes = MeetingNotes(
+            title: "T", summary: "Speaker 2 asked about dividends; Speaker 3 and Speaker 2's CFO agreed. Speaker 12 left.",
+            decisions: ["Speaker 3: hold the bid"], actionItems: ["Speaker 2: send the deck"],
+            details: [NotesDetail(topic: "Speaker 2 on debt", text: "Speaker 2 said 2.7x.", startSeconds: 1)])
+        XCTAssertEqual(m.shownNotes?.summary, m.notes?.summary, "nothing changes while the voices are unnamed")
+        m.setName("Stephen Aston", for: "S1")
+        let shown = try! XCTUnwrap(m.shownNotes)
+        XCTAssertEqual(shown.summary, "Stephen Aston asked about dividends; Speaker 3 and Stephen Aston's CFO agreed. Speaker 12 left.")
+        XCTAssertEqual(shown.actionItems, ["Stephen Aston: send the deck"])
+        XCTAssertEqual(shown.decisions, ["Speaker 3: hold the bid"])
+        XCTAssertEqual(shown.details?.first?.topic, "Stephen Aston on debt")
+        XCTAssertEqual(shown.details?.first?.text, "Stephen Aston said 2.7x.")
+        XCTAssertTrue(Render.notesText(m).contains("Stephen Aston asked"))
+        XCTAssertFalse(Render.emailHTML(m).contains("Speaker 2 "))
+    }
+
     func testTranscriptTextShowsCrosstalkAndGaps() {
         let text = Render.transcriptText(sample())
         XCTAssertTrue(text.hasPrefix("Greg [0:01]\nThanks everyone."))

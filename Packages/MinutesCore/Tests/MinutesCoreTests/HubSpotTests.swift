@@ -150,6 +150,12 @@ final class HubSpotTests: XCTestCase {
         XCTAssertTrue(Person.sameName("jordan carver", "Jordan Carver"))
         XCTAssertFalse(Person.sameName("J. Carver", "Greg Carver"))
         XCTAssertFalse(Person.sameName("Jordan Carver", "Jordan Martin"))
+        // A calendar lists an invitee known by address alone by first name; that is the voice already named.
+        XCTAssertTrue(Person.sameName("Jacob", "Jacob Frost"))
+        XCTAssertTrue(Person.sameName("Jacob Frost", "jacob"))
+        XCTAssertFalse(Person.sameName("Jake", "Jacob Frost"))
+        XCTAssertFalse(Person.sameName("J", "Jacob Frost"))
+        XCTAssertFalse(Person.sameName("Jacob", "Steve"))
     }
 
     func testDirectoryFillsInWhatIsMissing() {

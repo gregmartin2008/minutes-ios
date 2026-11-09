@@ -105,6 +105,13 @@ final class AppSettings {
         }
     }
 
+    /// A line about the person and their firm, sent to the cloud writer with every meeting so
+    /// it knows which side of the table the notes are for. Stays on the phone otherwise.
+    var aboutRecorder: String {
+        get { defaults.string(forKey: "aboutRecorder") ?? "" }
+        set { defaults.set(newValue, forKey: "aboutRecorder") }
+    }
+
     /// The Gemini model name; empty means the default.
     var geminiModel: String {
         get { defaults.string(forKey: "geminiModel") ?? "" }

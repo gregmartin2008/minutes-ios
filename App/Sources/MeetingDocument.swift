@@ -107,7 +107,7 @@ enum MeetingDocument {
         if !speakers.isEmpty { add("Speakers: " + speakers + Render.namesCaption(m), size: 10.5, color: muted, after: 2) }
         for r in m.remarks { add(r, size: 10.5, color: warn, before: 4, after: 2) }
 
-        if let n = m.notes, !n.isEmpty {
+        if let n = m.shownNotes, !n.isEmpty {
             if !n.summary.isEmpty {
                 heading("Summary")
                 add(n.summary, size: 11)

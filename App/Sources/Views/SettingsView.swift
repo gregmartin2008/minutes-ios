@@ -247,9 +247,17 @@ struct SettingsView: View {
     @State private var geminiChecking = false
     @State private var geminiResult: String?
     @State private var geminiFailed = false
+    @State private var aboutRecorder = AppSettings.shared.aboutRecorder
 
     private var notesSection: some View {
         Section {
+            if geminiSaved {
+                TextField(
+                    "About you and your firm", text: $aboutRecorder, axis: .vertical,
+                    prompt: Text("Dana Lee is a partner at Larkfield Capital (larkfield.example), a private equity firm that buys founder-led companies. Colleagues: Sam Park, Lee Ortiz."))
+                    .lineLimit(2...6)
+                    .onChange(of: aboutRecorder) { _, value in AppSettings.shared.aboutRecorder = value }
+            }
             SecureField(geminiSaved ? "Gemini API key (saved)" : "Gemini API key", text: $geminiKey)
                 .textContentType(.password)
                 .autocorrectionDisabled()
@@ -284,7 +292,7 @@ struct SettingsView: View {
             Text("Notes")
         } footer: {
             Text(geminiSaved
-                ? "The notes are written by Google's Gemini from the whole transcript, which is sent as text after each meeting (never the audio). If Gemini can't be reached, the iPhone writes them instead and the email says so. The key is kept in this iPhone's Keychain."
+                ? "The notes are written by Google's Gemini from the whole transcript, which is sent as text after each meeting (never the audio). The line about you goes with it, so the notes know which side of the table you sit on and don't call your firm the seller. If Gemini can't be reached, the iPhone writes them instead and the email says so. The key is kept in this iPhone's Keychain."
                 : "By default the notes are written on this iPhone by Apple's model, which runs short on long meetings. A Gemini API key (free at aistudio.google.com) has Google's model write them from the whole transcript instead; the transcript text is sent after each meeting, never the audio.")
         }
     }

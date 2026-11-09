@@ -576,7 +576,7 @@ private struct NotesTab: View {
     let rewrite: () -> Void
 
     var body: some View {
-        if let notes = meeting.notes, !notes.isEmpty {
+        if let notes = meeting.shownNotes, !notes.isEmpty {
             VStack(alignment: .leading, spacing: 22) {
                 if !notes.summary.isEmpty {
                     VStack(alignment: .leading, spacing: 8) {

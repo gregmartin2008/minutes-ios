@@ -339,6 +339,41 @@ public struct Meeting: Codable, Equatable, Identifiable, Sendable {
         return Meeting.genericName(for: label, among: speakerLabels)
     }
 
+    /// The notes with every "Speaker N" the writer had to use replaced by the name the person
+    /// gave that voice since, so naming a voice in the Speakers tab also fixes the notes.
+    public var shownNotes: MeetingNotes? {
+        guard var n = notes else { return nil }
+        let labels = speakerLabels
+        let names = labels.enumerated().compactMap { i, label -> (String, String)? in
+            guard let name = speakerNames[label]?.trimmingCharacters(in: .whitespaces), !name.isEmpty else { return nil }
+            return ("Speaker \(i + 1)", name)
+        }
+        guard !names.isEmpty else { return n }
+        func fix(_ text: String) -> String {
+            guard text.contains("Speaker ") else { return text }
+            var out = text
+            // Longer numbers first, so "Speaker 12" is not caught by "Speaker 1".
+            for (generic, name) in names.sorted(by: { $0.0.count > $1.0.count }) {
+                var searchFrom = out.startIndex
+                while let r = out.range(of: generic, range: searchFrom..<out.endIndex) {
+                    let next = r.upperBound < out.endIndex ? out[r.upperBound] : " "
+                    if next.isNumber { searchFrom = r.upperBound; continue }
+                    out.replaceSubrange(r, with: name)
+                    searchFrom = out.index(r.lowerBound, offsetBy: name.count)
+                }
+            }
+            return out
+        }
+        n.summary = fix(n.summary)
+        n.keyPoints = n.keyPoints.map(fix)
+        n.decisions = n.decisions.map(fix)
+        n.actionItems = n.actionItems.map(fix)
+        n.openQuestions = n.openQuestions.map(fix)
+        n.figures = n.figures.map(fix)
+        n.details = n.details?.map { d in var d = d; d.topic = fix(d.topic); d.text = fix(d.text); return d }
+        return n
+    }
+
     /// "Speaker N" numbered by order of first appearance, so the first voice heard is Speaker 1.
     public static func genericName(for label: String, among labels: [String]) -> String {
         if let i = labels.firstIndex(of: label) { return "Speaker \(i + 1)" }
@@ -418,14 +453,18 @@ extension Person {
         return name
     }
 
-    /// Whether two names are the same person: equal ignoring case, or one is the initial form
-    /// of the other ("J. Carver" and "Jordan Carver").
+    /// Whether two names are the same person: equal ignoring case, one the initial form of the
+    /// other ("J. Carver" and "Jordan Carver"), or one just the first name of the other ("Jacob"
+    /// and "Jacob Frost", which is how a calendar lists an invitee known by address alone).
     public static func sameName(_ a: String, _ b: String) -> Bool {
         let x = a.lowercased().trimmingCharacters(in: .whitespaces), y = b.lowercased().trimmingCharacters(in: .whitespaces)
         if x == y { return true }
         let xw = x.split(separator: " ").map { $0.trimmingCharacters(in: .punctuationCharacters) }
         let yw = y.split(separator: " ").map { $0.trimmingCharacters(in: .punctuationCharacters) }
-        guard xw.count >= 2, yw.count >= 2, xw.last == yw.last, let xf = xw.first, let yf = yw.first else { return false }
+        guard let xf = xw.first, let yf = yw.first else { return false }
+        if xw.count == 1, yw.count >= 2, xf.count >= 2 { return xf == yf }
+        if yw.count == 1, xw.count >= 2, yf.count >= 2 { return xf == yf }
+        guard xw.count >= 2, yw.count >= 2, xw.last == yw.last else { return false }
         return (xf.count == 1 && yf.hasPrefix(xf)) || (yf.count == 1 && xf.hasPrefix(yf))
     }
 
