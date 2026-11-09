@@ -253,8 +253,9 @@ struct SettingsView: View {
         Section {
             if geminiSaved {
                 TextField(
-                    "About you and your firm", text: $aboutRecorder, axis: .vertical,
-                    prompt: Text("Dana Lee is a partner at Larkfield Capital (larkfield.example), a private equity firm that buys founder-led companies. Colleagues: Sam Park, Lee Ortiz."))
+                    "About you and your firm", text: $aboutRecorder,
+                    prompt: Text("Dana Lee is a partner at Larkfield Capital (larkfield.example), a private equity firm that buys founder-led companies. Colleagues: Sam Park, Lee Ortiz."),
+                    axis: .vertical)
                     .lineLimit(2...6)
                     .onChange(of: aboutRecorder) { _, value in AppSettings.shared.aboutRecorder = value }
             }
