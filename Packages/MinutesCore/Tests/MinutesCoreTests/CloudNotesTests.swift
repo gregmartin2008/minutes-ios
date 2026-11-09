@@ -17,7 +17,10 @@ final class CloudNotesTests: XCTestCase {
                 ["owner": "Mark Farrow", "action": "post the deal summary on the Meridyan General channel"],
                 ["owner": "Greg", "action": "submit an offer by December 4th", "when": "December 4th"],
             ],
-            "decisions": ["Present option one at 49% as the primary proposal."],
+            "decisions": [
+                "Present option one at 49% as the primary proposal.", "Jordan Carver will add Greg Martin to the pipeline list.",
+                "Veltrona will consider the offer.",
+            ],
             "details": [
                 ["topic": "Market review", "start": "3:26", "text": "The NASDAQ was down 5% on the day. Oracle's debt stands at 4.4x EBITDA."],
                 ["topic": "Veltrona terms", "start": "1:02:15", "text": "Option one carries a $5 million earnout. A $99 million figure that was never said."],
@@ -65,8 +68,11 @@ final class CloudNotesTests: XCTestCase {
             "Jordan Carver: update the option 1 scenario to 49% ownership (tonight)",
             "Mark Farrow: post the deal summary on the Meridyan General channel",
             "Greg: submit an offer by December 4th",
+            "Jordan Carver: add Greg Martin to the pipeline list",
         ])
-        XCTAssertEqual(notes.decisions, ["Present option one at 49% as the primary proposal."])
+        XCTAssertEqual(
+            notes.decisions, ["Present option one at 49% as the primary proposal.", "Veltrona will consider the offer."],
+            "one speaker's promise moves to the next steps; a firm's intention stays a decision")
         let details = try XCTUnwrap(notes.details)
         XCTAssertEqual(details.map(\.topic), ["Market review", "Veltrona terms"])
         XCTAssertEqual(details[0].startSeconds, 206)

@@ -21,6 +21,11 @@ public enum TranscriptAssembler {
         public var clauseMajority: Double = 0.7
         /// ...and no more than this many of its words were attributed to someone else.
         public var clauseMinorityWords: Int = 5
+        /// A stray: at most this long and this many words, from a voice heard nowhere else within
+        /// `strayIsolation` seconds, between two utterances of one other voice.
+        public var strayMaxSeconds: Double = 5
+        public var strayMaxWords: Int = 12
+        public var strayIsolation: Double = 120
 
         public init() {}
     }
@@ -42,7 +47,33 @@ public enum TranscriptAssembler {
         var attributed = attribute(words: cleaned, turns: turns, options: options)
         snapBoundaries(&attributed, options: options)
         settleClauses(&attributed, options: options)
-        return group(attributed, options: options)
+        var grouped = group(attributed, options: options)
+        absorbStrays(&grouped, options: options)
+        return grouped
+    }
+
+    /// A few seconds given to a voice that is otherwise silent for minutes on either side, in
+    /// the middle of someone else's turn, is a slip of the speaker separation (a cough, a change
+    /// of tone), not a person: give the words to the voice around them. A real late joiner's first
+    /// words are followed by more from them, so they are left alone.
+    static func absorbStrays(_ u: inout [Utterance], options: Options) {
+        guard u.count >= 3, let first = u.first, let last = u.last else { return }
+        for i in 1..<(u.count - 1) {
+            let stray = u[i]
+            // Silence can only be judged where there is recording to be silent in.
+            guard last.end >= stray.end + options.strayIsolation || first.start <= stray.start - options.strayIsolation else { continue }
+            guard stray.end - stray.start <= options.strayMaxSeconds,
+                  stray.text.split(separator: " ").count <= options.strayMaxWords else { continue }
+            let before = u[i - 1], after = u[i + 1]
+            guard before.speaker == after.speaker, before.speaker != stray.speaker else { continue }
+            let alone = !u.enumerated().contains { j, other in
+                j != i && other.speaker == stray.speaker
+                    && other.end > stray.start - options.strayIsolation && other.start < stray.end + options.strayIsolation
+            }
+            guard alone else { continue }
+            u[i].speaker = before.speaker
+            u[i].overlapWith.removeAll { $0 == before.speaker }
+        }
     }
 
     // MARK: Attribution

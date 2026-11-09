@@ -176,8 +176,9 @@ public struct GeminiNotesWriter: CloudNotesWriting {
         schedule, introduce, review, revise, submit, call). Owner is the person's name as in the \
         transcript; "The group" when everyone. Include the deadline if one was said. Not opinions, not \
         things done during the meeting, not "continue to". Usually 0 to 8.
-        - decisions: only what the people settled between them: a price, a plan, who does what, an \
-        option chosen. One short sentence each. Not one person's view. Usually 0 to 5.
+        - decisions: only what the people settled between them: a price, a plan, an option chosen. \
+        One short sentence each. Not one person's view, and not one person's promise to do something \
+        after the meeting, which belongs in nextSteps. Usually 0 to 5.
         - details: the meeting part by part, in order, one entry per topic (typically 5 to 12 for an \
         hour). Each has a heading of 3 to 8 words, the start time of that part copied from the transcript \
         ("12:43"), and a paragraph of 3 to 7 sentences stating the substance: what each person said as \
@@ -223,10 +224,37 @@ public struct GeminiNotesWriter: CloudNotesWriting {
 
     /// The model's JSON as notes. Numbers in the details are checked against the transcript as
     /// with the on-device model: a sentence citing a figure that was never said is dropped.
+    /// A "decision" that is really one speaker promising to do something ("Jordan Carver will add
+    /// R. Gordon to the list"), rewritten in the next-step form "Name: do something"; nil for a
+    /// real decision. Only the speakers' own names count, so "Sable Capital will…" stays a decision.
+    static func nextStep(fromDecision item: String, speakers: Set<String>) -> String? {
+        let words = item.split(separator: " ").map(String.init)
+        for at in 1...min(3, max(1, words.count - 2)) where at < words.count - 1 {
+            let name = words[..<at].joined(separator: " ")
+            guard speakers.contains(name), ["will", "to", "is to", "agreed to"].contains(words[at]) else { continue }
+            var action = words[(at + 1)...].joined(separator: " ")
+            if action.hasPrefix("to ") { action.removeFirst(3) }
+            if action.hasSuffix(".") { action.removeLast() }
+            guard !action.isEmpty else { return nil }
+            return "\(name): \(action)"
+        }
+        return nil
+    }
+
+    /// The speaker names in a transcript as `Render.cloudTranscript` writes them.
+    static func speakers(in lines: [String]) -> Set<String> {
+        Set(lines.compactMap { line in
+            guard let bracket = line.range(of: " [") else { return nil }
+            let name = String(line[..<bracket.lowerBound])
+            return name.isEmpty || name.hasPrefix("[") ? nil : name
+        })
+    }
+
     static func notes(from json: [String: Any], transcript: String) throws -> MeetingNotes {
         guard let summary = json["summary"] as? String else { throw CloudNotesError(status: 0, message: "Gemini returned no summary.") }
         let lines = transcript.split(separator: "\n").map(String.init)
         let said = Set(lines.flatMap(NotesEngine.numbers))
+        let speakers = Self.speakers(in: lines)
         var next: [String] = []
         for item in json["nextSteps"] as? [[String: Any]] ?? [] {
             guard let owner = item["owner"] as? String, let action = item["action"] as? String else { continue }
@@ -238,7 +266,11 @@ public struct GeminiNotesWriter: CloudNotesWriting {
             }
             next.append(line)
         }
-        let decisions = (json["decisions"] as? [String] ?? []).map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
+        var decisions: [String] = []
+        for item in (json["decisions"] as? [String] ?? []).map({ $0.trimmingCharacters(in: .whitespacesAndNewlines) }) where !item.isEmpty {
+            // "Jordan Carver will add R. Gordon to the list" is one person's next step, not a decision.
+            if let step = Self.nextStep(fromDecision: item, speakers: speakers) { next.append(step) } else { decisions.append(item) }
+        }
         var details: [NotesDetail] = []
         for item in json["details"] as? [[String: Any]] ?? [] {
             guard let topic = item["topic"] as? String, let text = item["text"] as? String else { continue }

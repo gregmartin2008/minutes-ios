@@ -8,8 +8,8 @@ options:
 settings:
   base:
     SWIFT_VERSION: "5.0"
-    MARKETING_VERSION: "1.21"
-    CURRENT_PROJECT_VERSION: "36"
+    MARKETING_VERSION: "1.22"
+    CURRENT_PROJECT_VERSION: "37"
     ENABLE_USER_SCRIPT_SANDBOXING: "NO"
 packages:
   MinutesCore:
