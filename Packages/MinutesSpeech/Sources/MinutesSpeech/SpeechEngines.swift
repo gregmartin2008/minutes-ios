@@ -6,21 +6,17 @@ import MinutesCore
 /// Speech-to-text with word timings, using the Parakeet model on the Neural Engine.
 ///
 /// The recording is transcribed in pieces of about a minute, cut at quiet moments, the same way
-/// a meeting is transcribed while it is being recorded, with the person's names and terms
-/// listened for in each piece.
+/// a meeting is transcribed while it is being recorded.
 public struct FluidTranscriber: Transcribing {
     let models: SpeechModels
-    let boost: [BoostTerm]
 
-    public init(models: SpeechModels, boost: [BoostTerm] = []) {
+    public init(models: SpeechModels) {
         self.models = models
-        self.boost = boost
     }
 
     public func transcribe(audio: URL, progress: @escaping @Sendable (Double) -> Void) async throws -> [Word] {
         let asr = try await models.transcriber()
-        let booster = await models.booster(for: boost)
-        let pieces = PieceTranscriber(asr: asr, booster: booster, log: .shared)
+        let pieces = PieceTranscriber(asr: asr, log: .shared)
         let options = LiveAnalyzer.Options()
         let rate = 16_000
         let (source, _) = try AudioSourceFactory().makeDiskBackedSource(from: audio, targetSampleRate: rate)

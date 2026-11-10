@@ -188,7 +188,7 @@ final class AppModel: ObservableObject {
     /// is open; a retry also happens whenever it comes to the foreground.
     func retryCloudNotes() async {
         guard !isDemo else { return }
-        let pending = meetings.filter { $0.status == .done && $0.cloudPending == true && ($0.cloudRetries ?? 0) < 8 }
+        let pending = meetings.filter { $0.status == .done && $0.cloudPending == true && ($0.cloudRetries ?? 0) < MeetingPipeline.cloudRetryLimit }
         if pending.isEmpty { cloudRetryTask?.cancel(); cloudRetryTask = nil; return }
         guard runningID == nil, let cloud = services().cloudNotes() else { return }
         for m in pending {
@@ -199,7 +199,7 @@ final class AppModel: ObservableObject {
                     transcript: Render.cloudTranscript(m), title: m.titleIsAuto ? nil : m.title,
                     spellings: AppSettings.shared.vocabulary.spellings,
                     brief: NotesBrief(recorder: ownName, about: AppSettings.shared.aboutRecorder, people: m.people(excluding: ownName)))
-                notes.writer = cloud.name
+                notes.writer = notes.writer ?? cloud.name
                 guard var fresh = self.meeting(m.id) else { continue }
                 fresh.notes = notes
                 // These notes settle the meeting: nothing is left for the phone to try again.
@@ -212,24 +212,34 @@ final class AppModel: ObservableObject {
                 fresh.remarks.removeAll(where: MeetingPipeline.isCloudFallbackRemark)
                 if fresh.titleIsAuto, !notes.title.isEmpty { fresh.title = notes.title; fresh.titleIsAuto = false }
                 save(fresh)
-                Log.shared.info("meeting \(m.id): \(cloud.name) wrote the notes on try \(meeting.cloudRetries ?? 0); sending them")
+                Log.shared.info("meeting \(m.id): \(notes.writer ?? cloud.name) wrote the notes on try \(meeting.cloudRetries ?? 0); sending them")
                 if mailReady, fresh.emailedAt != nil {
                     if let problem = await sendEmail(m.id) { Log.shared.warn("meeting \(m.id): the second email failed: \(problem)") }
                 }
             } catch {
                 let transient = (error as? CloudNotesError)?.isTransient ?? false
-                if !transient || (meeting.cloudRetries ?? 0) >= 8 { meeting.cloudPending = nil }
+                let givingUp = !transient || (meeting.cloudRetries ?? 0) >= MeetingPipeline.cloudRetryLimit
+                if givingUp { meeting.cloudPending = nil }
                 Log.shared.warn("meeting \(m.id): \(cloud.name) still could not write the notes (try \(meeting.cloudRetries ?? 0)): \(error.localizedDescription)")
                 if let fresh = self.meeting(m.id) {
                     var copy = fresh
                     copy.cloudPending = meeting.cloudPending
                     copy.cloudRetries = meeting.cloudRetries
+                    // Only the transcript went out and Gemini is not coming back: the phone
+                    // writes the notes after all, and they go out in the second email.
+                    if givingUp, copy.notes == nil, copy.notesPending == true {
+                        copy.cloudRetries = MeetingPipeline.cloudRetryLimit
+                        copy.stage = .writeNotes
+                        copy.status = .processing
+                        Log.shared.info("meeting \(m.id): writing the notes on the iPhone instead")
+                    }
                     save(copy)
+                    if copy.status == .processing { kick() }
                 }
             }
         }
         // Keep trying every four minutes while something is still pending and the app is open.
-        if meetings.contains(where: { $0.cloudPending == true && ($0.cloudRetries ?? 0) < 8 }), cloudRetryTask == nil {
+        if meetings.contains(where: { $0.cloudPending == true && ($0.cloudRetries ?? 0) < MeetingPipeline.cloudRetryLimit }), cloudRetryTask == nil {
             cloudRetryTask = Task { [weak self] in
                 while !Task.isCancelled {
                     try? await Task.sleep(nanoseconds: 240_000_000_000)
@@ -243,7 +253,8 @@ final class AppModel: ObservableObject {
     /// Notes that iOS wouldn't let the app write earlier are tried again now that it is open.
     /// Limited to a few automatic tries per meeting; "Write the notes again" is always available.
     private func finishPendingNotes() {
-        for var m in meetings where m.status == .done && m.notesPending == true && (m.notesRetries ?? 0) < 3 {
+        // A meeting waiting on Gemini is left to `retryCloudNotes`.
+        for var m in meetings where m.status == .done && m.notesPending == true && m.cloudPending != true && (m.notesRetries ?? 0) < 3 {
             m.notesRetries = (m.notesRetries ?? 0) + 1
             m.stage = .writeNotes
             m.status = .processing
@@ -586,45 +597,31 @@ final class AppModel: ObservableObject {
             .sorted { $0.createdAt < $1.createdAt }
     }
 
-    /// The names and terms the recognizer listens for: the vocabulary, with the spellings it has
-    /// been heard as, and the names of the people whose voices Minutes knows.
-    func boostTerms() -> [BoostTerm] {
-        guard AppSettings.shared.listensForVocabulary else { return [] }
-        var out: [BoostTerm] = []
-        var seen = Set<String>()
-        func add(_ text: String, aliases: [String] = []) {
-            let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard t.count >= 3, seen.insert(t.lowercased()).inserted else { return }
-            out.append(BoostTerm(text: t, aliases: aliases.filter { !$0.isEmpty }))
-        }
-        // Only the typed terms. Listening for the names of known voices as well replaced common
-        // words with them in a long meeting ("market" became "Mark", "margin" became "Martin").
-        for term in AppSettings.shared.vocabulary.terms { add(term.term, aliases: term.heardAs) }
-        return out
-    }
-
     /// Loads the speech models ahead of a recording, so the first minutes of a meeting are not
     /// spent loading. Loading the transcription model has taken five to eight minutes on this
     /// phone whenever iOS had dropped its compiled copy, and seconds otherwise.
     func warmModels() {
         guard setup.ready, !isDemo, live == nil, runningID == nil else { return }
         let models = self.models
-        let listening = AppSettings.shared.listensForVocabulary
         Task.detached(priority: .utility) {
-            do { try await models.preloadAll(includingVocabulary: listening) } catch { Log.shared.warn("model warm-up failed: \(error)") }
+            do { try await models.preloadAll() } catch { Log.shared.warn("model warm-up failed: \(error)") }
         }
     }
 
     /// Starts transcribing and analyzing the meeting as it is recorded.
     private func startLiveWork(for id: String) {
         guard setup.ready, !isDemo else { return }
-        let notesModel: NotesModel?
-        switch FoundationNotesModel.make() {
-        case .success(let model): notesModel = model
-        case .failure: notesModel = nil
+        // With a Gemini key saved, Gemini writes the notes from the finished transcript, so the
+        // phone's own model does not draft them during the meeting: those drafts were thrown away
+        // (about thirteen runs of the model in a 25-minute meeting) and warmed the phone.
+        var notesModel: NotesModel?
+        if AppSettings.shared.geminiKey.isEmpty {
+            if case .success(let model) = FoundationNotesModel.make() { notesModel = model }
+        } else {
+            Log.shared.info("meeting \(id): notes are not drafted on the iPhone during the meeting; Gemini writes them at the end")
         }
         let live = LiveMeeting(
-            meetingID: id, models: models, vocabulary: AppSettings.shared.vocabulary, boost: boostTerms(),
+            meetingID: id, models: models, vocabulary: AppSettings.shared.vocabulary,
             notesModel: notesModel, engineOptions: notesOptions)
         self.live = live
         recorder.onSamples = { samples in live.add(samples) }
@@ -742,7 +739,7 @@ final class AppModel: ObservableObject {
         let own = ownProfileID()
         return PipelineServices(
             separator: FluidSeparator(models: models),
-            transcriber: FluidTranscriber(models: models, boost: boostTerms()),
+            transcriber: FluidTranscriber(models: models),
             notesModel: { FoundationNotesModel.make() },
             mailer: SMTPMailer(),
             notesOptions: notesOptions,
@@ -804,6 +801,8 @@ final class AppModel: ObservableObject {
             }
             edits.forEach { $0(&result) }
             save(result)
+            // A sure match in this meeting may have taught a voice profile something.
+            if result.learnedProfiles != nil { profiles = store.loadProfiles() }
             if result.status != .done { allSucceeded = false }
             announce(result)
             liveWork.remove(result.id)
@@ -937,6 +936,8 @@ final class AppModel: ObservableObject {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         var profileID: String?
         if !trimmed.isEmpty, let voice = m.voiceEmbeddings?[label], !voice.isEmpty {
+            // The pipeline may have updated a profile since these were read.
+            profiles = store.loadProfiles()
             profileID = profiles.learn(name: trimmed, embedding: voice)
             if profileID != nil { try? store.saveProfiles(profiles) }
         }
@@ -972,6 +973,7 @@ final class AppModel: ObservableObject {
     }
 
     func forgetVoice(_ profileID: String) {
+        profiles = store.loadProfiles()
         profiles.removeAll { $0.id == profileID }
         try? store.saveProfiles(profiles)
     }
@@ -1129,7 +1131,6 @@ final class AppModel: ObservableObject {
                     switch kind {
                     case .transcription: self.setup.transcription = max(self.setup.transcription, fraction)
                     case .separation: self.setup.separation = max(self.setup.separation, fraction)
-                    case .vocabulary: break
                     }
                     if self.setup.preparing != preparing { self.setup.preparing = preparing }
                 }

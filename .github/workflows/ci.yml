@@ -2,7 +2,7 @@ name: ci
 on:
   push:
     branches: [main]
-    paths-ignore: ["README.md", ".github/workflows/probe.yml"]
+    paths-ignore: ["README.md", ".github/workflows/benchmark-asr.yml"]
   workflow_dispatch:
 permissions:
   contents: write

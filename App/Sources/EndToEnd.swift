@@ -76,12 +76,10 @@ enum EndToEnd {
             model.removeMail()
         }
 
-        // Names the recognizer is unlikely to know, to check that it listens for the vocabulary.
+        // Names the recognizer is unlikely to know, to check that the typed spellings are applied.
         var vocabulary = Vocabulary()
         vocabulary.terms = [VocabularyTerm(term: "Meridyan", heardAs: ["Meridian"]), VocabularyTerm(term: "Kestrel")]
         AppSettings.shared.vocabulary = vocabulary
-        // The shipped default (off): the end-to-end run checks what a person gets without touching settings.
-        AppSettings.shared.listensForVocabulary = false
         AppSettings.shared.usesCalendar = false
         model.vocabulary = vocabulary
 

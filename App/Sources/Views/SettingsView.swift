@@ -34,7 +34,6 @@ struct SettingsView: View {
             notesSection
             peopleSection
             hubspotSection
-            microphoneSection
             voicesSection
             storageSection
             aboutSection
@@ -222,25 +221,6 @@ struct SettingsView: View {
         }
     }
 
-    // MARK: Microphone
-
-    @State private var rawMicrophone = AppSettings.shared.rawMicrophone
-
-    private var microphoneSection: some View {
-        Section {
-            Picker("Microphone", selection: $rawMicrophone) {
-                Text("Standard").tag(false)
-                Text("Raw").tag(true)
-            }
-            .pickerStyle(.segmented)
-            .onChange(of: rawMicrophone) { _, on in AppSettings.shared.rawMicrophone = on }
-        } header: {
-            Text("Microphone")
-        } footer: {
-            Text("Standard lets iOS adjust the microphone as it does for calls. Raw turns that off and records the room as it is, which may keep a quieter voice across the table from being flattened in a loud room. Try Raw for one noisy meeting and compare.")
-        }
-    }
-
     // MARK: Notes model
 
     @State private var geminiKey = ""
@@ -264,7 +244,7 @@ struct SettingsView: View {
             SecureField(geminiSaved ? "Gemini API key (saved)" : "Gemini API key", text: $geminiKey)
                 .textContentType(.password)
                 .autocorrectionDisabled()
-            TextField("Model", text: $geminiModel, prompt: Text(GeminiNotesWriter.defaultModel))
+            TextField("Model", text: $geminiModel, prompt: Text("Automatic"))
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
                 .onChange(of: geminiModel) { _, value in AppSettings.shared.geminiModel = value.trimmingCharacters(in: .whitespaces) }
@@ -295,7 +275,7 @@ struct SettingsView: View {
             Text("Notes")
         } footer: {
             Text(geminiSaved
-                ? "The notes are written by Google's Gemini from the whole transcript, which is sent as text after each meeting (never the audio). The line about you goes with it, so the notes know which side of the table you sit on and don't call your firm the seller. If Gemini can't be reached, the iPhone writes them instead and the email says so. The key is kept in this iPhone's Keychain."
+                ? "The notes are written by Google's Gemini from the whole transcript, which is sent as text after each meeting (never the audio). The line about you goes with it, so the notes know which side of the table you sit on and don't call your firm the seller. Leave Model empty and the larger Gemini model is asked first, the lighter one when it is busy. If Gemini is busy when a meeting ends, the transcript is emailed at once and the notes follow in a second email. The key is kept in this iPhone's Keychain."
                 : "By default the notes are written on this iPhone by Apple's model, which runs short on long meetings. A Gemini API key (free at aistudio.google.com) has Google's model write them from the whole transcript instead; the transcript text is sent after each meeting, never the audio.")
         }
     }

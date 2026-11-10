@@ -27,7 +27,9 @@ the email arriving, and the speech pipeline has been measured on 154 recorded me
 - **Tells the speakers apart**, with no fixed limit on how many, and marks the passages where
   people talked over each other.
 - **Names people it has heard before.** Name a voice once ("Speaker 3" becomes "Dana") and it is
-  recognized in later meetings; a voice that only resembles someone known is offered as a
+  recognized in later meetings, and each meeting where it is recognized with confidence teaches
+  Minutes more about how that person sounds. A voice named in only one meeting so far has to
+  match closely to be named again. A voice that only resembles someone known is offered as a
   suggestion to confirm, never applied. Type who you are meeting with before you tap Record
   ("With: Dana, Lee") and the voices that are not recognized get those names from the first
   email. After naming voices in the Speakers tab, the app offers to email the corrected notes.
@@ -36,10 +38,7 @@ the email arriving, and the speech pipeline has been measured on 154 recorded me
   citing a number that was never said is left out. See "What the notes look like" below.
 - **Learns your vocabulary.** Company names, people and the terms of your work that come out wrong
   ("EVITA" for EBITDA) are corrected in every transcript and spelled right in the notes. The common
-  finance terms are built in; add your own in Settings > Vocabulary. A second model that listens
-  for the terms in the audio is there as a switch, off by default: it runs on the processor for
-  every minute of a meeting, and in a long meeting it heated the phone and replaced common words
-  with names.
+  finance terms are built in; add your own in Settings > Vocabulary.
 - **Emails** the notes and the transcript, as the body of the message and as one PDF attachment,
   through your own Gmail account.
 - **Imports** a recording made elsewhere (a voice memo, a call recording) and treats it the same way.
@@ -111,9 +110,11 @@ there are no notes.
   picks between them or says it is not a calendar meeting. iOS asks for calendar permission at
   the first recording; the Settings screen can turn the feature off. The email's header lists
   the invited people with their addresses.
-- **While it records**, Minutes transcribes the meeting, analyzes the voices and drafts the notes a
-  few minutes behind live. This is the only time iOS lets an app work at full speed with the phone
-  locked, so the work is done then.
+- **While it records**, Minutes transcribes the meeting and analyzes the voices a few minutes
+  behind live. This is the only time iOS lets an app work at full speed with the phone locked,
+  so the work is done then. Without a Gemini key the notes are drafted then too; with one they
+  are not, because Gemini writes them from the finished transcript and the drafts only warmed
+  the phone.
 - **End meeting** asks once for confirmation. What remains is the last minute of audio, the final
   grouping of the voices, the merging of the notes, and the email, which together are meant to take
   under a minute. The microphone indicator stays on until the email has gone, because keeping the
@@ -122,7 +123,8 @@ there are no notes.
   model's final pass (the lists stay as drafted during the meeting, the summary is their gists)
   rather than running it for minutes on a throttled phone; the email says so.
 - **What the notes look like.** A summary of a few sentences; *Next steps*, each a named
-  person's commitment; *Decisions*, only what was actually agreed; then *Details*: the meeting
+  person's commitment; *Decisions*, only what was actually agreed; *Open questions* (with
+  Gemini), what was asked and left unanswered; then *Details*: the meeting
   part by part, each with a heading, the time it starts and a paragraph in the note-taker's own
   words with the names and numbers as said. A sentence whose number was never said in that part
   of the transcript is dropped rather than trusted.
@@ -132,10 +134,12 @@ there are no notes.
 - **A larger model for the notes, optional.** The on-device model runs short on long meetings.
   With a Gemini API key saved in Settings (free at aistudio.google.com), Google's model writes
   the notes from the whole transcript after each meeting: the transcript text is sent, never the
-  audio, and the key stays in the Keychain. If Gemini is overloaded or unreachable at the time, the iPhone writes
-  the notes as before and the email says so; Minutes then keeps trying Gemini for about half an
-  hour and sends a second email with its notes when it gets through. The foot of the notes
-  names which model wrote them. A line about you and your firm, typed once in Settings, goes
+  audio, and the key stays in the Keychain. The larger Gemini 3.8 Flash is asked
+  first and the lighter Gemini 3.5 Flash Lite takes over when it is busy; a model name typed in
+  Settings is used alone. If Gemini is overloaded at the moment a meeting ends, the transcript
+  is emailed at once and Minutes keeps trying while it is open, sending the notes in a second
+  email when Gemini gets through; if it never does, or the key is refused, the iPhone writes
+  them. The foot of the notes names which model wrote them. A line about you and your firm, typed once in Settings, goes
   with every transcript so the notes know which side of the table you sit on; the people
   invited go along by name and firm or email domain (never the address), so colleagues and
   counterparties are told apart. Naming a voice in the Speakers tab afterward renames it in the
@@ -241,7 +245,9 @@ their later appearances were named correctly, under 1% were given a wrong name, 
 left as "Speaker N" for the user to name. Replayed on the 129 evaluation meetings from the
 voice data the benchmark saved (`scripts/bench/voice_id.py`, with a third of the people held out
 as strangers), 95.4% of later appearances were named correctly and none wrongly, and 0.7% of
-strangers' voices were given a name.
+strangers' voices were given a name. Learning from each confident match (0.80 or better), which the
+app now does, raised that to 97.1% with still none named wrongly; asking a profile heard in only
+one meeting for the same 0.80 before it names anyone cost 0.2 points.
 
 **A clean recording.** A scripted six-voice test meeting with brief talk-overs, built from
 synthetic voices, is transcribed with 4.6% word error, and five of the six voices are told apart.

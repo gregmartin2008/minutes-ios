@@ -1,0 +1,60 @@
+name: benchmark-asr
+# Compares builds of the speech recognizer on the same recorded meetings: how long each takes to
+# load, how fast it transcribes, how large it is, and how many words it gets wrong. Started by
+# hand; each recognizer's results are published to its own branch (ci-asr-<name>).
+on:
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: "How many evaluation meetings to run"
+        default: "40"
+permissions:
+  contents: write
+env:
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+jobs:
+  recognizer:
+    name: Recognizer ${{ matrix.asr }}
+    runs-on: macos-26
+    timeout-minutes: 150
+    strategy:
+      fail-fast: false
+      matrix:
+        asr: [ultra, v3, redux, phonon2]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: Packages/MinutesSpeech/.build
+          key: speech-build-${{ hashFiles('Packages/MinutesSpeech/Package.swift') }}
+      - name: Build the benchmark tool
+        run: |
+          mkdir -p out
+          cd Packages/MinutesSpeech
+          swift build -c release --product minutes-bench 2>&1 | tee ../../out/build.log | grep -E "error|complete!" || true
+          test -x .build/release/minutes-bench
+      - name: Download meetings
+        run: |
+          source scripts/bench/config.env
+          python3 scripts/bench/fetch_notsofar.py --subset "$SUBSET" --limit "${{ inputs.limit }}" --out data 2>&1 | tee out/fetch.log
+      - name: Run the pipeline
+        run: |
+          mkdir -p out/results
+          # No models are cached, so the first load includes the download.
+          Packages/MinutesSpeech/.build/release/minutes-bench --list data/files.tsv --out-dir out/results --asr ${{ matrix.asr }} 2>&1 \
+            | grep -v "^\[Profiling\]" | tee out/bench.log
+          cp data/*.ref.json out/results/
+      - name: Load again, and size on disk
+        if: always()
+        run: |
+          # A second start, with the files already on disk: the load a meeting would wait for.
+          head -1 data/files.tsv > one.tsv
+          for i in 1 2; do
+            Packages/MinutesSpeech/.build/release/minutes-bench --list one.tsv --out-dir out/again --asr ${{ matrix.asr }} 2>&1 \
+              | grep -E "models ready|model ready|transcription" | sed "s/^/load $i: /" | tee -a out/reload.log
+          done
+          du -sk "$HOME/Library/Application Support/FluidAudio/Models"/* 2>/dev/null | tee out/sizes.log
+          rm -rf out/again
+      - name: Publish results
+        if: always()
+        run: scripts/ci_publish.sh out ci-asr-${{ matrix.asr }}

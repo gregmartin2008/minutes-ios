@@ -128,7 +128,7 @@ enum MeetingDocument {
             if let note = Render.remark(n) { add(note, size: 10.5, color: warn, before: 8) }
             add(Render.writerLine(n), size: 9.5, color: muted, before: 6)
         } else if m.notesPending == true {
-            add(Render.notesPendingText, size: 10.5, color: warn, before: 8)
+            add(Render.pendingText(m), size: 10.5, color: warn, before: 8)
         } else if let e = m.notesError {
             add("Notes could not be written: " + e, size: 10.5, color: warn, before: 8)
         }

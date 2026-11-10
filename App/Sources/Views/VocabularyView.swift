@@ -6,17 +6,9 @@ struct VocabularyView: View {
     @EnvironmentObject private var model: AppModel
     @State private var editing: VocabularyTerm?
     @State private var adding = false
-    @State private var listens = AppSettings.shared.listensForVocabulary
 
     var body: some View {
         List {
-            Section {
-                Toggle("Listen for these terms in the audio", isOn: $listens)
-                    .onChange(of: listens) { _, on in AppSettings.shared.listensForVocabulary = on }
-                    .listRowBackground(Theme.paper)
-            } footer: {
-                Text("A second model listens for the terms in the audio and corrects the transcript where it hears one. It runs on the processor for every minute of a meeting, which made the phone hot in a long meeting, so it is off unless you turn it on. The spelling corrections below work either way.")
-            }
             Section {
                 if model.vocabulary.terms.isEmpty {
                     Text("No terms yet. Add the names of your firm, your companies and the people you meet with, and the spellings Minutes has used for them.")

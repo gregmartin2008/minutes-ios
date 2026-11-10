@@ -21,6 +21,7 @@ final class CloudNotesTests: XCTestCase {
                 "Present option one at 49% as the primary proposal.", "Jordan Carver will add Greg Martin to the pipeline list.",
                 "Veltrona will consider the offer.",
             ],
+            "openQuestions": ["Who at Veltrona signs the letter of intent?", "Is a $77 million cap acceptable?", " "],
             "details": [
                 ["topic": "Market review", "start": "3:26", "text": "The NASDAQ was down 5% on the day. Oracle's debt stands at 4.4x EBITDA."],
                 ["topic": "Veltrona terms", "start": "1:02:15", "text": "Option one carries a $5 million earnout. A $99 million figure that was never said."],
@@ -78,10 +79,13 @@ final class CloudNotesTests: XCTestCase {
         XCTAssertEqual(details[0].startSeconds, 206)
         XCTAssertEqual(details[1].startSeconds, 3735)
         XCTAssertEqual(details[1].text, "Option one carries a $5 million earnout.")   // the $99M sentence was never said
-        XCTAssertEqual(writer.name, "Gemini 3.5 Flash Lite")
+        XCTAssertEqual(notes.openQuestions, ["Who at Veltrona signs the letter of intent?"], "a question citing a number never said is left out")
+        // The larger model is asked first, and the notes say which model wrote them.
+        XCTAssertEqual(notes.writer, "Gemini 3.8 Flash")
+        XCTAssertEqual(fake.requests.count, 1)
 
         let request = fake.requests[0]
-        XCTAssertEqual(request.url?.path, "/v1beta/models/gemini-3.5-flash-lite:generateContent")
+        XCTAssertEqual(request.url?.path, "/v1beta/models/gemini-3.8-flash:generateContent")
         XCTAssertEqual(request.value(forHTTPHeaderField: "x-goog-api-key"), "k")
         let body = try JSONSerialization.jsonObject(with: request.httpBody!) as! [String: Any]
         let config = body["generationConfig"] as! [String: Any]
@@ -112,22 +116,34 @@ final class CloudNotesTests: XCTestCase {
         writer.retryWaits = [0.01, 0.01, 0.01]
         let notes = try await writer.write(transcript: transcript, title: nil, spellings: [])
         XCTAssertEqual(notes.title, "Veltrona offer options")
-        XCTAssertEqual(fake.requests.count, 3)
+        // The larger model is tried once; the usual one takes over and is retried.
+        XCTAssertEqual(fake.requests.map { $0.url!.lastPathComponent }, [
+            "gemini-3.8-flash:generateContent", "gemini-3.5-flash-lite:generateContent", "gemini-3.5-flash-lite:generateContent",
+        ])
+        XCTAssertEqual(notes.writer, "Gemini 3.5 Flash Lite")
 
-        fake.first = [503, 503, 503, 503]
+        // A model the person typed is used alone.
+        let typed = GeminiNotesWriter(apiKey: "k", model: "gemini-3.8-pro", transport: { try fake.handle($0) })
+        XCTAssertNil(typed.first)
+        let own = try await typed.write(transcript: transcript, title: nil, spellings: [])
+        XCTAssertEqual(own.writer, "Gemini 3.8 Pro")
+        XCTAssertEqual(fake.requests.last?.url?.lastPathComponent, "gemini-3.8-pro:generateContent")
+        fake.requests.removeLast()
+
+        fake.first = [503, 503, 503, 503, 503]
         do {
             _ = try await writer.write(transcript: transcript, title: nil, spellings: [])
             XCTFail("expected an error")
         } catch {
             XCTAssertTrue(error.localizedDescription.hasPrefix("Gemini is overloaded right now"), error.localizedDescription)
         }
-        XCTAssertEqual(fake.requests.count, 7)
+        XCTAssertEqual(fake.requests.count, 8)
     }
 
     func testTheCheckListsModelsRatherThanGenerating() async throws {
         let fake = Fake()
         let ok = try await GeminiNotesWriter(apiKey: "k", transport: { try fake.handle($0) }).check()
-        XCTAssertEqual(ok, "Key accepted; Gemini 3.5 Flash Lite is available. The next meeting's notes come from it.")
+        XCTAssertEqual(ok, "Key accepted. The next meeting's notes come from Gemini 3.8 Flash, or from Gemini 3.5 Flash Lite when it is busy.")
         XCTAssertEqual(fake.requests.map { $0.url!.path }, ["/v1beta/models"])
         do {
             _ = try await GeminiNotesWriter(apiKey: "k", model: "gemini-2.5-flash", transport: { try fake.handle($0) }).check()

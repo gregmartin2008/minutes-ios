@@ -19,8 +19,7 @@ import MinutesSpeech
 //              under=600 (count only in recordings shorter than this many seconds)
 //   analysis:  step=0.2  minseg=1.0  overlap=false
 // --voices also writes <name>.voices.json: every window's voice embeddings, for studying the grouping.
-// --eend adds a variant named "eend": who-spoke-when from a different kind of model (LS-EEND, which
-// follows up to ten voices directly instead of grouping embeddings), to compare the two approaches.
+// --asr ultra|v3|redux|phonon2 transcribes with a different build of the recognizer, to compare them.
 
 struct SeparationOutput: Codable {
     var speakers: Int
@@ -76,7 +75,6 @@ var expected: Int? = nil
 var options = SpeechOptions()
 var variantSpecs: [String] = []
 var writeVoices = false
-var tryEEND = false
 // GitHub's build machines have no Neural Engine; Core ML falls back to the CPU either way.
 while !args.isEmpty {
     let flag = args.removeFirst()
@@ -96,7 +94,7 @@ while !args.isEmpty {
     case "--cpu": options.useNeuralEngine = false
     case "--variant": variantSpecs.append(value())
     case "--voices": writeVoices = true
-    case "--eend": tryEEND = true
+    case "--asr": options.transcriptionModel = value()
     default: fail("unknown option \(flag)\n\(usage)")
     }
 }
@@ -160,8 +158,6 @@ func describe(_ o: SpeechOptions, speakers: String) -> [String: String] {
     ]
 }
 
-var eend: LSEENDDiarizer? = nil
-
 let models = SpeechModels(options: options, log: Log())
 let encoder = JSONEncoder()
 encoder.outputFormatting = [.sortedKeys]
@@ -171,11 +167,7 @@ do {
     let loadStart = Date()
     try await models.prepareAll { _, _, _ in }
     let loadSeconds = Date().timeIntervalSince(loadStart)
-    print(String(format: "models ready in %.1fs", loadSeconds))
-    if tryEEND {
-        eend = try await LSEENDDiarizer(variant: .dihard3)
-        print("end-to-end diarizer ready")
-    }
+    print(String(format: "models ready in %.1fs (recognizer: %@)", loadSeconds, options.transcriptionModel))
 
     for job in jobs {
         do {
@@ -232,26 +224,6 @@ do {
                 }
                 if variant.speakers == "ref", count == nil { continue }
                 extra[variant.name] = try await separate(variant.options, speakers: count, label: variant.speakers)
-            }
-
-            if let eend {
-                let started = Date()
-                let timeline = try eend.processComplete(audioFileURL: job.audio)
-                var turns: [SpeakerTurn] = []
-                for (slot, speaker) in timeline.speakers {
-                    let label = "S" + String(slot + 1)
-                    for segment in speaker.finalizedSegments {
-                        let start = Double(segment.startTime)
-                        let end = Double(segment.endTime)
-                        if end > start { turns.append(SpeakerTurn(speaker: label, start: start, end: end)) }
-                    }
-                }
-                turns.sort { (a: SpeakerTurn, b: SpeakerTurn) -> Bool in a.start < b.start }
-                extra["eend"] = SeparationOutput(
-                    speakers: Set(turns.map { $0.speaker }).count, turns: turns,
-                    utterances: TranscriptAssembler.assemble(words: words, turns: turns), voices: [:],
-                    crosstalkSeconds: TranscriptAssembler.crosstalkSeconds(turns),
-                    separationSeconds: Date().timeIntervalSince(started), settings: ["model": "ls-eend dihard3"])
             }
 
             let audioSeconds = max(words.last?.end ?? 0, main.turns.map { $0.end }.max() ?? 0)

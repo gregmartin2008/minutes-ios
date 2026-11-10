@@ -143,9 +143,17 @@ public enum Render {
     public static let notesPendingText =
         "The notes aren't written yet: iOS limited the language model while this meeting was being processed. Open Minutes and it writes them and sends a second email."
 
+    public static let cloudPendingText =
+        "The notes aren't written yet: the Gemini model that writes them was busy when this meeting ended. Minutes tries again whenever it is open and sends them in a second email."
+
+    /// Why a meeting's notes are still to come.
+    public static func pendingText(_ m: Meeting) -> String {
+        m.cloudPending == true ? cloudPendingText : notesPendingText
+    }
+
     public static func notesText(_ m: Meeting) -> String {
         guard let n = m.shownNotes, !n.isEmpty else {
-            if m.notesPending == true { return notesPendingText + " The full transcript follows." }
+            if m.notesPending == true { return pendingText(m) + " The full transcript follows." }
             if let e = m.notesError { return "Notes could not be written: \(sentence(e)) The full transcript follows." }
             return ""
         }
@@ -267,7 +275,7 @@ public enum Render {
             html += "<p style=\"margin:14px 0 0;color:#5A6774;font-size:13px\">\(e(writerLine(n))) Check names, numbers and dates against the transcript before relying on them.</p>"
         } else {
             if m.notesPending == true {
-                html += "<p style=\"margin:18px 0 0;color:#8A5200\">\(e(notesPendingText)) The full transcript is below.</p>"
+                html += "<p style=\"margin:18px 0 0;color:#8A5200\">\(e(pendingText(m))) The full transcript is below.</p>"
             } else {
                 let why = m.notesError.map { " (" + e($0.trimmingCharacters(in: CharacterSet(charactersIn: ". "))) + ")" } ?? ""
                 html += "<p style=\"margin:18px 0 0;color:#8A5200\">Notes could not be written\(why). The full transcript is below; open Minutes to try the notes again.</p>"

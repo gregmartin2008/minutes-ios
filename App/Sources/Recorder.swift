@@ -87,7 +87,7 @@ final class Recorder: NSObject {
         try startEngine()
         observe()
         setState(.recording)
-        Log.shared.info("recording started: \(describeRoute())\(AppSettings.shared.rawMicrophone ? ", raw microphone" : "")")
+        Log.shared.info("recording started: \(describeRoute())")
     }
 
     func pause() {
@@ -164,8 +164,7 @@ final class Recorder: NSObject {
         let session = AVAudioSession.sharedInstance()
         // Record only, through the iPhone's own microphones: a Bluetooth headset's microphone is
         // tuned for one nearby voice and would miss the rest of the table.
-        let raw = AppSettings.shared.rawMicrophone
-        try session.setCategory(.record, mode: raw ? .measurement : .default, options: [])
+        try session.setCategory(.record, mode: .default, options: [])
         if let mic = session.availableInputs?.first(where: { $0.portType == .builtInMic }) {
             try? session.setPreferredInput(mic)
             // Prefer a microphone that can listen in all directions.

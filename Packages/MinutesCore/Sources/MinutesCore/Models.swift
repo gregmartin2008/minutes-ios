@@ -264,6 +264,9 @@ public struct Meeting: Codable, Equatable, Identifiable, Sendable {
     /// the app tries it again later and sends the notes again when it gets through.
     public var cloudPending: Bool?
     public var cloudRetries: Int?
+    /// The voice profiles this meeting's voices were folded into after a sure match, so running
+    /// the meeting again does not count the same voice twice.
+    public var learnedProfiles: [String]?
 
     // Notes and delivery
     public var notes: MeetingNotes?

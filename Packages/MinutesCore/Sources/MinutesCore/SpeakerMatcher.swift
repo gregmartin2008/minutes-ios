@@ -15,14 +15,27 @@ public enum SpeakerMatcher {
         public var margin: Float
         /// Similarity at or above which the app offers the name as a suggestion without applying it.
         public var suggest: Float
+        /// What a profile heard in only one meeting must reach to name a voice. One meeting is one
+        /// room and one microphone; such a profile is the kind strangers come close to.
+        public var firstAccept: Float
+        /// A match at or above this is folded back into the profile, so a voice the app keeps
+        /// recognizing is learned from every meeting and not only from the ones named by hand.
+        public var learn: Float
 
         /// `accept` was 0.60 until two conference days in a loud hall gave three strangers the
         /// names of people met hours earlier. A wrong name reads as right, so the bar is higher
         /// and the 0.45–0.70 band is shown as a suggestion to confirm instead.
-        public init(accept: Float = 0.70, margin: Float = 0.12, suggest: Float = 0.45) {
+        ///
+        /// `firstAccept` and `learn` were measured on the 129 benchmark meetings
+        /// (scripts/bench/voice_id.py): learning from matches of 0.80 or more took later
+        /// appearances named correctly from 95.4% to 97.1% with none named wrongly, and the
+        /// higher bar for one-meeting profiles cost 0.2 points.
+        public init(accept: Float = 0.70, margin: Float = 0.12, suggest: Float = 0.45, firstAccept: Float = 0.80, learn: Float = 0.80) {
             self.accept = accept
             self.margin = margin
             self.suggest = suggest
+            self.firstAccept = firstAccept
+            self.learn = learn
         }
     }
 
@@ -93,8 +106,9 @@ public enum SpeakerMatcher {
             for (label, other) in scoresByLabel where label != pair.label && pair.profile < other.count {
                 rival = max(rival, other[pair.profile])
             }
-            let confident = pair.score >= thresholds.accept && pair.score - rival >= thresholds.margin
             let p = profiles[pair.profile]
+            let needed = p.samples <= 1 ? max(thresholds.accept, thresholds.firstAccept) : thresholds.accept
+            let confident = pair.score >= needed && pair.score - rival >= thresholds.margin
             out[pair.label] = Match(profileID: p.id, name: p.name, score: pair.score, confident: confident)
         }
         return out

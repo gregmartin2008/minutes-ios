@@ -275,7 +275,8 @@ public final class MeetingPipeline: @unchecked Sendable {
                         transcript: Render.cloudTranscript(m), title: m.titleIsAuto ? nil : m.title,
                         spellings: services.vocabulary().spellings,
                         brief: NotesBrief(recorder: own, about: services.aboutRecorder(), people: m.people(excluding: own)))
-                    notes.writer = cloud.name
+                    notes.writer = notes.writer ?? cloud.name
+                    let writer = notes.writer ?? cloud.name
                     m.notes = notes
                     m.notesError = nil
                     m.notesCheckpoint = nil
@@ -288,17 +289,28 @@ public final class MeetingPipeline: @unchecked Sendable {
                         m.titleIsAuto = false
                     }
                     log.info(String(format: "meeting %@: notes written by %@ in %.1fs (%d parts, %d next steps)",
-                                    m.id, cloud.name, Date().timeIntervalSince(started), notes.details?.count ?? 0, notes.actionItems.count))
+                                    m.id, writer, Date().timeIntervalSince(started), notes.details?.count ?? 0, notes.actionItems.count))
                     break
                 } catch is CancellationError {
                     throw CancellationError()
                 } catch {
                     let transient = (error as? CloudNotesError)?.isTransient ?? false
-                    log.warn("meeting \(m.id): \(cloud.name) could not write the notes (\(error.localizedDescription)); using the on-device model\(transient ? "; will try again later" : "")")
+                    // Nothing was drafted on the phone during the meeting (it is not, when the
+                    // large model writes the notes): rather than run the small model over the
+                    // whole meeting now, send the transcript and let the notes follow.
+                    let drafted = !(services.liveWork(m.id)?.noteSections.isEmpty ?? true) || m.notesCheckpoint != nil
+                    // Once the later tries are used up, the phone writes them after all.
+                    let follow = transient && !drafted && m.notes == nil && (m.cloudRetries ?? 0) < Self.cloudRetryLimit
+                    log.warn("meeting \(m.id): \(cloud.name) could not write the notes (\(error.localizedDescription)); \(follow ? "sending the transcript, the notes follow" : "using the on-device model")\(transient ? "; will try again later" : "")")
                     // Writing the notes again says this once, with the latest reason.
                     m.remarks.removeAll(where: Self.isCloudFallbackRemark)
-                    m.remarks.append(Self.cloudFallbackRemark(cloud.name, error: error, willRetry: transient))
                     m.cloudPending = transient ? true : nil
+                    if follow {
+                        m.notesError = "\(cloud.name) could not write the notes yet (\(Self.describe(error))). Minutes keeps trying and sends them in a second email."
+                        m.notesPending = true
+                        break
+                    }
+                    m.remarks.append(Self.cloudFallbackRemark(cloud.name, error: error, willRetry: transient))
                 }
             }
             // Sections extracted during the recording cover the meeting up to their last `end`;
@@ -422,8 +434,10 @@ public final class MeetingPipeline: @unchecked Sendable {
         let candidates = voices.filter { present.contains($0.key) && m.speakerNames[$0.key] == nil }
         let thresholds = services.thresholds
         let own = services.ownProfileID()
-        let matches = SpeakerMatcher.match(voices: candidates, profiles: store.loadProfiles(), thresholds: thresholds)
+        var profiles = store.loadProfiles()
+        let matches = SpeakerMatcher.match(voices: candidates, profiles: profiles, thresholds: thresholds)
         var suggestions = m.suggestedNames ?? [:]
+        var learned = m.learnedProfiles ?? []
         for (label, match) in matches.sorted(by: { $0.key < $1.key }) {
             m.matchScores[label] = match.score
             // The person's own voice has the best-trained profile; it may be taken a little sooner.
@@ -437,9 +451,20 @@ public final class MeetingPipeline: @unchecked Sendable {
                 m.speakerProfiles[label] = match.profileID
                 if !m.autoNamed.contains(label) { m.autoNamed.append(label) }
                 suggestions.removeValue(forKey: label)
+                // A sure match teaches the profile how the person sounded today.
+                if match.confident, match.score >= thresholds.learn, !learned.contains(match.profileID),
+                   let voice = candidates[label], let i = profiles.firstIndex(where: { $0.id == match.profileID }) {
+                    profiles[i] = SpeakerMatcher.update(profiles[i], with: voice)
+                    learned.append(match.profileID)
+                }
             } else {
                 suggestions[label] = match.name
             }
+        }
+        if learned != (m.learnedProfiles ?? []) {
+            try? store.saveProfiles(profiles)
+            m.learnedProfiles = learned
+            log.info("meeting \(m.id): \(learned.count) voice profile(s) updated from sure matches")
         }
         m.autoNamed.sort()
         m.suggestedNames = suggestions.isEmpty ? nil : suggestions
@@ -516,8 +541,11 @@ public final class MeetingPipeline: @unchecked Sendable {
     }
 
     /// The line the notes carry when the large model could not write them.
+    /// How many later tries the large model gets at a meeting's notes before the phone writes them.
+    public static let cloudRetryLimit = 8
+
     public static func cloudFallbackRemark(_ name: String, error: Error, willRetry: Bool) -> String {
-        "\(name) could not write these notes (\(describe(error))); they were written on the iPhone instead."
+        return "\(name) could not write these notes (\(describe(error))); they were written on the iPhone instead."
             + (willRetry ? " Minutes tries \(name) again for a while and sends its notes if it gets through." : "")
     }
 

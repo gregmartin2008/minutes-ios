@@ -227,6 +227,16 @@ final class PipelineTests: XCTestCase {
         XCTAssertNotNil(out.speakerProfiles["S1"])
         XCTAssertEqual(model.sections.first, "Greg: Hold the bid.\nSpeaker 2: Agreed, Greg.")
         XCTAssertTrue(Render.headerText(out).contains("names recognized by voice"))
+        // A sure match teaches the profile, once per meeting however often the meeting is run.
+        XCTAssertEqual(store.loadProfiles().first?.samples, 2)
+        XCTAssertEqual(out.learnedProfiles?.count, 1)
+        var again = out
+        again.speakerNames = [:]
+        again.stage = .assemble
+        again.status = .processing
+        let rerun = await pipeline().run(again) { _, _ in }
+        XCTAssertEqual(rerun.speakerNames, ["S1": "Greg"])
+        XCTAssertEqual(store.loadProfiles().first?.samples, 2)
     }
 
     /// A voice that only resembles a known one is offered as a suggestion, never named: a wrong
@@ -319,7 +329,23 @@ final class PipelineTests: XCTestCase {
         let failing = PipelineServices(
             separator: separator, transcriber: transcriber, notesModel: { result }, mailer: mailer,
             notesOptions: options, cloudNotes: { Cloud(fail: true) })
-        let second = await MeetingPipeline(store: store, services: failing, log: Log()).run(try newMeeting()) { _, _ in }
+        // Busy, with nothing drafted on the phone: the transcript goes out and the notes follow.
+        let waiting = await MeetingPipeline(store: store, services: failing, log: Log()).run(try newMeeting()) { _, _ in }
+        XCTAssertNil(waiting.notes)
+        XCTAssertEqual(waiting.status, .done)
+        XCTAssertEqual(waiting.notesPending, true)
+        XCTAssertEqual(waiting.cloudPending, true)
+        XCTAssertEqual(waiting.emailCount, 1)
+        XCTAssertEqual(model.sections.count, 0, "the on-device model was not asked")
+        XCTAssertTrue(waiting.notesError?.contains("Gemini 2.5 Flash could not write the notes yet") ?? false, waiting.notesError ?? "")
+        XCTAssertTrue(Render.emailHTML(waiting).contains("was busy when this meeting ended"))
+
+        // Still busy after every later try: the phone writes them.
+        var spent = try newMeeting()
+        spent.cloudRetries = MeetingPipeline.cloudRetryLimit
+        try store.save(spent)
+        let second = await MeetingPipeline(store: store, services: failing, log: Log()).run(spent) { _, _ in }
+        XCTAssertNotNil(second.notes)
         XCTAssertNil(second.notes?.writer)
         XCTAssertGreaterThan(model.sections.count, 0)
         XCTAssertTrue(second.remarks.contains { $0.contains("Gemini 2.5 Flash could not write these notes") }, second.remarks.description)

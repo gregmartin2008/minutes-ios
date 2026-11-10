@@ -26,11 +26,11 @@ final class LiveMeeting {
     }
 
     init(
-        meetingID: String, models: SpeechModels, vocabulary: Vocabulary, boost: [BoostTerm], notesModel: NotesModel?,
+        meetingID: String, models: SpeechModels, vocabulary: Vocabulary, notesModel: NotesModel?,
         engineOptions: NotesEngine.Options = NotesEngine.Options()
     ) {
         self.meetingID = meetingID
-        self.analyzer = LiveAnalyzer(models: models, boost: boost)
+        self.analyzer = LiveAnalyzer(models: models)
         self.vocabulary = VocabularyCorrector(vocabulary)
         self.notes = notesModel.map { LiveNoteTaker(model: $0, spellings: vocabulary.spellings, engineOptions: engineOptions) }
     }

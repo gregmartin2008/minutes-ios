@@ -38,7 +38,6 @@ public actor LiveAnalyzer {
 
     private let models: SpeechModels
     private let options: Options
-    private let boost: [BoostTerm]
     private let sampleRate = 16_000
     private let log: Log
     private var pieceTranscriber: PieceTranscriber?
@@ -59,9 +58,8 @@ public actor LiveAnalyzer {
     private var transcriptionErrors = 0
     private var separationErrors = 0
 
-    public init(models: SpeechModels, boost: [BoostTerm] = [], options: Options = Options(), log: Log = .shared) {
+    public init(models: SpeechModels, options: Options = Options(), log: Log = .shared) {
         self.models = models
-        self.boost = boost
         self.options = options
         self.log = log
     }
@@ -75,8 +73,7 @@ public actor LiveAnalyzer {
     private func transcriberForPieces() async throws -> PieceTranscriber {
         if let pieceTranscriber { return pieceTranscriber }
         let asr = try await models.transcriber()
-        let booster = await models.booster(for: boost)
-        let t = PieceTranscriber(asr: asr, booster: booster, log: log)
+        let t = PieceTranscriber(asr: asr, log: log)
         pieceTranscriber = t
         return t
     }

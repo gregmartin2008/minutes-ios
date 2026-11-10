@@ -90,16 +90,28 @@ public struct GeminiNotesWriter: CloudNotesWriting {
     /// Waits before trying again when the service is overloaded (503) or rate-limited (429).
     public var retryWaits: [Double] = [5, 15, 30]
     public static let defaultModel = "gemini-3.5-flash-lite"
+    /// The larger model, which writes better notes on long meetings and is more often busy. It
+    /// is tried once before `model` when the model was left at its default.
+    public static let largerModel = "gemini-3.8-flash"
+    /// A model to try once, briefly, before `model`; nil for `model` alone.
+    public var first: String?
+    public var firstTimeout: TimeInterval = 45
 
-    public var name: String {
+    public var name: String { Self.displayName(model) }
+
+    /// "gemini-3.5-flash-lite" as "Gemini 3.5 Flash Lite".
+    public static func displayName(_ model: String) -> String {
         var parts = model.split(separator: "-").map(String.init)
         if parts.first == "gemini" { parts[0] = "Gemini" }
         return parts.map { $0.prefix(1).uppercased() + $0.dropFirst() }.joined(separator: " ")
     }
 
+    /// `model` empty or the default: the larger model first, the default as the fallback. Any
+    /// other model the person typed is used alone.
     public init(apiKey: String, model: String = GeminiNotesWriter.defaultModel, transport: Transport? = nil) {
         self.apiKey = apiKey
         self.model = model.isEmpty ? Self.defaultModel : model
+        self.first = self.model == Self.defaultModel ? Self.largerModel : nil
         self.transport = transport ?? { request in
             try await withCheckedThrowingContinuation { continuation in
                 URLSession.shared.dataTask(with: request) { data, response, error in
@@ -145,6 +157,9 @@ public struct GeminiNotesWriter: CloudNotesWriting {
         let models = try await availableModels()
         let flash = models.filter { $0.contains("flash") }
         if models.contains(model) {
+            if let first, models.contains(first) {
+                return "Key accepted. The next meeting's notes come from \(Self.displayName(first)), or from \(name) when it is busy."
+            }
             return "Key accepted; \(name) is available. The next meeting's notes come from it."
         }
         let suggestion = flash.first.map { " Try \"\($0)\"." } ?? ""
@@ -154,8 +169,22 @@ public struct GeminiNotesWriter: CloudNotesWriting {
 
     public func write(transcript: String, title: String?, spellings: [String], brief: NotesBrief) async throws -> MeetingNotes {
         let prompt = Self.prompt(transcript: transcript, title: title, spellings: spellings, brief: brief)
+        if let first, first != model {
+            do {
+                let json = try await generateOnce(prompt: prompt, schema: Self.schema, model: first, timeout: firstTimeout)
+                var notes = try Self.notes(from: json, transcript: transcript)
+                notes.writer = Self.displayName(first)
+                return notes
+            } catch is CancellationError {
+                throw CancellationError()
+            } catch {
+                Log.shared.warn("gemini: \(first) did not write the notes (\(error.localizedDescription)); using \(model)")
+            }
+        }
         let json = try await generate(prompt: prompt, schema: Self.schema)
-        return try Self.notes(from: json, transcript: transcript)
+        var notes = try Self.notes(from: json, transcript: transcript)
+        notes.writer = name
+        return notes
     }
 
     // MARK: Prompt and schema
@@ -179,6 +208,9 @@ public struct GeminiNotesWriter: CloudNotesWriting {
         - decisions: only what the people settled between them: a price, a plan, an option chosen. \
         One short sentence each. Not one person's view, and not one person's promise to do something \
         after the meeting, which belongs in nextSteps. Usually 0 to 5.
+        - openQuestions: what someone asked or raised that was left without an answer by the end, and \
+        matters for what happens next. One short sentence each, naming who needs to answer when that \
+        was clear. Not questions that were answered in the meeting. Usually 0 to 5.
         - details: the meeting part by part, in order, one entry per topic (typically 5 to 12 for an \
         hour). Each has a heading of 3 to 8 words, the start time of that part copied from the transcript \
         ("12:43"), and a paragraph of 3 to 7 sentences stating the substance: what each person said as \
@@ -213,6 +245,7 @@ public struct GeminiNotesWriter: CloudNotesWriting {
                 "required": ["owner", "action"],
             ]],
             "decisions": ["type": "ARRAY", "items": ["type": "STRING"]],
+            "openQuestions": ["type": "ARRAY", "items": ["type": "STRING"]],
             "details": ["type": "ARRAY", "items": [
                 "type": "OBJECT",
                 "properties": ["topic": ["type": "STRING"], "start": ["type": "STRING"], "text": ["type": "STRING"]],
@@ -279,6 +312,9 @@ public struct GeminiNotesWriter: CloudNotesWriting {
             // "Jordan Carver will add R. Gordon to the list" is one person's next step, not a decision.
             if let step = Self.nextStep(fromDecision: item, speakers: speakers) { next.append(step) } else { decisions.append(item) }
         }
+        // An open question citing a number that was never said is left out, like any other sentence.
+        let open = (json["openQuestions"] as? [String] ?? []).map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { q in !q.isEmpty && NotesEngine.citedNumbers(in: q, speakers: speakers).allSatisfy { said.contains($0) } }
         var details: [NotesDetail] = []
         var dropped = 0
         for item in json["details"] as? [[String: Any]] ?? [] {
@@ -295,6 +331,7 @@ public struct GeminiNotesWriter: CloudNotesWriting {
             summary: summary.trimmingCharacters(in: .whitespacesAndNewlines),
             decisions: NotesEngine.dedupe(decisions),
             actionItems: NotesEngine.dedupe(next),
+            openQuestions: NotesEngine.dedupe(open),
             skippedSections: 0, totalSections: 1,
             details: details)
     }
@@ -313,7 +350,7 @@ public struct GeminiNotesWriter: CloudNotesWriting {
         var attempt = 0
         while true {
             do {
-                return try await generateOnce(prompt: prompt, schema: schema)
+                return try await generateOnce(prompt: prompt, schema: schema, model: model, timeout: 180)
             } catch let e as CloudNotesError where (e.status == 503 || e.status == 429) && attempt < retryWaits.count {
                 Log.shared.warn("gemini: \(e.status), trying again in \(Int(retryWaits[attempt]))s")
                 try await Task.sleep(nanoseconds: UInt64(retryWaits[attempt] * 1_000_000_000))
@@ -322,7 +359,7 @@ public struct GeminiNotesWriter: CloudNotesWriting {
         }
     }
 
-    private func generateOnce(prompt: String, schema: [String: Any]?) async throws -> [String: Any] {
+    private func generateOnce(prompt: String, schema: [String: Any]?, model: String, timeout: TimeInterval) async throws -> [String: Any] {
         var config: [String: Any] = ["temperature": 0.2]
         if let schema {
             config["responseMimeType"] = "application/json"
@@ -336,7 +373,7 @@ public struct GeminiNotesWriter: CloudNotesWriting {
         guard let url = URL(string: path, relativeTo: base)?.absoluteURL else { throw CloudNotesError(status: 0, message: "Bad model name.") }
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
-        request.timeoutInterval = 180
+        request.timeoutInterval = timeout
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue(apiKey, forHTTPHeaderField: "x-goog-api-key")
         request.httpBody = try JSONSerialization.data(withJSONObject: body)

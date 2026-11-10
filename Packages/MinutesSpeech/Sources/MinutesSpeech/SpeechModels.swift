@@ -35,28 +35,27 @@ public struct SpeechOptions: Sendable {
     /// Recordings at least this long skip the counting step and keep the library's own grouping,
     /// which has enough to go on once every speaker has been heard for a while.
     public var countOnlyUnderSeconds = Double.infinity
+    /// Which build of the Parakeet recognizer transcribes: "ultra" (what the app ships), or
+    /// "v3", "redux" or "phonon2", which the benchmark tool compares it with.
+    public var transcriptionModel = "ultra"
 
     public init() {}
 
     var computeUnits: MLComputeUnits { useNeuralEngine ? .cpuAndNeuralEngine : .cpuOnly }
+
+    var asrVersion: AsrModelVersion {
+        switch transcriptionModel {
+        case "v3": return .v3
+        case "redux": return .redux
+        case "phonon2": return .phonon2
+        default: return .ultra
+        }
+    }
 }
 
 public enum SpeechModelKind: String, Sendable {
     case transcription
     case separation
-    /// The small model that listens for the person's own names and terms (see `BoostTerm`).
-    case vocabulary
-}
-
-/// A name or term the recognizer should listen for, so that it is written as given rather than
-/// as whatever common words sound like it.
-public struct BoostTerm: Sendable, Equatable {
-    public var text: String
-    public var aliases: [String]
-    public init(text: String, aliases: [String] = []) {
-        self.text = text
-        self.aliases = aliases
-    }
 }
 
 /// Owns the Core ML models: downloads them on first use, loads them when a stage needs them,
@@ -68,7 +67,6 @@ public actor SpeechModels {
     private var asrLoading: Task<AsrManager, Error>?
     private var diarizerModels: OfflineDiarizerModels?
     private var diarizerLoading: Task<OfflineDiarizerModels, Error>?
-    private var ctc: CtcModels?
     private let log: Log
 
     public init(options: SpeechOptions = SpeechOptions(), log: Log = .shared) {
@@ -78,7 +76,7 @@ public actor SpeechModels {
 
     /// True when the transcription model is already on this device (no download needed).
     public nonisolated func transcriptionModelIsDownloaded() -> Bool {
-        AsrModels.modelsExist(at: AsrModels.defaultCacheDirectory(for: .ultra), version: .ultra)
+        AsrModels.modelsExist(at: AsrModels.defaultCacheDirectory(for: options.asrVersion), version: options.asrVersion)
     }
 
     /// Downloads and compiles the models. Safe to call again; it returns quickly once they are present.
@@ -89,41 +87,6 @@ public actor SpeechModels {
         progress(.transcription, 1, false)
         _ = try await separationModels { progress(.separation, $0, $1) }
         progress(.separation, 1, false)
-        progress(.vocabulary, 1, false)
-    }
-
-    func vocabularyModels() async throws -> CtcModels {
-        if let ctc { return ctc }
-        let started = Date()
-        log.info("loading the vocabulary model")
-        // On the CPU: compiling this model for the Neural Engine crashed inside Core ML on iOS 27.
-        let models = try await CtcModels.downloadAndLoad(variant: .ctc110m, computeUnits: .cpuOnly)
-        ctc = models
-        log.info(String(format: "vocabulary model ready in %.1fs", Date().timeIntervalSince(started)))
-        return models
-    }
-
-    /// A session that listens for `terms` in the audio and corrects the transcript where it hears
-    /// one, or nil when there are no usable terms or the vocabulary model is not available.
-    public func booster(for terms: [BoostTerm]) async -> VocabularyBoostingSession? {
-        let usable = terms.filter { $0.text.trimmingCharacters(in: .whitespaces).count >= 3 }
-        guard !usable.isEmpty else { return nil }
-        do {
-            let models = try await vocabularyModels()
-            // Cautious settings: a word is replaced only when it already resembles the term in
-            // spelling and the audio agrees. The library's acoustic-only "rescue" pass, which may
-            // replace any word the spotter fires near, turned "measure" into a name in testing.
-            let context = CustomVocabularyContext(
-                terms: usable.map { CustomVocabularyTerm(text: $0.text, aliases: $0.aliases.isEmpty ? nil : $0.aliases) },
-                minSimilarity: 0.6)
-            let config = VocabularyRescorer.Config(shortTermCbwTaperPivot: 5, spotterRescueEnabled: false)
-            let session = try await VocabularyBoostingSession(vocabulary: context, ctcModels: models, config: config)
-            log.info("listening for \(usable.count) vocabulary terms")
-            return session
-        } catch {
-            log.warn("vocabulary boosting unavailable: \(error)")
-            return nil
-        }
     }
 
     /// The size of the app's caches directory and its newest entry, where Core ML keeps compiled
@@ -158,7 +121,7 @@ public actor SpeechModels {
             let configuration = MLModelConfiguration()
             configuration.computeUnits = options.computeUnits
             let models = try await AsrModels.downloadAndLoad(
-                configuration: configuration, version: .ultra,
+                configuration: configuration, version: options.asrVersion,
                 progressHandler: { p in progress?(p.fractionCompleted, Self.isCompiling(p.phase)) })
             let loaded = Date()
             let manager = AsrManager(config: .default)
@@ -186,13 +149,10 @@ public actor SpeechModels {
         _ = try await transcriber()
     }
 
-    /// Loads the models and keeps them in memory until `unload` is called. The vocabulary model
-    /// is fetched if it is missing (it was added after the first builds), and skipped if it can't be.
-    public func preloadAll(includingVocabulary: Bool = false) async throws {
+    /// Loads the models and keeps them in memory until `unload` is called.
+    public func preloadAll() async throws {
         _ = try await separationModels()
         _ = try await transcriber()
-        guard includingVocabulary else { return }
-        do { _ = try await vocabularyModels() } catch { log.warn("vocabulary model not available: \(error)") }
     }
 
     /// Runs the transcriber once on a few seconds of silence. The first run of a Core ML model on
@@ -248,14 +208,11 @@ public actor SpeechModels {
             diarizerLoading?.cancel()
             diarizerLoading = nil
             diarizerModels = nil
-        case .vocabulary:
-            ctc = nil
         }
     }
 
     public func unloadAll() async {
         await unload(.transcription)
         await unload(.separation)
-        await unload(.vocabulary)
     }
 }

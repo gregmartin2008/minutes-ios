@@ -34,6 +34,20 @@ final class SpeakerMatcherTests: XCTestCase {
         XCTAssertNil(m["S3"])
     }
 
+    /// A profile heard in one meeting names a voice only on a close match; one heard in several
+    /// names it at the usual bar.
+    func testAOneMeetingProfileNeedsACloserMatch() {
+        let once = SpeakerMatcher.makeProfile(name: "Dana", embedding: voice(2))
+        let heard = voice(2, tilt: 0.9, toward: 5)
+        let score = SpeakerMatcher.cosine(heard, once.embedding)
+        XCTAssertTrue(score > 0.70 && score < 0.80, "\(score)")
+        XCTAssertEqual(SpeakerMatcher.match(voices: ["S1": heard], profiles: [once])["S1"]?.confident, false)
+        var often = once
+        often.samples = 3
+        XCTAssertEqual(SpeakerMatcher.match(voices: ["S1": heard], profiles: [often])["S1"]?.confident, true)
+        XCTAssertEqual(SpeakerMatcher.match(voices: ["S1": voice(2, tilt: 0.2, toward: 5)], profiles: [once])["S1"]?.confident, true)
+    }
+
     func testOneProfileIsNeverGivenToTwoVoices() {
         let profiles = [SpeakerMatcher.makeProfile(name: "Greg", embedding: voice(1))]
         let voices = ["S1": voice(1, tilt: 0.3, toward: 2), "S2": voice(1, tilt: 0.05, toward: 3)]
