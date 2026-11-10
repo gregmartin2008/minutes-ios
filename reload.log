@@ -1,0 +1,4 @@
+load 1: models ready in 0.5s (recognizer: v3)
+load 1: MTG_32000.wav: 363s audio, 4 speakers (reference 4), 1156 words, 39 utterances, 58.8s crosstalk | separation 17.7s (21x), transcription 14.0s (26x)
+load 2: models ready in 0.3s (recognizer: v3)
+load 2: MTG_32000.wav: 363s audio, 4 speakers (reference 4), 1156 words, 39 utterances, 58.8s crosstalk | separation 16.9s (21x), transcription 11.9s (30x)
