@@ -32,7 +32,7 @@ jobs:
           # The system Python (3.9) is used on purpose: the SMTP test server library predates Python 3.14.
           /usr/bin/python3 -m venv /tmp/venv && /tmp/venv/bin/pip -q install aiosmtpd
           /tmp/venv/bin/python scripts/smtp_integration.py Packages/MinutesCore 2>&1 | tee out/smtp-integration.log | grep -E "PASS|FAIL|checks passed"
-          grep -q "13/13 checks passed" out/smtp-integration.log
+          grep -q "14/14 checks passed" out/smtp-integration.log
       - name: Encrypted connection to Gmail
         run: |
           cd Packages/MinutesCore
