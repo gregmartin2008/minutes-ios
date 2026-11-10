@@ -5,10 +5,13 @@ Starts a local SMTP server that requires a password, runs the Swift integration 
 then parses what the server received with Python's standard email library and compares every part
 with what the app intended to send.
 """
-import json, os, socket, subprocess, sys, tempfile, email
+import base64, json, os, socket, subprocess, sys, tempfile, email
 from email import policy
 from aiosmtpd.controller import Controller
 from aiosmtpd.smtp import AuthResult, LoginPassword
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import docx_read
 
 received = []
 
@@ -74,11 +77,22 @@ def main():
     atts = list(msg.iter_attachments())
     check("one attachment, the document with the notes and the transcript", len(atts) == 1, len(atts))
     if len(atts) == 1:
-        check("document name and content",
-              atts[0].get_filename() == expected["document_name"] and norm(atts[0].get_content()) == norm(expected["document"]),
+        data = atts[0].get_content()
+        check("document name and content, byte for byte",
+              atts[0].get_filename() == expected["document_name"] and atts[0].get_filename().endswith(".docx")
+              and isinstance(data, bytes) and data == base64.b64decode(expected["document"]),
               atts[0].get_filename())
+        check("the document is declared as a Word file",
+              atts[0].get_content_type() == "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+              atts[0].get_content_type())
+        try:
+            parts = docx_read.paragraphs(data)
+        except Exception as e:
+            parts = []
+            check("the Word file opens", False, e)
+        headings = [t for s, t in parts if s == "Heading1"]
         check("the document carries the notes and the transcript",
-              "SUMMARY" in atts[0].get_content() and "TRANSCRIPT" in atts[0].get_content())
+              "Summary" in headings and "Transcript" in headings and bool(docx_read.transcript(parts)), headings)
     lines = raw.split(b"\r\n")
     check("no line longer than 998 bytes (SMTP limit)", max(len(l) for l in lines) <= 998, max(len(l) for l in lines))
     check("message is 7-bit clean on the wire", all(b < 128 for b in raw))

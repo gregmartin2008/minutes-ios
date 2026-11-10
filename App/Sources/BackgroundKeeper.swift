@@ -42,6 +42,32 @@ final class BackgroundKeeper {
     func end(success: Bool) {
         active = false
         audioHeld = false
+        guard !lingering else { return }
+        stopSilentAudio()
+        endToken()
+    }
+
+    /// True while the app is being kept running after processing, to try something again.
+    private(set) var lingering = false
+
+    /// Keeps the app running after a meeting has been processed, so that notes Gemini was too
+    /// busy to write can be tried again with the phone locked. Call it before the microphone is
+    /// let go: iOS does not let an app in the background start playing from nothing.
+    func linger() {
+        guard !lingering else { return }
+        lingering = true
+        if backgroundToken == .invalid {
+            backgroundToken = UIApplication.shared.beginBackgroundTask(withName: "minutes.retry") { [weak self] in
+                self?.endToken()
+            }
+        }
+        startSilentAudio()
+    }
+
+    func stopLingering() {
+        guard lingering else { return }
+        lingering = false
+        guard !active else { return }
         stopSilentAudio()
         endToken()
     }
@@ -52,7 +78,7 @@ final class BackgroundKeeper {
     }
 
     func resumeAudioAfterRecording() {
-        if active, !audioHeld { startSilentAudio() }
+        if (active && !audioHeld) || lingering { startSilentAudio() }
     }
 
     private func endToken() {

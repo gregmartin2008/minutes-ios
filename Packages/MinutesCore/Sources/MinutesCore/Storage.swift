@@ -1,10 +1,17 @@
 import Foundation
 
-/// Meetings on disk: one folder per meeting holding `meeting.json` and `audio.wav`,
+/// Meetings on disk: one folder per meeting holding `meeting.json`, `words.json` and `audio.wav`,
 /// plus one file of named voices shared across meetings.
+///
+/// The timed words of a meeting (ten thousand an hour) are kept in their own file. They are
+/// needed only while a meeting is processed, so a `Meeting` read from the store comes without
+/// them and the list of meetings stays small in memory and quick to read and save.
 public final class MeetingStore: @unchecked Sendable {
     public let root: URL
     private let lock = NSLock()
+    /// What `words.json` holds for each meeting written by this store, so it is rewritten only
+    /// when the words change. Guarded by `lock`.
+    private var wordsOnDisk: [String: String] = [:]
 
     public init(root: URL) throws {
         self.root = root
@@ -26,6 +33,14 @@ public final class MeetingStore: @unchecked Sendable {
         directory(for: id).appendingPathComponent("meeting.json")
     }
 
+    func wordsURL(for id: String) -> URL {
+        directory(for: id).appendingPathComponent("words.json")
+    }
+
+    private static func signature(_ words: [Word]) -> String {
+        "\(words.count)|\(words.first?.start ?? 0)|\(words.last?.end ?? 0)|\(words.last?.text ?? "")"
+    }
+
     // Dates use Foundation's default numeric encoding, which round-trips exactly (ISO 8601 text
     // drops fractions of a second, so a reloaded meeting would not equal the one that was saved).
     static func encoder() -> JSONEncoder { JSONEncoder() }
@@ -34,17 +49,45 @@ public final class MeetingStore: @unchecked Sendable {
 
     // MARK: Meetings
 
+    /// Saves the meeting. Its words, when it carries them, go to their own file; a meeting saved
+    /// without them leaves the words already on disk as they are.
     public func save(_ meeting: Meeting) throws {
-        let data = try Self.encoder().encode(meeting)
+        var record = meeting
+        record.words = nil
+        let data = try Self.encoder().encode(record)
         lock.lock()
         defer { lock.unlock() }
         try FileManager.default.createDirectory(at: directory(for: meeting.id), withIntermediateDirectories: true)
+        if let words = meeting.words {
+            let signature = Self.signature(words)
+            if wordsOnDisk[meeting.id] != signature {
+                try Self.encoder().encode(words).write(to: wordsURL(for: meeting.id), options: .atomic)
+                wordsOnDisk[meeting.id] = signature
+            }
+        }
         try data.write(to: recordURL(for: meeting.id), options: .atomic)
     }
 
+    /// The meeting without its words (see `loadWords`).
     public func load(id: String) -> Meeting? {
+        guard let data = try? Data(contentsOf: recordURL(for: id)),
+              var meeting = try? Self.decoder().decode(Meeting.self, from: data) else { return nil }
+        if meeting.words != nil {
+            // Written by a version that kept the words inside the record: move them out.
+            try? save(meeting)
+            meeting.words = nil
+        }
+        return meeting
+    }
+
+    /// A meeting's timed words, or nil if it has not been transcribed.
+    public func loadWords(id: String) -> [Word]? {
+        if let data = try? Data(contentsOf: wordsURL(for: id)), let words = try? Self.decoder().decode([Word].self, from: data) {
+            return words
+        }
+        // A record that still has them inside (moving them out failed, on a full disk for one).
         guard let data = try? Data(contentsOf: recordURL(for: id)) else { return nil }
-        return try? Self.decoder().decode(Meeting.self, from: data)
+        return (try? Self.decoder().decode(Meeting.self, from: data))?.words
     }
 
     /// Every stored meeting, newest first. Folders without a readable record are skipped.
@@ -57,6 +100,7 @@ public final class MeetingStore: @unchecked Sendable {
     public func delete(id: String) {
         lock.lock()
         defer { lock.unlock() }
+        wordsOnDisk[id] = nil
         try? FileManager.default.removeItem(at: directory(for: id))
     }
 

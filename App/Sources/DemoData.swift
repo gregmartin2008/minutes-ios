@@ -4,7 +4,7 @@ import MinutesCore
 /// Sample content used when the app is launched with `-demo <screen>`, so each screen can be
 /// checked in the simulator, which has no microphone, speech models or mail account.
 enum DemoScenario: String {
-    case home, empty, recording, paused, processing, waiting, failed, notes, transcript, speakers, settings, vocabulary, people, document
+    case home, empty, recording, paused, processing, waiting, failed, notes, transcript, speakers, settings, vocabulary, people
 
     static func fromLaunchArguments() -> DemoScenario? {
         let args = ProcessInfo.processInfo.arguments
@@ -26,8 +26,6 @@ extension AppModel {
             return [.settings, .vocabulary]
         case .people:
             return [.settings, .people]
-        case .document:
-            return meetings.first.map { [.documentPage($0.id)] }
         case .home, .empty, .recording, .paused:
             return nil
         }

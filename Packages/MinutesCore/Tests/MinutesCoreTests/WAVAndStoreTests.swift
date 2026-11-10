@@ -133,6 +133,44 @@ final class WAVAndStoreTests: XCTestCase {
         XCTAssertEqual(store.loadAll().count, 1)
     }
 
+    /// The timed words live in their own file: a meeting read back comes without them, a save
+    /// without them leaves them alone, and a record from before the split is moved over.
+    func testWordsAreKeptApartFromTheMeeting() throws {
+        let store = try MeetingStore(root: dir)
+        let words = [Word(text: "Hello", start: 0, end: 0.4, confidence: 0.9), Word(text: "there.", start: 0.5, end: 0.9, confidence: 0.8)]
+        var m = Meeting(title: "Words")
+        m.words = words
+        try store.save(m)
+        let loaded = try XCTUnwrap(store.load(id: m.id))
+        XCTAssertNil(loaded.words)
+        XCTAssertEqual(store.loadWords(id: m.id), words)
+        let record = try Data(contentsOf: store.directory(for: m.id).appendingPathComponent("meeting.json"))
+        XCTAssertFalse(String(decoding: record, as: UTF8.self).contains("Hello"))
+
+        // Saving the light copy (a rename, say) keeps the words; new words replace them.
+        var renamed = loaded
+        renamed.title = "Renamed"
+        try store.save(renamed)
+        XCTAssertEqual(store.loadWords(id: m.id), words)
+        renamed.words = [words[0]]
+        try store.save(renamed)
+        XCTAssertEqual(store.loadWords(id: m.id), [words[0]])
+        XCTAssertNil(store.loadWords(id: "nothing"))
+
+        // A record written before the split, with the words inside it.
+        var old = Meeting(title: "Old")
+        old.words = words
+        let folder = store.directory(for: old.id)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        try JSONEncoder().encode(old).write(to: folder.appendingPathComponent("meeting.json"))
+        XCTAssertEqual(store.loadWords(id: old.id), words)
+        XCTAssertNil(try XCTUnwrap(store.load(id: old.id)).words)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: folder.appendingPathComponent("words.json").path))
+        let moved = try Data(contentsOf: folder.appendingPathComponent("meeting.json"))
+        XCTAssertFalse(String(decoding: moved, as: UTF8.self).contains("Hello"))
+        XCTAssertEqual(try MeetingStore(root: dir).loadWords(id: old.id), words)
+    }
+
     func testStoreSkipsCorruptRecords() throws {
         let store = try MeetingStore(root: dir)
         let m = Meeting(title: "Good")

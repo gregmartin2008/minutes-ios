@@ -16,6 +16,8 @@ extension Meeting {
         autoNamed.removeAll { $0 == label }
         typedNamed?.removeAll { $0 == label }
         suggestedNames?.removeValue(forKey: label)
+        nameHints?.removeValue(forKey: label)
+        if nameHints?.isEmpty == true { nameHints = nil }
         let after = displayName(for: label)
         guard before != after, var n = notes else { return }
         func fix(_ s: String) -> String { Meeting.replacingName(before, with: after, in: s) }
@@ -32,6 +34,21 @@ extension Meeting {
             return d
         }
         notes = n
+    }
+
+    /// Moves the names the note writer found for unnamed voices from the notes onto the meeting,
+    /// keyed by voice. A voice that has a name by now, or a name another voice already has, is skipped.
+    public mutating func takeNameHints() {
+        guard let hints = notes?.speakerHints else { return }
+        notes?.speakerHints = nil
+        var out: [String: SpeakerHint] = [:]
+        let taken = Set(speakerNames.values.map { $0.lowercased() })
+        for hint in hints {
+            guard let label = speakerLabels.first(where: { Meeting.genericName(for: $0, among: speakerLabels) == hint.speaker }),
+                  speakerNames[label] == nil, !taken.contains(hint.name.lowercased()) else { continue }
+            out[label] = hint
+        }
+        nameHints = out.isEmpty ? nil : out
     }
 
     /// Replaces whole-name occurrences only: renaming "Speaker 2" must not touch "Speaker 21",

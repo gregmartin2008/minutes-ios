@@ -39,7 +39,7 @@ the email arriving, and the speech pipeline has been measured on 154 recorded me
 - **Learns your vocabulary.** Company names, people and the terms of your work that come out wrong
   ("EVITA" for EBITDA) are corrected in every transcript and spelled right in the notes. The common
   finance terms are built in; add your own in Settings > Vocabulary.
-- **Emails** the notes and the transcript, as the body of the message and as one PDF attachment,
+- **Emails** the notes and the transcript, as the body of the message and as one Word attachment,
   through your own Gmail account.
 - **Imports** a recording made elsewhere (a voice memo, a call recording) and treats it the same way.
 
@@ -139,13 +139,17 @@ there are no notes.
   Settings is used alone. If Gemini is overloaded at the moment a meeting ends, the transcript
   is emailed at once and Minutes keeps trying while it is open, sending the notes in a second
   email when Gemini gets through; if it never does, or the key is refused, the iPhone writes
-  them. The foot of the notes names which model wrote them. A line about you and your firm, typed once in Settings, goes
+  them. For the first quarter of an hour those tries go on with the phone locked. The foot of
+  the notes names which model wrote them. When the transcript itself gives away who an unnamed
+  voice is ("Thanks, Dana"), the Speakers tab offers that name with the line it came from;
+  nothing is named without a tap. A line about you and your firm, typed once in Settings, goes
   with every transcript so the notes know which side of the table you sit on; the people
   invited go along by name and firm or email domain (never the address), so colleagues and
   counterparties are told apart. Naming a voice in the Speakers tab afterward renames it in the
   notes too.
-- **One document.** The email carries the notes in its body and one attachment, a PDF with the
-  notes followed by the full transcript; *Share* hands out the same PDF.
+- **One document.** The email carries the notes in its body and one attachment, a Word file
+  (.docx) with the notes followed by the full transcript, which opens and edits in Word, Pages
+  and Google Docs; *Share* hands out the same file.
 - The email arrives when that finishes. Leaving Minutes open on the screen is no longer needed.
 - **Cancel meeting**, the quiet link under the buttons, throws the meeting away after a
   confirmation: the recording is deleted and nothing is written or emailed.

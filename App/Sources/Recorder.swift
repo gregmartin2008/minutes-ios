@@ -146,15 +146,16 @@ final class Recorder: NSObject {
     /// True between a `stop(holdingSession: true)` and `release()`.
     private(set) var holding = false
 
-    /// Lets go of the microphone held by `stop(holdingSession: true)`.
-    func release() {
+    /// Lets go of the microphone held by `stop(holdingSession: true)`. With `keepingSession`, the
+    /// audio session is left active for whoever has taken it over (see `BackgroundKeeper.linger`).
+    func release(keepingSession: Bool = false) {
         guard holding else { return }
         holding = false
         guard state == .idle else { return }   // a new recording has taken the engine over
         removeTap()
         engine.stop()
         converter = nil
-        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        if !keepingSession { try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation) }
         Log.shared.info("microphone released")
     }
 

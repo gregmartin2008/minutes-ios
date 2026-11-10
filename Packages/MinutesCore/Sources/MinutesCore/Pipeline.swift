@@ -145,7 +145,23 @@ public final class MeetingPipeline: @unchecked Sendable {
     /// Runs every remaining stage. Returns the meeting in its final state for this run:
     /// `.done`, `.waiting` (will resume by itself), or `.failed` (needs the person).
     @discardableResult
+    /// Runs the meeting from the stage it is at. The meeting comes in and goes out without its
+    /// timed words: they are read from the store for the run and saved back by it.
     public func run(
+        _ input: Meeting, update: @escaping @Sendable (Meeting, Double) -> Void
+    ) async -> Meeting {
+        var prepared = input
+        if prepared.words == nil { prepared.words = store.loadWords(id: input.id) }
+        var out = await runWithWords(prepared) { meeting, fraction in
+            var light = meeting
+            light.words = nil
+            update(light, fraction)
+        }
+        out.words = nil
+        return out
+    }
+
+    private func runWithWords(
         _ input: Meeting, update: @escaping @Sendable (Meeting, Double) -> Void
     ) async -> Meeting {
         var m = input
@@ -278,6 +294,7 @@ public final class MeetingPipeline: @unchecked Sendable {
                     notes.writer = notes.writer ?? cloud.name
                     let writer = notes.writer ?? cloud.name
                     m.notes = notes
+                    m.takeNameHints()
                     m.notesError = nil
                     m.notesCheckpoint = nil
                     m.notesPending = nil

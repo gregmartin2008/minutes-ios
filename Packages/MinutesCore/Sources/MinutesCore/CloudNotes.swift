@@ -216,6 +216,11 @@ public struct GeminiNotesWriter: CloudNotesWriting {
         ("12:43"), and a paragraph of 3 to 7 sentences stating the substance: what each person said as \
         fact, with the numbers. No quotes, no bullet points, no "X asked and Y responded" play-by-play. \
         Small talk gets one sentence at most, or nothing.
+        - speakerNames: only for voices the transcript calls "Speaker 1", "Speaker 2" and so on, and only \
+        when the transcript itself shows who that voice is: they say their own name, or someone \
+        addresses them by name and that voice answers next. Give the label, the name as spoken, and \
+        the one transcript line that shows it, copied exactly. Leave a voice out unless you are sure; \
+        most meetings have none.
         - title: 3 to 8 words naming the meeting's subject, no date.
         """
         if let recorder = brief.recorder, !recorder.isEmpty {
@@ -246,6 +251,11 @@ public struct GeminiNotesWriter: CloudNotesWriting {
             ]],
             "decisions": ["type": "ARRAY", "items": ["type": "STRING"]],
             "openQuestions": ["type": "ARRAY", "items": ["type": "STRING"]],
+            "speakerNames": ["type": "ARRAY", "items": [
+                "type": "OBJECT",
+                "properties": ["speaker": ["type": "STRING"], "name": ["type": "STRING"], "evidence": ["type": "STRING"]],
+                "required": ["speaker", "name", "evidence"],
+            ]],
             "details": ["type": "ARRAY", "items": [
                 "type": "OBJECT",
                 "properties": ["topic": ["type": "STRING"], "start": ["type": "STRING"], "text": ["type": "STRING"]],
@@ -333,7 +343,36 @@ public struct GeminiNotesWriter: CloudNotesWriting {
             actionItems: NotesEngine.dedupe(next),
             openQuestions: NotesEngine.dedupe(open),
             skippedSections: 0, totalSections: 1,
-            details: details)
+            details: details, speakerHints: Self.hints(from: json, lines: lines, speakers: speakers))
+    }
+
+    /// The names the model found for unnamed voices, kept only when they hold up: the voice is
+    /// one the transcript calls "Speaker N", the name is not one a voice already has, and the
+    /// line given as evidence is really in the transcript and really contains the name.
+    static func hints(from json: [String: Any], lines: [String], speakers: Set<String>) -> [SpeakerHint]? {
+        func words(_ s: String) -> [String] {
+            s.lowercased().split(whereSeparator: { !$0.isLetter && !$0.isNumber }).map(String.init)
+        }
+        let taken = Set(speakers.map { $0.lowercased() })
+        let spoken = lines.map { (line: $0, text: " " + words(NotesEngine.spokenPart(of: $0) ?? "").joined(separator: " ") + " ") }
+        var out: [SpeakerHint] = []
+        for item in json["speakerNames"] as? [[String: Any]] ?? [] {
+            guard let speaker = (item["speaker"] as? String)?.trimmingCharacters(in: .whitespaces),
+                  let name = (item["name"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines),
+                  let evidence = item["evidence"] as? String else { continue }
+            let nameWords = words(name)
+            guard speaker.hasPrefix("Speaker "), speakers.contains(speaker), let first = nameWords.first, first.count >= 2,
+                  nameWords.count <= 4, first != "speaker", !taken.contains(name.lowercased()),
+                  !out.contains(where: { $0.speaker == speaker || $0.name.lowercased() == name.lowercased() }) else { continue }
+            // The evidence may come back with or without its "Name [time]:" prefix.
+            let quoted = words(evidence.contains("]: ") ? (NotesEngine.spokenPart(of: evidence) ?? evidence) : evidence)
+            guard quoted.count >= 3, quoted.contains(first) else { continue }
+            let needle = " " + quoted.joined(separator: " ") + " "
+            guard let found = spoken.first(where: { $0.text.contains(needle) }) else { continue }
+            out.append(SpeakerHint(speaker: speaker, name: name, evidence: found.line))
+        }
+        if !out.isEmpty { Log.shared.info("notes: \(out.count) name(s) suggested for unnamed voices") }
+        return out.isEmpty ? nil : out
     }
 
     /// "1:02:15" or "12:43" as seconds.

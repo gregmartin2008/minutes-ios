@@ -65,6 +65,22 @@ public struct Utterance: Codable, Equatable, Identifiable, Sendable {
 
 // MARK: - Notes
 
+/// A name for an unnamed voice that the transcript itself gives away ("Thanks, Dana"), offered
+/// on the Speakers tab with the line it came from. Never applied without the person's say-so.
+public struct SpeakerHint: Codable, Equatable, Sendable {
+    /// The voice as the transcript called it ("Speaker 2").
+    public var speaker: String
+    public var name: String
+    /// The line of the transcript that shows it.
+    public var evidence: String
+
+    public init(speaker: String, name: String, evidence: String) {
+        self.speaker = speaker
+        self.name = name
+        self.evidence = evidence
+    }
+}
+
 public struct MeetingNotes: Codable, Equatable, Sendable {
     public var title: String
     public var summary: String
@@ -88,12 +104,14 @@ public struct MeetingNotes: Codable, Equatable, Sendable {
     public var details: [NotesDetail]?
     /// Which model wrote the notes when it was not the on-device one ("Gemini 3.5 Flash Lite").
     public var writer: String?
+    /// Names the note writer found for unnamed voices; moved onto the meeting once read.
+    public var speakerHints: [SpeakerHint]?
 
     public init(
         title: String = "", summary: String = "", keyPoints: [String] = [], decisions: [String] = [],
         actionItems: [String] = [], openQuestions: [String] = [], figures: [String] = [],
         skippedSections: Int = 0, totalSections: Int = 0, throttled: Bool? = nil, hot: Bool? = nil,
-        details: [NotesDetail]? = nil, writer: String? = nil
+        details: [NotesDetail]? = nil, writer: String? = nil, speakerHints: [SpeakerHint]? = nil
     ) {
         self.title = title
         self.summary = summary
@@ -108,6 +126,7 @@ public struct MeetingNotes: Codable, Equatable, Sendable {
         self.hot = hot
         self.details = details
         self.writer = writer
+        self.speakerHints = speakerHints
     }
 
     public var isEmpty: Bool {
@@ -267,6 +286,8 @@ public struct Meeting: Codable, Equatable, Identifiable, Sendable {
     /// The voice profiles this meeting's voices were folded into after a sure match, so running
     /// the meeting again does not count the same voice twice.
     public var learnedProfiles: [String]?
+    /// Names the transcript suggests for voices that have none, by voice label.
+    public var nameHints: [String: SpeakerHint]?
 
     // Notes and delivery
     public var notes: MeetingNotes?

@@ -317,22 +317,15 @@ public enum Render {
         "\(fileSafe(m.title)) \(formatter("yyyy-MM-dd", timeZone).string(from: m.createdAt))"
     }
 
-    /// The notes and the transcript as one plain-text document.
-    public static func documentText(_ m: Meeting, timeZone: TimeZone = .current) -> Data {
-        Data((fullText(m, timeZone: timeZone)).utf8)
-    }
-
-    /// The email: the notes in the body, and one attached document with the notes and the
-    /// transcript. The app passes a PDF as `document`; without one, the document is plain text.
+    /// The email: the notes in the body, and one attached Word document with the notes and the
+    /// transcript.
     public static func email(
-        for m: Meeting, from: String, to: [String], document: EmailMessage.Attachment? = nil,
-        timeZone: TimeZone = .current, now: Date = Date()
+        for m: Meeting, from: String, to: [String], timeZone: TimeZone = .current, now: Date = Date()
     ) -> EmailMessage {
-        let base = documentBase(m, timeZone: timeZone)
         let attachments: [EmailMessage.Attachment] = [
-            document ?? .init(
-                filename: "\(base) - Notes and Transcript.txt", mimeType: "text/plain; charset=utf-8",
-                data: documentText(m, timeZone: timeZone)),
+            .init(
+                filename: MeetingDocumentText.fileName(m, timeZone: timeZone), mimeType: MeetingDocumentText.mimeType,
+                data: MeetingDocumentText.docx(m, timeZone: timeZone)),
         ]
         return EmailMessage(
             from: from, fromName: "Minutes", to: to,

@@ -127,7 +127,7 @@ enum EndToEnd {
             status.utterances = m.utterances?.count ?? 0
             status.crosstalkUtterances = (m.utterances ?? []).filter { $0.isCrosstalk }.count
             status.overlappedUtterances = (m.utterances ?? []).filter { !$0.overlapWith.isEmpty }.count
-            status.words = m.words?.count ?? 0
+            status.words = (m.utterances ?? []).reduce(0) { $0 + $1.text.split(separator: " ").count }
             status.audioSeconds = m.duration
             status.emailed = m.emailedAt != nil
             status.notes = m.notes != nil
@@ -146,7 +146,7 @@ enum EndToEnd {
         status.phase = "finished"
         status.finished = true
         write(status)
-        if let text = model.exportText(id).flatMap({ try? String(contentsOf: $0, encoding: .utf8) }) {
+        if let text = model.meeting(id).map({ Render.fullText($0) }) {
             try? Data(text.utf8).write(to: documents.appendingPathComponent("e2e-transcript.txt"), options: .atomic)
         }
         if let diagnostics = model.diagnosticsFile() {

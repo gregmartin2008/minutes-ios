@@ -17,6 +17,7 @@ from aiosmtpd.smtp import AuthResult, LoginPassword
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from score_meeting import edit_distance, norm_words
+import docx_read
 
 def _device():
     if os.environ.get("MINUTES_SIMULATOR"):
@@ -100,7 +101,7 @@ def main():
     shutil.copy(wav, os.path.join(documents, "e2e.wav"))
     simctl("ui", DEVICE, "appearance", "light")
     simctl("terminate", DEVICE, BUNDLE)
-    args = ["-e2e", "e2e.wav", "-e2e-mail", f"127.0.0.1:{port}", "-plain-document"] + (["-e2e-live"] if live else [])
+    args = ["-e2e", "e2e.wav", "-e2e-mail", f"127.0.0.1:{port}"] + (["-e2e-live"] if live else [])
     print(stamp(), "launching:", simctl("launch", DEVICE, BUNDLE, *args, check=True), flush=True)
 
     status, last = {}, None
@@ -152,22 +153,26 @@ def main():
         html = msg.get_body(preferencelist=("html",))
         check("has an HTML body with the transcript", html is not None and "Transcript" in html.get_content())
         attachments = {a.get_filename(): a.get_content() for a in msg.iter_attachments()}
-        document = next((v for k, v in attachments.items() if k and k.endswith("Notes and Transcript.txt")), None)
-        check("one document attached, with the notes and the transcript", document is not None and len(attachments) == 1, list(attachments))
-        transcript = document.replace("\r\n", "\n").split("\nTRANSCRIPT\n", 1)[-1] if document is not None else None
-        if transcript is not None:
+        document = next((v for k, v in attachments.items() if k and k.endswith("Notes and Transcript.docx")), None)
+        check("one Word document attached", document is not None and len(attachments) == 1, list(attachments))
+        passages = None
+        if document is not None:
+            try:
+                passages = docx_read.transcript(docx_read.paragraphs(document))
+            except Exception as e:
+                check("the Word document opens", False, e)
+        check("the document carries the transcript", bool(passages))
+        if passages:
             ref = json.load(open(ref_path))["lines"]
             ref_words = [w for line in sorted(ref, key=lambda r: r["start"]) for w in norm_words(line["text"])]
-            header = re.compile(r"^.{1,60} \[\d+:\d\d(:\d\d)?\]( \(.*\))?$")
-            # After the TRANSCRIPT heading: "Name [time]" lines each followed by speech.
-            body = transcript
-            body_lines = [l for l in body.splitlines() if l.strip() and not header.match(l.strip()) and not l.startswith("[Recording paused")]
-            hyp_words = norm_words(" ".join(body_lines))
+            # Each passage is a "Name  time" heading and the speech under it.
+            spoken = " ".join(text for _, text in passages)
+            hyp_words = norm_words(spoken)
             wer = edit_distance(ref_words, hyp_words) / max(len(ref_words), 1)
             check("emailed transcript matches what was said", wer <= 0.15, f"word error {wer * 100:.1f}% over {len(ref_words)} words")
-            names = {m.group(1) for m in (re.match(r"^(Speaker \d+) \[", l.strip()) for l in transcript.splitlines()) if m}
+            names = {m.group(1) for m in (re.match(r"^(Speaker \d+)  \d+:\d\d", head) for head, _ in passages) if m}
             check("transcript names each voice", len(names) >= 4, sorted(names))
-            heard = [t for t in ("Meridyan", "Kestrel") if t in transcript]
+            heard = [t for t in ("Meridyan", "Kestrel") if t in spoken]
             check("the vocabulary terms were written as given", len(heard) == 2, heard)
 
     if live:

@@ -96,6 +96,41 @@ final class CloudNotesTests: XCTestCase {
         XCTAssertTrue(prompt.hasSuffix(transcript))
     }
 
+    /// A name for an unnamed voice is kept only when the line given for it is really in the
+    /// transcript and really has the name in it.
+    func testNamesForUnnamedVoicesMustBeShownByTheTranscript() throws {
+        let lines = [
+            "Greg Martin [0:05]: Thanks for joining, Dana. How was the flight?",
+            "Speaker 2 [0:09]: Fine, thanks. This is Dana Lee from Harbor, by the way.",
+            "Speaker 3 [0:20]: And I'm on the line as well.",
+            "Speaker 2 [0:31]: Let's start with the numbers.",
+        ]
+        let speakers = GeminiNotesWriter.speakers(in: lines)
+        let json: [String: Any] = ["speakerNames": [
+            ["speaker": "Speaker 2", "name": "Dana Lee", "evidence": "Speaker 2 [0:09]: Fine, thanks. This is Dana Lee from Harbor, by the way."],
+            ["speaker": "Speaker 3", "name": "Priya", "evidence": "And I'm on the line as well."],          // the line never says Priya
+            ["speaker": "Speaker 3", "name": "Tom", "evidence": "Tom here, sorry I'm late."],             // never said
+            ["speaker": "Greg Martin", "name": "Gregory", "evidence": "Thanks for joining, Dana."],       // already named
+            ["speaker": "Speaker 3", "name": "Greg Martin", "evidence": "Thanks for joining, Dana. How was the flight?"],
+        ]]
+        let hints = try XCTUnwrap(GeminiNotesWriter.hints(from: json, lines: lines, speakers: speakers))
+        XCTAssertEqual(hints, [SpeakerHint(speaker: "Speaker 2", name: "Dana Lee", evidence: lines[1])])
+
+        // On the meeting they are keyed by voice, and naming the voice clears them.
+        var m = Meeting(title: "t")
+        m.utterances = [
+            Utterance(id: 0, speaker: "S4", start: 5, end: 8, text: "Thanks for joining, Dana."),
+            Utterance(id: 1, speaker: "S1", start: 9, end: 12, text: "This is Dana Lee."),
+        ]
+        m.speakerNames = ["S4": "Greg Martin"]
+        m.notes = MeetingNotes(summary: "s", speakerHints: hints)
+        m.takeNameHints()
+        XCTAssertEqual(m.nameHints?["S1"]?.name, "Dana Lee")
+        XCTAssertNil(m.notes?.speakerHints)
+        m.setName("Dana Lee", for: "S1")
+        XCTAssertNil(m.nameHints)
+    }
+
     func testABadKeyIsSaidPlainly() async {
         let fake = Fake()
         fake.status = 400

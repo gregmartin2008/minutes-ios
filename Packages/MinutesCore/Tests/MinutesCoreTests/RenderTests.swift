@@ -4,7 +4,9 @@ import XCTest
 final class RenderTests: XCTestCase {
     let tz = TimeZone(identifier: "America/New_York")!
 
-    func sample() -> Meeting {
+    func sample() -> Meeting { Self.sampleMeeting() }
+
+    static func sampleMeeting() -> Meeting {
         var m = Meeting(title: "Harbor Tools <add-on> & \"diligence\"", titleIsAuto: false,
                         createdAt: Date(timeIntervalSince1970: 1_791_829_200))   // 2026-10-12 18:20 UTC
         m.duration = 2531
@@ -98,14 +100,13 @@ final class RenderTests: XCTestCase {
         let m = sample()
         let e = Render.email(for: m, from: "me@gmail.com", to: ["me@gmail.com"], timeZone: tz, now: Date(timeIntervalSince1970: 1_791_830_000))
         XCTAssertEqual(e.subject, "Meeting notes: Harbor Tools <add-on> & \"diligence\" (Oct 12, 2026)")
-        XCTAssertEqual(e.attachments.map { $0.filename }, ["Harbor Tools add-on & diligence 2026-10-12 - Notes and Transcript.txt"])
-        let transcript = String(decoding: e.attachments[0].data, as: UTF8.self)
-        XCTAssertTrue(transcript.contains("Speakers: Greg, Speaker 2, Speaker 3 (names recognized by voice; check them)"))
-        XCTAssertTrue(transcript.contains("Late remark."))
-        XCTAssertTrue(transcript.contains("\nTRANSCRIPT\n"))
-        // The app's own document (a PDF) takes the place of the text one.
-        let pdf = EmailMessage.Attachment(filename: "x.pdf", mimeType: "application/pdf", data: Data([1, 2]))
-        XCTAssertEqual(Render.email(for: m, from: "a@b.c", to: ["a@b.c"], document: pdf).attachments.map { $0.filename }, ["x.pdf"])
+        XCTAssertEqual(e.attachments.map { $0.filename }, ["Harbor Tools add-on & diligence 2026-10-12 - Notes and Transcript.docx"])
+        XCTAssertEqual(e.attachments[0].mimeType, "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+        XCTAssertEqual(e.attachments[0].data, MeetingDocumentText.docx(m, timeZone: tz))
+        let document = MeetingDocumentText.paragraphs(m, timeZone: tz).map(\.text)
+        XCTAssertTrue(document.contains("Speakers: Greg, Speaker 2, Speaker 3 (names recognized by voice; check them)"))
+        XCTAssertTrue(document.contains("Oct 12, 2026 at 2:20 PM, 42 min"))
+        XCTAssertTrue(document.contains("Late remark."))
         XCTAssertTrue(e.text.contains("TRANSCRIPT"))
         XCTAssertEqual(e.messageID, "\(m.id).1.1791830000")
         XCTAssertEqual(e.fromName, "Minutes")

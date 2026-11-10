@@ -183,11 +183,36 @@ final class AppModel: ObservableObject {
 
     private var cloudRetryTask: Task<Void, Never>?
 
+    /// Until when the app keeps itself running in the background to try Gemini again.
+    private var cloudLingerUntil: Date?
+
+    /// For a quarter of an hour after a meeting whose notes Gemini was too busy to write, the
+    /// app keeps itself running (silent audio, as for an imported recording) so the later tries
+    /// happen with the phone locked. After that they wait for Minutes to be opened.
+    private func updateCloudLinger() {
+        let waiting = meetings.contains {
+            $0.status == .done && $0.cloudPending == true && ($0.cloudRetries ?? 0) < MeetingPipeline.cloudRetryLimit
+        }
+        if waiting, let until = cloudLingerUntil, Date() < until, recording == nil {
+            // Not while a meeting is being processed with the microphone held: that run decides
+            // again when it ends.
+            if !BackgroundKeeper.shared.lingering, !BackgroundKeeper.shared.isActive {
+                Log.shared.info("staying awake until \(Render.time(until)) to try Gemini again")
+                BackgroundKeeper.shared.linger()
+            }
+        } else {
+            if BackgroundKeeper.shared.lingering { Log.shared.info("no longer staying awake for Gemini") }
+            if !waiting { cloudLingerUntil = nil }
+            BackgroundKeeper.shared.stopLingering()
+        }
+    }
+
     /// Notes that Gemini could not write at the time (overloaded) are tried again every few
-    /// minutes for about half an hour, and sent again when it gets through. Runs while the app
-    /// is open; a retry also happens whenever it comes to the foreground.
+    /// minutes, and sent when it gets through: for the first quarter of an hour with the phone
+    /// locked too, after that while the app is open and whenever it comes to the foreground.
     func retryCloudNotes() async {
         guard !isDemo else { return }
+        defer { updateCloudLinger() }
         let pending = meetings.filter { $0.status == .done && $0.cloudPending == true && ($0.cloudRetries ?? 0) < MeetingPipeline.cloudRetryLimit }
         if pending.isEmpty { cloudRetryTask?.cancel(); cloudRetryTask = nil; return }
         guard runningID == nil, let cloud = services().cloudNotes() else { return }
@@ -202,6 +227,7 @@ final class AppModel: ObservableObject {
                 notes.writer = notes.writer ?? cloud.name
                 guard var fresh = self.meeting(m.id) else { continue }
                 fresh.notes = notes
+                fresh.takeNameHints()
                 // These notes settle the meeting: nothing is left for the phone to try again.
                 fresh.notesError = nil
                 fresh.notesPending = nil
@@ -238,12 +264,13 @@ final class AppModel: ObservableObject {
                 }
             }
         }
-        // Keep trying every four minutes while something is still pending and the app is open.
+        // Keep trying while something is still pending: every minute and a half while the app is
+        // keeping itself awake for this, every four minutes while it is merely open.
         if meetings.contains(where: { $0.cloudPending == true && ($0.cloudRetries ?? 0) < MeetingPipeline.cloudRetryLimit }), cloudRetryTask == nil {
             cloudRetryTask = Task { [weak self] in
                 while !Task.isCancelled {
-                    try? await Task.sleep(nanoseconds: 240_000_000_000)
-                    guard !Task.isCancelled, AppState.shared.isActive else { continue }
+                    try? await Task.sleep(nanoseconds: BackgroundKeeper.shared.lingering ? 90_000_000_000 : 240_000_000_000)
+                    guard !Task.isCancelled, AppState.shared.isActive || BackgroundKeeper.shared.lingering else { continue }
                     await self?.retryCloudNotes()
                 }
             }
@@ -811,7 +838,9 @@ final class AppModel: ObservableObject {
             BackgroundKeeper.shared.end(success: allSucceeded)
             UIApplication.shared.isIdleTimerDisabled = false
         }
-        if recording == nil { recorder.release() }
+        // Decided before the microphone is let go, so the silent audio takes over a live session.
+        updateCloudLinger()
+        if recording == nil { recorder.release(keepingSession: BackgroundKeeper.shared.lingering) }
         // The models stay loaded for the next meeting; a memory warning releases them.
     }
 
@@ -828,7 +857,10 @@ final class AppModel: ObservableObject {
 
     private func announce(_ m: Meeting) {
         Log.shared.info("meeting \(m.id) ended run as \(m.status.rawValue) at \(m.stage.rawValue)")
-        if m.cloudPending == true { Task { await retryCloudNotes() } }
+        if m.cloudPending == true {
+            cloudLingerUntil = Date().addingTimeInterval(15 * 60)
+            Task { await retryCloudNotes() }
+        }
         guard !isDemo, UIApplication.shared.applicationState != .active else { return }
         switch m.status {
         case .done:
@@ -1155,14 +1187,12 @@ final class AppModel: ObservableObject {
 
     // MARK: Sharing and diagnostics
 
-    /// The meeting's document (notes and transcript) as a PDF to share, or as text if the PDF
-    /// cannot be drawn.
-    func exportText(_ id: String) -> URL? {
+    /// The meeting's document (notes and transcript) as a Word file to share.
+    func exportDocument(_ id: String) -> URL? {
         guard let m = meeting(id) else { return nil }
-        if let pdf = MeetingDocument.temporaryFile(m) { return pdf }
-        let url = FileManager.default.temporaryDirectory.appendingPathComponent("\(Render.fileSafe(m.title)).txt")
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(MeetingDocumentText.fileName(m))
         do {
-            try Data(Render.fullText(m).utf8).write(to: url, options: .atomic)
+            try MeetingDocumentText.docx(m).write(to: url, options: .atomic)
             return url
         } catch {
             return nil

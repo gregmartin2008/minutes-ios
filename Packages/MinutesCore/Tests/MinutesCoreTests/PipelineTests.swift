@@ -636,7 +636,8 @@ final class LiveWorkTests: XCTestCase {
         XCTAssertEqual(separator.analysisCalls, 1)
         XCTAssertEqual(separator.calls, 0)
         XCTAssertEqual(transcriber.calls, 0, "the words came from the recording")
-        XCTAssertEqual(result.words?.count, 40)
+        XCTAssertNil(result.words, "a meeting leaves the pipeline without its words")
+        XCTAssertEqual(store.loadWords(id: m.id)?.count, 40)
         // Only the part after the live section (words starting at 60 s or later) went to the model.
         XCTAssertEqual(model.sections.count, 1)
         XCTAssertFalse(model.sections.first?.contains("word0 ") ?? true, model.sections.first ?? "")

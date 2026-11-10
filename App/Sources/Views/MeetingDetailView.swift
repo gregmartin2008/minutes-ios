@@ -174,7 +174,7 @@ struct MeetingDetailView: View {
             }
             if meeting.utterances != nil {
                 Button {
-                    if let url = model.exportText(meeting.id) { share = ShareItem(url: url) }
+                    if let url = model.exportDocument(meeting.id) { share = ShareItem(url: url) }
                 } label: {
                     Label("Share notes and transcript", systemImage: "square.and.arrow.up")
                 }
@@ -950,6 +950,24 @@ private struct SpeakersTab: View {
                         .fixedSize(horizontal: false, vertical: true)
                     Spacer(minLength: 4)
                     Button("Yes, it's \(suggested)") { onSuggested(label, suggested) }
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(Theme.ok)
+                        .buttonStyle(.plain)
+                }
+            }
+            // A name the transcript itself gives away, with the line that shows it.
+            if meeting.speakerNames[label] == nil, let hint = meeting.nameHints?[label] {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("The transcript suggests this is \(hint.name):")
+                        .font(.footnote)
+                        .foregroundStyle(Theme.muted)
+                    Text(hint.evidence)
+                        .font(.footnote)
+                        .italic()
+                        .foregroundStyle(Theme.ink)
+                        .lineLimit(4)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Button("Yes, it's \(hint.name)") { onSuggested(label, hint.name) }
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundStyle(Theme.ok)
                         .buttonStyle(.plain)
