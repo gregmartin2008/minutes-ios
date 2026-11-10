@@ -78,7 +78,7 @@ enum EndToEnd {
 
         // Names the recognizer is unlikely to know, to check that the typed spellings are applied.
         var vocabulary = Vocabulary()
-        vocabulary.terms = [VocabularyTerm(term: "Meridyan", heardAs: ["Meridian"]), VocabularyTerm(term: "Kestrel")]
+        vocabulary.terms = [VocabularyTerm(term: "Meridyan", heardAs: ["Meridian", "Meridien", "Meridion", "Meridyen", "Meridiane"]), VocabularyTerm(term: "Kestrel")]
         AppSettings.shared.vocabulary = vocabulary
         AppSettings.shared.usesCalendar = false
         model.vocabulary = vocabulary
