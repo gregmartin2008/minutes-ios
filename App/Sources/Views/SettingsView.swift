@@ -216,11 +216,13 @@ struct SettingsView: View {
         } header: {
             Text("On this iPhone")
         } footer: {
-            Text("Recording, speaker separation, transcription and note writing all run on this iPhone. The only thing that leaves it is the email, sent through your own account.")
+            Text(geminiSaved
+                ? "Recording, speaker separation and transcription run on this iPhone. The transcript text goes to Google's Gemini to write the notes (see Notes below), and the email goes out through your own account. The audio never leaves the phone."
+                : "Recording, speaker separation, transcription and note writing all run on this iPhone. The only thing that leaves it is the email, sent through your own account.")
         }
     }
 
-    // MARK: Vocabulary
+    // MARK: Microphone
 
     @State private var rawMicrophone = AppSettings.shared.rawMicrophone
 
@@ -590,7 +592,7 @@ struct SettingsView: View {
         } header: {
             Text("Help")
         } footer: {
-            Text("Diagnostics list the app's recent activity and timings. They contain no audio, no transcript text and no passwords; your email address may appear.\n\nMinutes \(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "")")
+            Text("Diagnostics list the app's recent activity and timings. They contain no audio, no transcript and no passwords; meeting titles, people's names and your email address do appear.\n\nMinutes \(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "")")
         }
     }
 

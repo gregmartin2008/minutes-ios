@@ -88,6 +88,11 @@ final class MeetingCalendar {
             default: break
             }
             let email = Self.email(of: participant)
+            // The organizer is usually among the attendees too: one entry, one lookup.
+            if let email, let i = people.firstIndex(where: { $0.email?.lowercased() == email.lowercased() }) {
+                if organizer { people[i].organizer = true }
+                return
+            }
             var name = participant.name?.trimmingCharacters(in: .whitespaces) ?? ""
             // Google calendars often list an invitee by address only. The People list knows
             // some of them; "first.last@" gives a name; a bare address stays an address.

@@ -7,7 +7,7 @@ import FoundationNetworking
 /// network: Google's Gemini, with the person's own API key. Used when a key is saved; the
 /// on-device model remains the fallback. Only the transcript text is sent, never the audio.
 public protocol CloudNotesWriting: Sendable {
-    /// A short name for the email's footer: "Gemini 2.5 Flash".
+    /// A short name for the foot of the notes: "Gemini 3.5 Flash Lite".
     var name: String { get }
     func write(transcript: String, title: String?, spellings: [String], brief: NotesBrief) async throws -> MeetingNotes
 }
@@ -222,21 +222,27 @@ public struct GeminiNotesWriter: CloudNotesWriting {
         "required": ["title", "summary", "nextSteps", "decisions", "details"],
     ]
 
-    /// The model's JSON as notes. Numbers in the details are checked against the transcript as
-    /// with the on-device model: a sentence citing a figure that was never said is dropped.
     /// A "decision" that is really one speaker promising to do something ("Jordan Carver will add
-    /// R. Gordon to the list"), rewritten in the next-step form "Name: do something"; nil for a
-    /// real decision. Only the speakers' own names count, so "Sable Capital will…" stays a decision.
+    /// R. Gordon to the list", "Dana Lee agreed to send the model"), rewritten in the next-step
+    /// form "Name: do something"; nil for a real decision. Only the speakers' own names count, so
+    /// "Sable Capital will…" stays a decision.
     static func nextStep(fromDecision item: String, speakers: Set<String>) -> String? {
         let words = item.split(separator: " ").map(String.init)
-        for at in 1...min(3, max(1, words.count - 2)) where at < words.count - 1 {
-            let name = words[..<at].joined(separator: " ")
-            guard speakers.contains(name), ["will", "to", "is to", "agreed to"].contains(words[at]) else { continue }
-            var action = words[(at + 1)...].joined(separator: " ")
-            if action.hasPrefix("to ") { action.removeFirst(3) }
+        guard words.count >= 3 else { return nil }
+        for at in 1...min(3, words.count - 2) {
+            guard speakers.contains(words[..<at].joined(separator: " ")) else { continue }
+            let verb = words[at].lowercased()
+            var rest: ArraySlice<String>
+            if verb == "will" || verb == "to" {
+                rest = words[(at + 1)...]
+            } else if ["is", "agreed", "agrees", "plans", "committed", "offered", "promised"].contains(verb), at + 2 < words.count, words[at + 1].lowercased() == "to" {
+                rest = words[(at + 2)...]
+            } else {
+                return nil
+            }
+            var action = rest.joined(separator: " ")
             if action.hasSuffix(".") { action.removeLast() }
-            guard !action.isEmpty else { return nil }
-            return "\(name): \(action)"
+            return action.isEmpty ? nil : "\(words[..<at].joined(separator: " ")): \(action)"
         }
         return nil
     }
@@ -250,10 +256,12 @@ public struct GeminiNotesWriter: CloudNotesWriting {
         })
     }
 
+    /// The model's JSON as notes. Numbers in the details are checked against the transcript as
+    /// with the on-device model: a sentence citing a figure that was never said is dropped.
     static func notes(from json: [String: Any], transcript: String) throws -> MeetingNotes {
         guard let summary = json["summary"] as? String else { throw CloudNotesError(status: 0, message: "Gemini returned no summary.") }
         let lines = transcript.split(separator: "\n").map(String.init)
-        let said = Set(lines.flatMap(NotesEngine.numbers))
+        let said = NotesEngine.saidNumbers(in: lines)
         let speakers = Self.speakers(in: lines)
         var next: [String] = []
         for item in json["nextSteps"] as? [[String: Any]] ?? [] {
@@ -272,12 +280,16 @@ public struct GeminiNotesWriter: CloudNotesWriting {
             if let step = Self.nextStep(fromDecision: item, speakers: speakers) { next.append(step) } else { decisions.append(item) }
         }
         var details: [NotesDetail] = []
+        var dropped = 0
         for item in json["details"] as? [[String: Any]] ?? [] {
             guard let topic = item["topic"] as? String, let text = item["text"] as? String else { continue }
-            let kept = NotesEngine.sentences(text).filter { s in NotesEngine.numbers(s).allSatisfy { said.contains($0) } }
+            let all = NotesEngine.sentences(text)
+            let kept = all.filter { s in NotesEngine.citedNumbers(in: s, speakers: speakers).allSatisfy { said.contains($0) } }
+            dropped += all.count - kept.count
             guard !kept.isEmpty else { continue }
             details.append(NotesDetail(topic: NotesEngine.tidyTopic(topic), text: kept.joined(separator: " "), startSeconds: Self.seconds(item["start"] as? String)))
         }
+        if dropped > 0 { Log.shared.info("notes: \(dropped) sentence(s) left out for citing a number the transcript does not have") }
         return MeetingNotes(
             title: NotesEngine.tidyTitle(json["title"] as? String ?? ""),
             summary: summary.trimmingCharacters(in: .whitespacesAndNewlines),

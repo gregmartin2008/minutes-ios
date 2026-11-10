@@ -86,7 +86,7 @@ public struct MeetingNotes: Codable, Equatable, Sendable {
     public var missingTailSeconds: Double?
     /// The meeting told part by part: a heading and a paragraph for each.
     public var details: [NotesDetail]?
-    /// Which model wrote the notes when it was not the on-device one ("Gemini 2.5 Flash").
+    /// Which model wrote the notes when it was not the on-device one ("Gemini 3.5 Flash Lite").
     public var writer: String?
 
     public init(
@@ -444,7 +444,7 @@ extension Person {
     public static func naturalName(_ raw: String) -> String {
         var name = raw.trimmingCharacters(in: .whitespaces)
         let parts = name.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
-        if parts.count == 2, !parts[0].isEmpty, !parts[1].isEmpty, !parts[1].contains(" ") || parts[1].split(separator: " ").count <= 2 {
+        if parts.count == 2, !parts[0].isEmpty, !parts[1].isEmpty, parts[1].split(separator: " ").count <= 2 {
             name = parts[1] + " " + parts[0]
         }
         if name == name.uppercased(), name.contains(where: \.isLetter) {
@@ -502,7 +502,7 @@ extension Person {
 
 // MARK: - Calendar
 
-/// Someone invited to a calendar meeting, as the calendar lists them.
+/// Someone met: as a calendar invitation lists them, as typed on a meeting, or from the People list.
 public struct Person: Codable, Equatable, Sendable {
     public var name: String
     public var email: String?

@@ -705,4 +705,23 @@ final class RefusalTests: XCTestCase {
         XCTAssertEqual(c.decisions, ["Hold the bid."])
         XCTAssertEqual(c.actionItems, ["Greg Martin: will send the one-pager and an NDA.", "Alex Sterling: will add Greg to the quarterly email."])
     }
+
+    /// Numbers said in words vouch for figures written in digits; the name and clock time that
+    /// start a transcript line vouch for nothing; an unnamed speaker's number is not a figure.
+    func testSaidNumbersAreWhatWasSaid() {
+        let lines = [
+            "Greg Martin [12:43]: Our sweet spot is three to eight million of EBITDA, call it fifteen to twenty of equity.",
+            "Speaker 2 [1:02:15]: We closed in twenty twenty-four at two and a half turns, about five hundred thousand a year.",
+            "[Recording paused for 7 min: a phone call took the microphone]",
+            "Speaker 2 [1:03:00]: One point five million, forty nine percent, December fourth.",
+        ]
+        let said = NotesEngine.saidNumbers(in: lines)
+        for n in ["3", "8", "15", "20", "2024", "2.5", "500000", "1.5", "49", "4"] { XCTAssertTrue(said.contains(n), n) }
+        for n in ["12", "43", "62", "7", "1"].filter({ $0 != "1" }) { XCTAssertFalse(said.contains(n), "\(n) is only in a line's prefix") }
+        XCTAssertEqual(NotesEngine.citedNumbers(in: "Speaker 2 asked about the $5 million earnout.", speakers: ["Speaker 2"]), ["5"])
+        XCTAssertEqual(NotesEngine.citedNumbers(in: "Voice 3 and Speaker 12 agreed on 6.5x."), ["6.5"])
+        XCTAssertEqual(
+            NotesEngine.verifiedParagraph("The range is $3M to $8M of EBITDA. The fund is $43 million.", against: lines),
+            "The range is $3M to $8M of EBITDA.")
+    }
 }

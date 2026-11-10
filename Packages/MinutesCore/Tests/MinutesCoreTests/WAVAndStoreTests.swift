@@ -174,4 +174,20 @@ final class WAVAndStoreTests: XCTestCase {
         XCTAssertTrue(trimmed.hasPrefix("line "))
         XCTAssertTrue(trimmed.contains("line 19999 "))
     }
+
+    /// The streamed levels match the levels worked out from the whole file in memory.
+    func testLevelsAreReadWithoutLoadingTheRecording() throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("levels-\(UUID().uuidString).wav")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let writer = try WAVWriter(url: url, sampleRate: 16_000)
+        var samples: [Float] = []
+        for i in 0..<(16_000 * 9 + 700) { samples.append(Float((i / 1_600) % 2 == 0 ? 8_000 : 800) / 32_768 * (i % 2 == 0 ? 1 : -1)) }
+        try writer.append(samples)
+        try writer.finish()
+        let levels = try WAVWriter.levels(url: url, perSecond: 10)
+        XCTAssertEqual(levels.count, 90)
+        XCTAssertEqual(levels[0], 8_000.0 / 32_768, accuracy: 0.001)
+        XCTAssertEqual(levels[1], 800.0 / 32_768, accuracy: 0.001)
+        XCTAssertEqual(levels[88], 8_000.0 / 32_768, accuracy: 0.001)
+    }
 }

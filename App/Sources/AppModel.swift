@@ -105,7 +105,6 @@ final class AppModel: ObservableObject {
         }
 
         Log.shared.info("launch: \(Self.deviceSummary())")
-        Log.shared.info(BackgroundKeeper.shared.status)
         Log.shared.info("calendar: \(AppSettings.shared.usesCalendar ? "on" : "off"), access \(MeetingCalendar.shared.status)")
         watchAppState()
         setup.ready = AppSettings.shared.modelsReady && models.transcriptionModelIsDownloaded()
@@ -203,6 +202,11 @@ final class AppModel: ObservableObject {
                 notes.writer = cloud.name
                 guard var fresh = self.meeting(m.id) else { continue }
                 fresh.notes = notes
+                // These notes settle the meeting: nothing is left for the phone to try again.
+                fresh.notesError = nil
+                fresh.notesPending = nil
+                fresh.notesRetries = nil
+                fresh.notesCheckpoint = nil
                 fresh.cloudPending = nil
                 fresh.cloudRetries = meeting.cloudRetries
                 fresh.remarks.removeAll(where: MeetingPipeline.isCloudFallbackRemark)
@@ -821,7 +825,6 @@ final class AppModel: ObservableObject {
             meetings[i] = updated
         }
         progress[snapshot.id] = fraction
-        BackgroundKeeper.shared.update(fraction: fraction, title: snapshot.title, subtitle: snapshot.stage.label)
     }
 
     private func announce(_ m: Meeting) {
@@ -1151,7 +1154,6 @@ final class AppModel: ObservableObject {
 
     // MARK: Sharing and diagnostics
 
-    /// Writes the notes and transcript to a text file that can be shared.
     /// The meeting's document (notes and transcript) as a PDF to share, or as text if the PDF
     /// cannot be drawn.
     func exportText(_ id: String) -> URL? {

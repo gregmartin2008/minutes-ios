@@ -4,9 +4,9 @@
 set -uo pipefail
 kind="$1"
 mkdir -p out build
-# The bundle identifier the app is built with. A re-signing tool that changes it breaks the
-# continued-processing task (its identifier must begin with the installed bundle id), so the
-# owner can set MINUTES_BUNDLE_ID to the id their tool uses and install with that id instead.
+# The bundle identifier the app is built with. An install tool may change it when it signs the
+# app; building with the id the tool will use (App/bundle-id.txt, or MINUTES_BUNDLE_ID) keeps
+# the build and the installed app the same.
 bundle_id="${MINUTES_BUNDLE_ID:-$(tr -d '[:space:]' < App/bundle-id.txt)}"
 bundle_id="${bundle_id:-app.minutes.recorder}"
 if [ "$kind" = sim ]; then
@@ -19,7 +19,7 @@ if [ "$kind" = sim ]; then
 else
   destination='generic/platform=iOS'
   configuration=Release
-  # Left unsigned: the installer (Sideloadly, AltStore) signs it with the owner's Apple ID.
+  # Left unsigned: the installer (iloader, Sideloadly, AltStore) signs it with the owner's Apple ID.
   signing=(CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=)
 fi
 xcodebuild -project Minutes.xcodeproj -scheme Minutes -configuration "$configuration" \

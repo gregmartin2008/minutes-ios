@@ -168,4 +168,14 @@ final class CloudNotesTests: XCTestCase {
         let bare = GeminiNotesWriter.prompt(transcript: "x", title: nil, spellings: [])
         XCTAssertFalse(bare.contains("Invited:"))
     }
+
+    func testASpeakersPromiseBecomesANextStep() {
+        let speakers: Set<String> = ["Jordan Carver", "Dana"]
+        XCTAssertEqual(GeminiNotesWriter.nextStep(fromDecision: "Jordan Carver will add Greg to the list.", speakers: speakers), "Jordan Carver: add Greg to the list")
+        XCTAssertEqual(GeminiNotesWriter.nextStep(fromDecision: "Dana agreed to send the model", speakers: speakers), "Dana: send the model")
+        XCTAssertEqual(GeminiNotesWriter.nextStep(fromDecision: "Dana to send the model", speakers: speakers), "Dana: send the model")
+        XCTAssertNil(GeminiNotesWriter.nextStep(fromDecision: "Sable Capital will consider the offer.", speakers: speakers))
+        XCTAssertNil(GeminiNotesWriter.nextStep(fromDecision: "Dana prefers option one.", speakers: speakers))
+        XCTAssertNil(GeminiNotesWriter.nextStep(fromDecision: "Dana will", speakers: speakers))
+    }
 }

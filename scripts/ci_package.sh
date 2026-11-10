@@ -1,5 +1,5 @@
 #!/bin/bash
-# Wraps the device build as an .ipa that can be installed with Sideloadly or AltStore, which sign it
+# Wraps the device build as an .ipa that can be installed with iloader, Sideloadly or AltStore, which sign it
 # with the installer's own Apple ID. Publishes it as the repository's "latest" release.
 set -euo pipefail
 app="build/device/Build/Products/Release-iphoneos/Minutes.app"
@@ -17,7 +17,7 @@ cp -R "$app" build/ipa/Payload/
 } | tee out/ipa.txt
 
 if [ "${1:-}" = "--release" ]; then
-  notes="Unsigned build of Minutes for iPhone (iOS 26 or later), from commit ${GITHUB_SHA:0:7}. Install Minutes.ipa with Sideloadly; see the README."
+  notes="Unsigned build of Minutes for iPhone (iOS 26 or later), from commit ${GITHUB_SHA:0:7}. Install Minutes.ipa with iloader or Sideloadly; see the README."
   gh release delete latest --cleanup-tag -y 2>/dev/null || true
   gh release create latest build/ipa/Minutes.ipa --target "$GITHUB_SHA" --title "Minutes for iPhone" --notes "$notes"
   echo "released" | tee -a out/ipa.txt

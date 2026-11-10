@@ -281,6 +281,8 @@ public final class MeetingPipeline: @unchecked Sendable {
                     m.notesCheckpoint = nil
                     m.notesPending = nil
                     m.notesRetries = nil
+                    m.cloudPending = nil
+                    m.remarks.removeAll(where: Self.isCloudFallbackRemark)
                     if m.titleIsAuto, !notes.title.isEmpty {
                         m.title = notes.title
                         m.titleIsAuto = false
@@ -293,6 +295,8 @@ public final class MeetingPipeline: @unchecked Sendable {
                 } catch {
                     let transient = (error as? CloudNotesError)?.isTransient ?? false
                     log.warn("meeting \(m.id): \(cloud.name) could not write the notes (\(error.localizedDescription)); using the on-device model\(transient ? "; will try again later" : "")")
+                    // Writing the notes again says this once, with the latest reason.
+                    m.remarks.removeAll(where: Self.isCloudFallbackRemark)
                     m.remarks.append(Self.cloudFallbackRemark(cloud.name, error: error, willRetry: transient))
                     m.cloudPending = transient ? true : nil
                 }
@@ -445,6 +449,8 @@ public final class MeetingPipeline: @unchecked Sendable {
     /// in order of first speaking, when the counts line up. The person's own voice, if
     /// recognized, is left out of the count. Otherwise the names are left for the person to place.
     private func applyTypedNames(to m: inout Meeting) {
+        // Separating the voices again starts this over; an earlier run's remark no longer applies.
+        m.remarks.removeAll(where: Self.isTypedNamesRemark)
         let own = services.ownProfileID()
         // A typed name that a voice already carries (the person's own, usually, or someone
         // recognized by voice) is not looking for another voice.
@@ -486,21 +492,10 @@ public final class MeetingPipeline: @unchecked Sendable {
         m.typedNamed = named.sorted()
     }
 
-    /// How loud each voice was and how loud the room was, for judging a rough transcript. Reads
-    /// the recording once; a minute of a long meeting costs nothing noticeable.
+    /// How loud each voice was and how loud the room was, for judging a rough transcript. The
+    /// recording is read a few seconds at a time; the levels of a two-hour meeting are 72,000 numbers.
     private func logSpeakerLevels(_ m: Meeting, audio: URL?) {
-        guard let audio, let (samples, rate) = try? WAVWriter.readSamples(url: audio), !samples.isEmpty else { return }
-        let frame = max(1, rate / 10)
-        var frameRMS: [Float] = []
-        frameRMS.reserveCapacity(samples.count / frame + 1)
-        var i = 0
-        while i + frame <= samples.count {
-            var e: Float = 0
-            for j in i..<(i + frame) { e += samples[j] * samples[j] }
-            frameRMS.append((e / Float(frame)).squareRoot())
-            i += frame
-        }
-        guard !frameRMS.isEmpty else { return }
+        guard let audio, let frameRMS = try? WAVWriter.levels(url: audio, perSecond: 10), !frameRMS.isEmpty else { return }
         func dB(_ x: Float) -> String { x > 0 ? String(format: "%.0f dBFS", 20 * log10(x)) : "silent" }
         let sorted = frameRMS.sorted()
         let floor = sorted[sorted.count / 10]

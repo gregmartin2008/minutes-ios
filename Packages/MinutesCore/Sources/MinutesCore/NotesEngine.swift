@@ -922,23 +922,161 @@ public struct NotesEngine: Sendable {
 
     /// Keeps only the figures whose numbers all appear in the transcript.
     static func verified(figures: [String], against lines: [String]) -> [String] {
-        let said = Set(lines.flatMap(numbers))
-        return figures.filter { item in
-            let found = numbers(item)
-            return found.isEmpty || found.allSatisfy { said.contains($0) }
-        }
+        let said = saidNumbers(in: lines)
+        let speakers = speakers(in: lines)
+        return figures.filter { item in citedNumbers(in: item, speakers: speakers).allSatisfy { said.contains($0) } }
     }
 
-    /// The paragraph without any sentence whose numbers were not said in the section. Written-out
-    /// numbers ("three to eight") are not checked; a sentence with a digit that the transcript does
-    /// not have anywhere in the section is the model's invention or garbling.
+    /// The paragraph without any sentence that cites a number the section never said (as digits
+    /// or in words: "three to eight million" covers "$3M to $8M"). Such a number is the model's
+    /// invention or garbling, and a wrong number in the notes is worse than a missing sentence.
     static func verifiedParagraph(_ text: String, against lines: [String]) -> String {
-        let said = Set(lines.flatMap(numbers))
+        let said = saidNumbers(in: lines)
         let speakers = speakers(in: lines)
         let kept = sentences(text).filter { sentence in
-            numbers(sentence).allSatisfy { said.contains($0) } && isWrittenUp(sentence, speakers: speakers, lines: lines)
+            citedNumbers(in: sentence, speakers: speakers).allSatisfy { said.contains($0) }
+                && isWrittenUp(sentence, speakers: speakers, lines: lines)
         }
         return kept.joined(separator: " ")
+    }
+
+    /// The numbers a transcript says, written as `numbers` writes them: the digits in what was
+    /// said and the numbers spoken as words. The "Name:" or "Name [12:43]:" that starts a line is
+    /// not something anyone said, so its digits do not count (a clock time on every line would
+    /// otherwise vouch for any number up to 59).
+    static func saidNumbers(in lines: [String]) -> Set<String> {
+        var out = Set<String>()
+        for line in lines {
+            guard let body = spokenPart(of: line) else { continue }
+            out.formUnion(numbers(body))
+            out.formUnion(spokenNumbers(body))
+        }
+        return out
+    }
+
+    /// What was said in a transcript line, without the name (and time) it starts with; nil for a
+    /// line that is a note about the recording ("[Recording paused for 2 min]").
+    static func spokenPart(of line: String) -> String? {
+        let trimmed = line.trimmingCharacters(in: .whitespaces)
+        if trimmed.hasPrefix("[") { return nil }
+        if let close = trimmed.range(of: "]: "), trimmed.distance(from: trimmed.startIndex, to: close.lowerBound) <= 70,
+           trimmed[..<close.lowerBound].contains("[") {
+            return String(trimmed[close.upperBound...])
+        }
+        if let colon = trimmed.firstIndex(of: ":"), trimmed.distance(from: trimmed.startIndex, to: colon) <= 40 {
+            return String(trimmed[trimmed.index(after: colon)...])
+        }
+        return trimmed
+    }
+
+    /// The numbers a sentence of the notes cites. The number in an unnamed speaker's label
+    /// ("Speaker 2 asked about the valuation") is a name, not a figure.
+    static func citedNumbers(in text: String, speakers: Set<String> = []) -> [String] {
+        var t = text
+        for name in speakers where name.contains(where: \.isNumber) { t = t.replacingOccurrences(of: name, with: " ") }
+        for label in ["Speaker ", "Voice "] {
+            var from = t.startIndex
+            while let r = t.range(of: label, range: from..<t.endIndex) {
+                var end = r.upperBound
+                while end < t.endIndex, t[end].isNumber { end = t.index(after: end) }
+                if end > r.upperBound { t.replaceSubrange(r.lowerBound..<end, with: " "); from = r.lowerBound } else { from = r.upperBound }
+            }
+        }
+        return numbers(t)
+    }
+
+    private static let unitWords: [String: Int] = [
+        "zero": 0, "one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8, "nine": 9,
+        "ten": 10, "eleven": 11, "twelve": 12, "thirteen": 13, "fourteen": 14, "fifteen": 15, "sixteen": 16,
+        "seventeen": 17, "eighteen": 18, "nineteen": 19,
+        "first": 1, "second": 2, "third": 3, "fourth": 4, "fifth": 5, "sixth": 6, "seventh": 7, "eighth": 8, "ninth": 9,
+        "tenth": 10, "eleventh": 11, "twelfth": 12, "thirteenth": 13, "fourteenth": 14, "fifteenth": 15, "sixteenth": 16,
+        "seventeenth": 17, "eighteenth": 18, "nineteenth": 19,
+    ]
+    private static let tensWords: [String: Int] = [
+        "twenty": 20, "thirty": 30, "forty": 40, "fifty": 50, "sixty": 60, "seventy": 70, "eighty": 80, "ninety": 90,
+        "twentieth": 20, "thirtieth": 30,
+    ]
+    private static let scaleWords: [String: Double] = ["hundred": 100, "thousand": 1_000, "million": 1_000_000, "billion": 1_000_000_000]
+
+    /// The numbers spoken as words in a text, written as `numbers` writes them. Generous on
+    /// purpose: "five hundred thousand" yields 5, 100, 500, 1000 and 500000, "twenty twenty-six"
+    /// yields 20, 26 and 2026, "two and a half" yields 2, 0.5 and 2.5, so that however the notes
+    /// write a figure that was said, it is found.
+    static func spokenNumbers(_ text: String) -> Set<String> {
+        func key(_ v: Double) -> String { v == v.rounded() && abs(v) < 1e15 ? String(Int64(v)) : String(v) }
+        let words = text.lowercased().split(whereSeparator: { !$0.isLetter }).map(String.init)
+        var out = Set<String>()
+        var i = 0
+        while i < words.count {
+            let w = words[i]
+            switch w {
+            case "half": out.formUnion(["0.5", "50"])
+            case "quarter": out.formUnion(["0.25", "25"])
+            case "dozen": out.insert("12")
+            case "couple", "double", "twice": out.insert("2")
+            case "triple": out.insert("3")
+            case "a", "an":
+                if i + 1 < words.count, scaleWords[words[i + 1]] != nil || words[i + 1] == "dozen" { out.insert("1") }
+            default: break
+            }
+            guard unitWords[w] != nil || tensWords[w] != nil || scaleWords[w] != nil else { i += 1; continue }
+            // A run of number words: its value, and the values along the way.
+            var total = 0.0, current = 0.0
+            var groups: [Int] = []          // the two-digit groups, for years said as "twenty twenty-six"
+            var j = i
+            while j < words.count {
+                let x = words[j]
+                if let u = unitWords[x] {
+                    out.insert(String(u))
+                    current += Double(u)
+                    if let last = groups.last, last >= 20, last % 10 == 0, u < 10, j > i, tensWords[words[j - 1]] != nil {
+                        groups[groups.count - 1] = last + u
+                    } else {
+                        groups.append(u)
+                    }
+                } else if let t = tensWords[x] {
+                    out.insert(String(t))
+                    current += Double(t)
+                    groups.append(t)
+                } else if let scale = scaleWords[x] {
+                    out.insert(key(scale))
+                    if scale == 100 {
+                        current = max(current, 1) * 100
+                    } else {
+                        total += max(current, 1) * scale
+                        out.insert(key(max(current, 1)))
+                        current = 0
+                    }
+                    groups.removeAll()
+                } else if x == "and", j + 1 < words.count, unitWords[words[j + 1]] != nil || tensWords[words[j + 1]] != nil, current > 0 || total > 0 {
+                    // "one hundred and five"
+                } else if x == "point", j + 1 < words.count, let digit = unitWords[words[j + 1]], digit < 10, total == 0 {
+                    // "one point five", "two point seven five"
+                    var fraction = "", k = j + 1
+                    while k < words.count, let d = unitWords[words[k]], d < 10 { fraction += String(d); out.insert(String(d)); k += 1 }
+                    if let v = Double("\(Int(current)).\(fraction)") { out.insert(key(v)) }
+                    j = k
+                    current = 0
+                    break
+                } else {
+                    break
+                }
+                if current > 0 { out.insert(key(current)) }
+                if total + current > 0 { out.insert(key(total + current)) }
+                j += 1
+            }
+            if groups.count == 2, (10...99).contains(groups[0]), (0...99).contains(groups[1]) {
+                out.insert(String(groups[0] * 100 + groups[1]))      // "twenty twenty-six", "nineteen ninety"
+            }
+            // "two and a half", "three and a quarter"
+            if j + 2 < words.count, words[j] == "and", words[j + 1] == "a", total + current > 0 {
+                if words[j + 2] == "half" { out.insert(key(total + current + 0.5)) }
+                if words[j + 2] == "quarter" { out.insert(key(total + current + 0.25)) }
+            }
+            i = max(j, i + 1)
+        }
+        return out
     }
 
     /// Whether a sentence reads as a note rather than as transcript copied through: no run of

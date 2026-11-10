@@ -25,6 +25,12 @@ extension Meeting {
         n.actionItems = n.actionItems.map(fix)
         n.openQuestions = n.openQuestions.map(fix)
         n.figures = n.figures.map(fix)
+        n.details = n.details?.map { d in
+            var d = d
+            d.topic = fix(d.topic)
+            d.text = fix(d.text)
+            return d
+        }
         notes = n
     }
 

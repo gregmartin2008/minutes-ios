@@ -70,7 +70,11 @@ jobs:
           set -o pipefail
           Packages/MinutesSpeech/.build/release/minutes-bench out/meeting.wav --out out/result.json 2>&1 | tee out/bench.log | tail -8
       - name: Score
-        run: python3 scripts/score_meeting.py out/result.json out/meeting.ref.json --json out/score.json | tee out/score.log
+        run: |
+          set -o pipefail
+          # Word error on this test has been 4 to 5%; a build that doubles it is broken. The speaker
+          # scores vary too much between runner images to gate on.
+          python3 scripts/score_meeting.py out/result.json out/meeting.ref.json --json out/score.json --max-wer 0.10 | tee out/score.log
       - name: Publish results
         if: always()
         run: |

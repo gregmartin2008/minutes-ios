@@ -4,32 +4,20 @@ A private meeting recorder for iPhone. Tap **Record meeting**, put the phone on 
 **End meeting** when you are done. Minutes then works out who said what, writes the transcript and
 the notes, and emails both to you. Nothing else is needed after the tap.
 
-Everything except sending the email runs on the phone. No audio or text goes to a transcription
-or AI service, there is no account, and there is nothing to pay for, however much it is used.
+Recording, telling the speakers apart and transcription run on the phone, and the audio never
+leaves it. The notes are written on the phone by Apple's language model or, with a free Gemini
+API key saved in Settings, by Google's model from the transcript text. There is nothing to pay
+for, however much it is used.
 
 This repository holds the app's source and the automation that builds and tests it on GitHub's
 Macs. It contains no keys, passwords, or meeting content.
 
-**Status.** The app builds for iPhone and passes its automated tests, including two full runs in
-the iPhone simulator from a recording to the email arriving (one imported, one fed through the
-app as if it were being recorded), and its speech pipeline has been measured on 190 recorded
-meetings (see "How accurate it is"). On an iPhone 18 Pro Max it has recorded and processed five
-real meetings, up to 1 hour 52 minutes and seven voices, with the notes written by Apple
-Intelligence and every email delivered. Those runs showed that a phone locked after the meeting
-gets almost no processor time, so the work was moved into the meeting itself (see "Using it").
-On a 13-minute meeting the email arrived five seconds after the tap. On a 74-minute meeting the
-previous build started the final step before the meeting-time work had been handed over, redid
-the whole meeting from the recording and ran out of memory with the phone locked; this build
-fixed the order, kept less in memory, logged memory use, and stopped running the vocabulary
-model on the processor during a meeting, which had made the phone hot; two 20-minute meetings
-then went from End to email in 25 seconds. A 37-minute meeting with the phone put to other uses
-right after End took 30 minutes: iOS throttles Apple's language model for an app in the
-background, and the final notes pass kept waiting for it. This build gives that pass 30 seconds
-and then finishes the notes from the sections drafted during the meeting (lists merged as they
-are, summary from their gists, the last few minutes left out and said so). On the phone that
-brought a 28-minute meeting, with the phone put to other uses right after End, to 56 seconds
-from End to email; this build stops waiting on the model as soon as the app is in the
-background, which should bring that under 15 seconds.
+**Status.** The app is in daily use on an iPhone 18 Pro Max (iOS 27), with more than 80 meetings
+recorded, up to 1 hour 52 minutes and seven voices. With the work done during the meeting and
+Gemini writing the notes, the email has been arriving 6 to 25 seconds after **End meeting**.
+Every build passes the unit tests and two full runs in the iPhone simulator from a recording to
+the email arriving, and the speech pipeline has been measured on 154 recorded meetings (see
+"How accurate it is").
 
 ## What it does
 
@@ -44,8 +32,8 @@ background, which should bring that under 15 seconds.
   ("With: Dana, Lee") and the voices that are not recognized get those names from the first
   email. After naming voices in the Speakers tab, the app offers to email the corrected notes.
 - **Transcribes** on the phone, with a time on every passage; tap a time to hear that moment.
-- **Writes notes** with Apple's on-device language model: summary, key points, decisions, action
-  items, open questions, figures and dates. A figure whose numbers were never said is left out.
+- **Writes notes**: a summary, next steps, decisions, and the meeting part by part. A sentence
+  citing a number that was never said is left out. See "What the notes look like" below.
 - **Learns your vocabulary.** Company names, people and the terms of your work that come out wrong
   ("EVITA" for EBITDA) are corrected in every transcript and spelled right in the notes. The common
   finance terms are built in; add your own in Settings > Vocabulary. A second model that listens
@@ -58,8 +46,10 @@ background, which should bring that under 15 seconds.
 
 ## Installing it from a Windows PC
 
-The app is not in the App Store. It is installed with [Sideloadly](https://sideloadly.io), a free
-Windows program that signs an app with your Apple ID and puts it on your iPhone.
+The app is not in the App Store. It is installed with a free Windows program that signs an app
+with your Apple ID and puts it on your iPhone over a cable: [iloader](https://github.com/nab138/iloader),
+which is what this project's own phone is installed with, or [Sideloadly](https://sideloadly.io),
+whose steps follow (iloader's are the same in outline: connect, sign in, pick the `.ipa`).
 
 1. **On the PC**, install Sideloadly, and the iTunes and iCloud installers that its download page
    links to (Apple's own installers, not the Microsoft Store versions, which Sideloadly cannot use).
@@ -101,8 +91,9 @@ Two things, both on the first screen:
    that Google issues for one app and that you can revoke at any time. The Settings screen has the
    two Google links and the three steps. Then tap *Save and send a test email*.
 
-The notes need Apple Intelligence to be turned on (Settings > Apple Intelligence & Siri). Without
-it, Minutes still emails the full transcript and says why there are no notes.
+Without a Gemini key, the notes need Apple Intelligence to be turned on (Settings > Apple
+Intelligence & Siri). Without either, Minutes still emails the full transcript and says why
+there are no notes.
 
 ## Using it
 
@@ -247,7 +238,10 @@ long-meeting runs, so those results are not entirely unseen by that one decision
 **Recognizing people across meetings.** On the 36 NOTSOFAR-1 development meetings (twelve people
 recurring in different rooms), with each person named the first time they appeared, 85 to 88% of
 their later appearances were named correctly, under 1% were given a wrong name, and the rest were
-left as "Speaker N" for the user to name.
+left as "Speaker N" for the user to name. Replayed on the 129 evaluation meetings from the
+voice data the benchmark saved (`scripts/bench/voice_id.py`, with a third of the people held out
+as strangers), 95.4% of later appearances were named correctly and none wrongly, and 0.7% of
+strangers' voices were given a name.
 
 **A clean recording.** A scripted six-voice test meeting with brief talk-overs, built from
 synthetic voices, is transcribed with 4.6% word error, and five of the six voices are told apart.
@@ -258,19 +252,21 @@ nothing has broken.
 tracks up to ten voices directly) scored 73.8% tcpWER on the same 129 meetings, against 48.9% for
 the approach used, so it was not adopted.
 
-**What has not been tested.** All of the above is the speech pipeline running on GitHub's Macs with
-the same models and code as the app. On an actual iPhone, as of this writing, nothing has been
-measured: not the microphone path, not processing time or battery use, not behavior with the phone
-locked, and not the notes, which need Apple Intelligence and cannot run in a simulator.
+**What has not been measured.** All of the above is the speech pipeline running on GitHub's Macs
+with the same models and code as the app. On the iPhone the app is used daily and its logs
+record timings and memory, but accuracy there has not been scored: not the microphone path
+(most real meetings so far were video calls heard through a laptop's speakers, which is harder
+than a room), and not the notes, which are judged by reading them against the transcript.
 
 ## Privacy
 
 - Audio, transcripts, notes and voice profiles are stored only on the iPhone, inside the app.
 - The speech models are downloaded once from Hugging Face; nothing is uploaded.
-- Notes are written by Apple's on-device model (the Foundation Models framework).
-- The only data that leaves the phone is the email itself, sent over an encrypted connection
-  from your Gmail account to the address you chose, and, only when you tap *Add to HubSpot*,
-  the people met and the notes of that meeting, sent to HubSpot's API with your own token.
+- Without a Gemini key, notes are written by Apple's on-device model (the Foundation Models
+  framework), and the only data that leaves the phone is the email itself, sent over an encrypted
+  connection from your Gmail account to the address you chose.
+- Only when you tap *Add to HubSpot*, the people met and the notes of that meeting are sent to
+  HubSpot's API with your own token.
 - The Gmail app password is kept in the iPhone's Keychain.
 - The calendar is only read, on the phone, to find the meeting on now; nothing is written to it.
 - With a Gemini API key saved, the transcript text (not the audio), the line about you from
@@ -285,12 +281,16 @@ locked, and not the notes, which need Apple Intelligence and cannot run in a sim
   is transcribed and much of the other is lost; Minutes marks those passages rather than guessing.
 - **Speaker labels are not perfect**, especially in fast back-and-forth. Check names before
   forwarding a transcript as a record of who said what.
-- **Notes come from a small on-device model.** They are a good first draft. Check figures, names
-  and dates against the transcript, and treat a "decision" as a prompt to confirm, not a record.
+- **Notes are a first draft**, more so when the small on-device model wrote them than when
+  Gemini did. Check figures, names and dates against the transcript, and treat a "decision" as a
+  prompt to confirm, not a record.
 - **Spoken numbers are a weak spot.** "Four hundred, five hundred thousand" can come out as one
   run-together number. Check any figure that matters against the recording.
-- **iOS can refuse the note writing** when the phone is locked. Minutes then emails the transcript
-  right away and sends the notes in a second email the next time it is opened.
+- **iOS can refuse the on-device note writing** when the phone is locked. Minutes then emails
+  the transcript right away and sends the notes in a second email the next time it is opened.
+- **The transcription model is slow to load**: about a minute and a half after the app is opened
+  cold, and several minutes the first time after each install. Recording starts at once and
+  nothing is lost; the transcript catches up.
 - **The seven-day re-signing** described above, unless a paid developer account is used.
 
 ## How it is built
@@ -302,13 +302,18 @@ locked, and not the notes, which need Apple Intelligence and cannot run in a sim
   (the pyannote community-1 pipeline), both running as Core ML models through
   [FluidAudio](https://github.com/FluidInference/FluidAudio), the live analysis that runs during a
   recording, and `minutes-bench`, which runs the same code on recorded meetings for measurement.
-- `Packages/FluidAudio`: a copy of FluidAudio 0.17.7 with one added file, so that the voice
-  analysis can be done in pieces during the meeting and joined at the end (`UPSTREAM.md` there).
+- `Packages/FluidAudio`: a copy of FluidAudio 0.17.7 with three small changes, the main one so
+  that the voice analysis can be done in pieces during the meeting and joined at the end
+  (`UPSTREAM.md` there).
 - `App`: the iPhone app (SwiftUI).
 - `scripts` and `.github/workflows`: the build. Every change is compiled on GitHub's Macs, the unit
   tests run, the mail code is checked against a real mail server, the whole app is run in the iPhone
   simulator from a recording through to the email arriving, and every screen is photographed.
-  `benchmark` workflows measure accuracy on public meeting recordings.
+  `benchmark` workflows measure accuracy on public meeting recordings. Two tools in
+  `scripts/bench` reuse what those runs published, with no models and no Mac: `reassemble`
+  rebuilds every transcript from its words and speaker turns with the current code, so a change
+  to how words are given to speakers can be scored in minutes, and `voice_id.py` replays the
+  meetings to measure recognizing people from one meeting to the next.
 
 FluidAudio is used under the Apache 2.0 license; the speech models and the meeting recordings used
 for measurement (NOTSOFAR-1, AMI, ICSI) under the licenses they are published with. The recordings

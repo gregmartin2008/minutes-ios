@@ -91,15 +91,13 @@ public final class NetworkSMTPTransport: SMTPTransport, @unchecked Sendable {
         let deadline = timeout
         return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Data, Error>) in
             let once = Once(continuation)
-            c.receive(minimumIncompleteLength: 1, maximumLength: 64 * 1024) { data, _, isComplete, error in
+            c.receive(minimumIncompleteLength: 1, maximumLength: 64 * 1024) { data, _, _, error in
                 if let data = data, !data.isEmpty {
                     once.resume(.success(data))
                 } else if let error = error {
                     once.resume(.failure(SMTPError.connection(error.localizedDescription)))
-                } else if isComplete {
-                    once.resume(.success(Data()))
                 } else {
-                    once.resume(.success(Data()))
+                    once.resume(.success(Data()))      // the server closed the connection
                 }
             }
             queue.asyncAfter(deadline: .now() + deadline) {

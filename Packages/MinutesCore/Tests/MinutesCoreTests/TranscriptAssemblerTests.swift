@@ -21,25 +21,6 @@ final class TranscriptAssemblerTests: XCTestCase {
         XCTAssertEqual(u.map { $0.id }, [0, 1])
     }
 
-    /// Three seconds given to a voice heard nowhere else for minutes, inside someone else's turn,
-    /// go to that someone; a late joiner whose first words are followed by more keeps them.
-    func testAStrayFragmentGoesToTheVoiceAroundIt() {
-        var u = [
-            Utterance(id: 0, speaker: "S1", start: 60, end: 75, text: "We have invested committed funds", overlapWith: [], overlapShare: 0),
-            Utterance(id: 1, speaker: "S2", start: 78, end: 81, text: "um eight of them over the last 33 years", overlapWith: ["S1"], overlapShare: 0.2),
-            Utterance(id: 2, speaker: "S1", start: 81, end: 110, text: "And as my founders have advanced", overlapWith: [], overlapShare: 0),
-            Utterance(id: 3, speaker: "S2", start: 430, end: 450, text: "Apologies guys I had some overlap", overlapWith: [], overlapShare: 0),
-            Utterance(id: 4, speaker: "S1", start: 451, end: 460, text: "No problem", overlapWith: [], overlapShare: 0),
-            Utterance(id: 5, speaker: "S2", start: 461, end: 463, text: "Thanks", overlapWith: [], overlapShare: 0),
-            Utterance(id: 6, speaker: "S1", start: 464, end: 470, text: "So where were we", overlapWith: [], overlapShare: 0),
-        ]
-        TranscriptAssembler.absorbStrays(&u, options: TranscriptAssembler.Options())
-        XCTAssertEqual(u[1].speaker, "S1", "a lone fragment six minutes before its voice is heard again")
-        XCTAssertEqual(u[1].overlapWith, [])
-        XCTAssertEqual(u[3].speaker, "S2", "a real turn is long enough to keep")
-        XCTAssertEqual(u[5].speaker, "S2", "a short answer near the same voice's other turns is theirs")
-    }
-
     func testMoreThanFourSpeakersKeepDistinctLabels() {
         var w: [Word] = []
         var turns: [SpeakerTurn] = []

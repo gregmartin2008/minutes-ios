@@ -7,7 +7,6 @@ struct MinutesApp: App {
     @Environment(\.scenePhase) private var scenePhase
 
     init() {
-        BackgroundKeeper.shared.register()
         _model = StateObject(wrappedValue: AppModel(demo: DemoScenario.fromLaunchArguments()))
     }
 

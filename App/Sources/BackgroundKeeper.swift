@@ -22,12 +22,6 @@ final class BackgroundKeeper {
     /// True while a meeting is being processed and this object owns the audio session.
     var isActive: Bool { active }
 
-    /// One line for the diagnostics.
-    var status: String { "background: the microphone is held while a recorded meeting is processed" }
-
-    /// Call once at launch.
-    func register() {}
-
     /// Call when processing starts. `audioHeld` says the recorder is keeping the microphone open,
     /// so no silent audio is needed (and starting it would take the session away).
     func begin(title: String, audioHeld: Bool = false) {
@@ -44,8 +38,6 @@ final class BackgroundKeeper {
             startSilentAudio()
         }
     }
-
-    func update(fraction: Double, title: String, subtitle: String) {}
 
     func end(success: Bool) {
         active = false

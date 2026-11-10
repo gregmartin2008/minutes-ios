@@ -1,8 +1,8 @@
 // swift-tools-version: 6.0
-// A copy of FluidAudio 0.17.7 (https://github.com/FluidInference/FluidAudio, Apache 2.0) with one
-// addition for Minutes: PreparedDiarization+Pieces.swift, which lets the speaker-separation
-// analysis be done in pieces while a meeting is still being recorded and joined at the end.
-// Everything else is as published. See UPSTREAM.md.
+// A copy of FluidAudio 0.17.7 (https://github.com/FluidInference/FluidAudio, Apache 2.0) with three
+// changes for Minutes, listed in UPSTREAM.md: speaker-separation analysis that can be done in
+// pieces during a meeting, a compute-unit choice for the vocabulary model, and model load
+// timings for the diagnostics. Everything else is as published.
 import PackageDescription
 
 let package = Package(

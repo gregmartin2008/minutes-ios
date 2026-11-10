@@ -3,8 +3,8 @@ import FluidAudio
 import Foundation
 import MinutesCore
 
-/// How the speech models are run. The defaults favor accuracy over speed: a meeting is processed
-/// once, after it ends, so a few extra minutes buy better speaker separation.
+/// How the speech models are run. The defaults favor accuracy over speed: the work is spread over
+/// the meeting itself, so the slower, better speaker-separation settings cost no waiting.
 public struct SpeechOptions: Sendable {
     /// Neural Engine and CPU only. The GPU is avoided because iOS does not let an app use it
     /// once the screen is locked, and processing has to survive that.
@@ -79,10 +79,6 @@ public actor SpeechModels {
     /// True when the transcription model is already on this device (no download needed).
     public nonisolated func transcriptionModelIsDownloaded() -> Bool {
         AsrModels.modelsExist(at: AsrModels.defaultCacheDirectory(for: .ultra), version: .ultra)
-    }
-
-    public nonisolated func vocabularyModelIsDownloaded() -> Bool {
-        CtcModels.modelsExist(at: CtcModels.defaultCacheDirectory(for: .ctc110m))
     }
 
     /// Downloads and compiles the models. Safe to call again; it returns quickly once they are present.

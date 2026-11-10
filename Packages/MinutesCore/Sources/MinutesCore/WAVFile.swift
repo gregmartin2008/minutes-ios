@@ -43,7 +43,6 @@ public final class WAVWriter {
     }
 
     public var seconds: Double { Double(dataBytes) / Double(sampleRate * channels * 2) }
-    public var byteCount: Int { dataBytes }
 
     /// Appends samples in the range -1...1, converting to 16-bit.
     public func append(_ samples: UnsafeBufferPointer<Float>) throws {
@@ -138,7 +137,45 @@ public final class WAVWriter {
         return Double(audio) / Double(rate * frame)
     }
 
-    /// Reads a 16-bit PCM WAV written by this class back into samples in -1...1.
+    /// How loud each stretch of a recording written by this class is: the RMS level (0...1) of
+    /// every `1/perSecond` of a second, in order. Read a few seconds at a time, so an hour of
+    /// audio costs a few kilobytes here rather than the hundreds of megabytes `readSamples` needs.
+    public static func levels(url: URL, perSecond: Int = 10) throws -> [Float] {
+        let handle = try FileHandle(forReadingFrom: url)
+        defer { try? handle.close() }
+        guard let head = try handle.read(upToCount: headerSize), head.count == headerSize else { return [] }
+        let channels = max(1, Int(head[22]) | Int(head[23]) << 8)
+        let rate = Int(head[24]) | Int(head[25]) << 8 | Int(head[26]) << 16 | Int(head[27]) << 24
+        guard rate > 0, perSecond > 0 else { return [] }
+        let samplesPerLevel = max(1, rate / perSecond) * channels
+        let bytesPerLevel = samplesPerLevel * 2
+        var out: [Float] = []
+        var carry = Data()
+        while let chunk = try handle.read(upToCount: bytesPerLevel * perSecond * 4), !chunk.isEmpty {
+            carry.append(chunk)
+            let whole = carry.count / bytesPerLevel
+            guard whole > 0 else { continue }
+            carry.withUnsafeBytes { raw in
+                guard let base = raw.baseAddress else { return }
+                for level in 0..<whole {
+                    var energy: Float = 0
+                    let start = level * bytesPerLevel
+                    for i in 0..<samplesPerLevel {
+                        let lo = UInt16(base.load(fromByteOffset: start + i * 2, as: UInt8.self))
+                        let hi = UInt16(base.load(fromByteOffset: start + i * 2 + 1, as: UInt8.self))
+                        let v = Float(Int16(bitPattern: lo | hi << 8)) / 32768
+                        energy += v * v
+                    }
+                    out.append((energy / Float(samplesPerLevel)).squareRoot())
+                }
+            }
+            carry = Data(carry.dropFirst(whole * bytesPerLevel))
+        }
+        return out
+    }
+
+    /// Reads a 16-bit PCM WAV written by this class back into samples in -1...1. The whole
+    /// recording is held in memory: for short files and tests, not for a meeting.
     public static func readSamples(url: URL) throws -> (samples: [Float], sampleRate: Int) {
         let data = try Data(contentsOf: url, options: .mappedIfSafe)
         guard data.count >= headerSize else { return ([], 16_000) }
