@@ -203,9 +203,11 @@ public struct GeminiNotesWriter: CloudNotesWriting {
         said, and where it ended up. Specific, no filler like "met to discuss".
         - nextSteps: only concrete things a named person committed to do after the meeting (send, \
         schedule, introduce, review, revise, submit, call). Owner is the person's name as in the \
-        transcript; "The group" when everyone. Include the deadline if one was said. Not opinions, not \
-        things done during the meeting, not "continue to". Usually 0 to 8.
-        - decisions: only what the people settled between them: a price, a plan, an option chosen. \
+        transcript; "The group" when everyone. Include the deadline if one was said. An agreement to \
+        talk again, reconnect or follow up by some date is a next step, and so is something a person \
+        offered to send. Not opinions, not things done during the meeting, not "continue to". Usually 0 to 8.
+        - decisions: only what the people settled between them: a price, a plan, an option chosen, or \
+        to hold off for now and revisit later. \
         One short sentence each. Not one person's view, and not one person's promise to do something \
         after the meeting, which belongs in nextSteps. Usually 0 to 5.
         - openQuestions: what someone asked or raised that was left without an answer by the end, and \

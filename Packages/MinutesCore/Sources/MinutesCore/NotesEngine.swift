@@ -950,6 +950,41 @@ public struct NotesEngine: Sendable {
             guard let body = spokenPart(of: line) else { continue }
             out.formUnion(numbers(body))
             out.formUnion(spokenNumbers(body))
+            out.formUnion(scaledNumbers(body))
+        }
+        return out
+    }
+
+    /// The same amounts written the other way: "20k" and "5 million" also vouch for 20,000 and
+    /// 5,000,000, and "60,000" for the 60 of "60k". The notes often write a spoken "20k" out in full.
+    static func scaledNumbers(_ text: String) -> [String] {
+        var out: [String] = []
+        func add(_ v: Double) {
+            guard v.isFinite, abs(v) < 1e15 else { return }
+            out.append(v == v.rounded() ? String(Int64(v)) : String(v))
+        }
+        let chars = Array(text.lowercased())
+        var i = 0
+        while i < chars.count {
+            guard chars[i].isNumber, chars[i].isASCII else { i += 1; continue }
+            var j = i
+            while j < chars.count, (chars[j].isNumber && chars[j].isASCII) || ((chars[j] == "," || chars[j] == ".") && j + 1 < chars.count && chars[j + 1].isNumber) { j += 1 }
+            let value = Double(String(chars[i..<j]).replacingOccurrences(of: ",", with: ""))
+            var k = j
+            if k < chars.count, chars[k] == " " { k += 1 }
+            var unit = ""
+            while k < chars.count, chars[k].isLetter { unit.append(chars[k]); k += 1 }
+            if let value {
+                switch unit {
+                case "k", "grand", "thousand": add(value * 1_000)
+                case "m", "mm", "mil", "million": add(value * 1_000_000)
+                case "b", "bn", "billion": add(value * 1_000_000_000)
+                default:
+                    if value >= 1_000, value.truncatingRemainder(dividingBy: 1_000) == 0 { add(value / 1_000) }
+                    if value >= 1_000_000, value.truncatingRemainder(dividingBy: 1_000_000) == 0 { add(value / 1_000_000) }
+                }
+            }
+            i = max(j, i + 1)
         }
         return out
     }

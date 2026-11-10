@@ -462,7 +462,7 @@ public final class MeetingPipeline: @unchecked Sendable {
             let apply = match.confident || ownAndClose
             log.info(String(
                 format: "meeting %@: %@ sounds like %@ (%.2f) — %@", m.id, Meeting.genericName(for: label, among: m.speakerLabels),
-                match.name, match.score, apply ? "named" : "suggested only"))
+                match.name, match.score, apply ? "named" : "suggested only" + (match.rival.map { ", too close to \($0)" } ?? "")))
             if apply {
                 m.speakerNames[label] = match.name
                 m.speakerProfiles[label] = match.profileID
@@ -501,9 +501,32 @@ public final class MeetingPipeline: @unchecked Sendable {
         var given = (m.attendees ?? []).map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
         // Nothing typed and no calendar: a meeting named "Firm - First Last" says who the other person is.
         if given.isEmpty, let fromTitle = Meeting.personFromTitle(m.title) { given = [fromTitle.name] }
-        let typed = given.filter { name in !taken.contains { Person.sameName($0, name) } }
+        var typed = given.filter { name in !taken.contains { Person.sameName($0, name) } }
         guard !typed.isEmpty else { return }
-        let unnamed = m.speakerLabels.filter { m.speakerNames[$0] == nil }
+        var named: [String] = m.typedNamed ?? []
+        // A voice that sounds like someone who was invited is that person: the resemblance and
+        // the invitation are two separate reasons. The name is spelled as it was typed.
+        for label in m.speakerLabels where m.speakerNames[label] == nil {
+            guard let sounds = m.suggestedNames?[label],
+                  let i = typed.firstIndex(where: { Person.sameOrNearlySame($0, sounds) }) else { continue }
+            let name = typed.remove(at: i)
+            m.speakerNames[label] = name
+            m.suggestedNames?.removeValue(forKey: label)
+            named.append(label)
+            log.info("meeting \(m.id): \(Meeting.genericName(for: label, among: m.speakerLabels)) sounds like \(sounds), who was invited; named \(name)")
+        }
+        if m.suggestedNames?.isEmpty == true { m.suggestedNames = nil }
+        m.typedNamed = named.isEmpty ? m.typedNamed : named.sorted()
+        guard !typed.isEmpty else { return }
+        // A voice heard for a few seconds (someone walking past, talk after the call ended) is
+        // not one of the people the names are for.
+        let stats = TranscriptAssembler.stats(m.utterances ?? [])
+        let total = stats.values.reduce(0) { $0 + $1.seconds }
+        let unnamed = m.speakerLabels.filter { label in
+            guard m.speakerNames[label] == nil else { return false }
+            let seconds = stats[label]?.seconds ?? 0
+            return seconds >= 20 || seconds >= 0.03 * total
+        }
         // Every voice already has a name: a leftover invitee did not speak (or did not join).
         guard !unnamed.isEmpty else {
             log.info("meeting \(m.id): every voice is named; \(typed.joined(separator: ", ")) not heard")
@@ -511,7 +534,11 @@ public final class MeetingPipeline: @unchecked Sendable {
         }
         let ownRecognized = m.speakerProfiles.values.contains { $0 == own }
         // Without the person's own voice recognized, one more voice than names is expected: theirs.
-        let spare = ownRecognized ? 0 : 1
+        var spare = ownRecognized ? 0 : 1
+        // A voice profile heard in several meetings would have recognized its owner: when the
+        // voices and the names line up one for one, the owner simply said little or nothing.
+        let ownIsWellKnown = own.flatMap { id in store.loadProfiles().first { $0.id == id } }.map { $0.samples >= 3 } ?? false
+        if spare == 1, ownIsWellKnown, unnamed.count == typed.count { spare = 0 }
         guard unnamed.count == typed.count + spare else {
             log.info("meeting \(m.id): \(typed.count) typed names not applied to \(unnamed.count) unnamed voices")
             m.remarks.append("The names typed for this meeting (\(typed.joined(separator: ", "))) were not applied: \(unnamed.count) voices were not recognized for \(typed.count) names. Name them in the Speakers tab.")
@@ -520,12 +547,10 @@ public final class MeetingPipeline: @unchecked Sendable {
         var candidates = unnamed
         if spare == 1 {
             // The person's own voice is the one that talks the most, in a meeting they recorded.
-            let stats = TranscriptAssembler.stats(m.utterances ?? [])
             if let mine = candidates.max(by: { (stats[$0]?.seconds ?? 0) < (stats[$1]?.seconds ?? 0) }) {
                 candidates.removeAll { $0 == mine }
             }
         }
-        var named: [String] = m.typedNamed ?? []
         for (label, name) in zip(candidates, typed) {
             m.speakerNames[label] = name
             named.append(label)

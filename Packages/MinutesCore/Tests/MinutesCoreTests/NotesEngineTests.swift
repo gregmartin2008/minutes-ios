@@ -502,6 +502,17 @@ final class NotesCleaningTests: XCTestCase {
         XCTAssertEqual(NotesEngine.tidyItem("No-shows will be charged"), "No-shows will be charged")
     }
 
+    /// "30k" said aloud vouches for "$30,000" in the notes, and the other way around.
+    func testAmountsSaidInThousandsAndMillions() {
+        let said = NotesEngine.saidNumbers(in: [
+            "Speaker 1 [15:28]: say a 90k fee, 30k up front with the rest on completion.",
+            "Dana Lee [15:14]: call it a $300,000 job, and the fund is 5 million. Revenue was 12.5mm.",
+        ])
+        for n in ["90000", "30000", "300", "5000000", "12500000", "30", "5"] { XCTAssertTrue(said.contains(n), n) }
+        XCTAssertFalse(said.contains("15"), "the time on the line is not something said")
+        XCTAssertFalse(said.contains("60000"))
+    }
+
     func testNumbersAreNormalized() {
         XCTAssertEqual(NotesEngine.numbers("$12,500 per month and 4.80% by Q2 2027."), ["12500", "4.8", "2", "2027"])
         XCTAssertEqual(NotesEngine.numbers("1.75 million, then 1,750,000"), ["1.75", "1750000"])

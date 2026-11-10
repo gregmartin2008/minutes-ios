@@ -45,6 +45,9 @@ public enum SpeakerMatcher {
         public var score: Float
         /// True when the score cleared the accept threshold and margin, so the name can be applied.
         public var confident: Bool
+        /// The closest competitor that kept a good score from being applied: another known voice
+        /// this one also resembles, or another voice in the meeting that resembles the same person.
+        public var rival: String?
     }
 
     // MARK: Vector helpers
@@ -101,15 +104,25 @@ public enum SpeakerMatcher {
 
             // Runner-up among the other profiles for this voice, and among the other voices for this profile.
             let row = scoresByLabel[pair.label] ?? []
-            var rival: Float = -1
-            for (j, s) in row.enumerated() where j != pair.profile { rival = max(rival, s) }
-            for (label, other) in scoresByLabel where label != pair.label && pair.profile < other.count {
-                rival = max(rival, other[pair.profile])
-            }
             let p = profiles[pair.profile]
+            var rival: Float = -1
+            var rivalName = ""
+            // A second profile of the same person (named twice, or once with a slip of the
+            // keyboard) is not a competitor.
+            for (j, s) in row.enumerated() where j != pair.profile && s > rival && !Person.sameOrNearlySame(profiles[j].name, p.name) {
+                rival = s
+                rivalName = profiles[j].name
+            }
+            for (label, other) in scoresByLabel where label != pair.label && pair.profile < other.count && other[pair.profile] > rival {
+                rival = other[pair.profile]
+                rivalName = "another voice in the meeting"
+            }
             let needed = p.samples <= 1 ? max(thresholds.accept, thresholds.firstAccept) : thresholds.accept
             let confident = pair.score >= needed && pair.score - rival >= thresholds.margin
-            out[pair.label] = Match(profileID: p.id, name: p.name, score: pair.score, confident: confident)
+            let heldBack = pair.score >= needed && !confident
+            out[pair.label] = Match(
+                profileID: p.id, name: p.name, score: pair.score, confident: confident,
+                rival: heldBack ? String(format: "%@ at %.2f", rivalName, rival) : nil)
         }
         return out
     }

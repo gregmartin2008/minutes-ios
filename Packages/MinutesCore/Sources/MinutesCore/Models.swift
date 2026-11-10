@@ -492,6 +492,23 @@ extension Person {
         return (xf.count == 1 && yf.hasPrefix(xf)) || (yf.count == 1 && xf.hasPrefix(yf))
     }
 
+    /// The same name, or one that differs by a slip of the keyboard: "Dana Whitfiel" and "Dana Whitfield".
+    public static func sameOrNearlySame(_ a: String, _ b: String) -> Bool {
+        if sameName(a, b) { return true }
+        let x = Array(a.lowercased().filter { $0.isLetter || $0 == " " }), y = Array(b.lowercased().filter { $0.isLetter || $0 == " " })
+        guard min(x.count, y.count) >= 8, abs(x.count - y.count) <= 2, x.first == y.first else { return false }
+        // Edit distance of two at most.
+        var previous = Array(0...y.count)
+        for i in 1...x.count {
+            var current = [i] + [Int](repeating: 0, count: y.count)
+            for j in 1...y.count {
+                current[j] = min(previous[j] + 1, current[j - 1] + 1, previous[j - 1] + (x[i - 1] == y[j - 1] ? 0 : 1))
+            }
+            previous = current
+        }
+        return previous[y.count] <= 2
+    }
+
     /// Fills what this person is missing from a directory entry with the same name (or email).
     public func completed(from directory: [Person]) -> Person {
         let name = self.name.lowercased()

@@ -275,6 +275,66 @@ final class PipelineTests: XCTestCase {
         XCTAssertEqual(model.sections.first, "Greg: Hold the bid.\nDana Lee: Agreed, Greg.")
     }
 
+    /// Three things that happen in practice: an invited person whose voice is only a near match
+    /// (and whose profile was typed with a slip), voices heard for a few seconds after the call,
+    /// and an owner who said almost nothing.
+    func testInvitedPeopleAreNamedDespiteStrayVoicesAndANearMatch() async throws {
+        var trained = SpeakerMatcher.makeProfile(name: "Greg", embedding: [0, 0, 1])
+        trained.samples = 5
+        let own = trained
+        // Cosine with S2's voice [0,3,0] is 0.6: a suggestion, not a match.
+        let near = SpeakerMatcher.makeProfile(name: "Dana Whitfiel", embedding: [0.8, 0.6, 0])
+        try store.saveProfiles([own, near])
+        func services() -> PipelineServices {
+            let result = modelResult!
+            return PipelineServices(
+                separator: separator, transcriber: transcriber, notesModel: { result }, mailer: mailer, ownProfileID: { own.id })
+        }
+
+        // The near match is the invited person: named, with the invitation's spelling.
+        separator.result = SeparationResult(
+            turns: [SpeakerTurn(speaker: "S1", start: 0, end: 2), SpeakerTurn(speaker: "S2", start: 2.4, end: 5)],
+            voices: ["S1": [0, 0, 2], "S2": [0, 3, 0]])
+        var m = try newMeeting()
+        m.attendees = ["Dana Whitfield"]
+        try store.save(m)
+        let first = await MeetingPipeline(store: store, services: services(), log: Log()).run(m) { _, _ in }
+        XCTAssertEqual(first.speakerNames, ["S1": "Greg", "S2": "Dana Whitfield"])
+        XCTAssertNil(first.suggestedNames)
+        XCTAssertFalse(first.remarks.contains { $0.contains("were not applied") })
+
+        // One real voice the owner's profile does not match, one invited name, and a voice heard
+        // for a moment at the end: the name goes to the real voice.
+        separator.result = SeparationResult(
+            turns: [SpeakerTurn(speaker: "S1", start: 0, end: 60), SpeakerTurn(speaker: "S2", start: 60, end: 61)],
+            voices: ["S1": [1, -1, 0], "S2": [0, 3, 0]])
+        transcriber.words = (0..<60).map { Word(text: "word\($0)", start: Double($0), end: Double($0) + 0.8) }
+            + [Word(text: "Kings.", start: 60.1, end: 60.6)]
+        var n = try newMeeting()
+        n.attendees = ["Lee Sandoval"]
+        try store.save(n)
+        let second = await MeetingPipeline(store: store, services: services(), log: Log()).run(n) { _, _ in }
+        XCTAssertEqual(second.speakerNames["S1"], "Lee Sandoval")
+        XCTAssertNil(second.speakerNames["S2"])
+        XCTAssertFalse(second.remarks.contains { $0.contains("were not applied") })
+    }
+
+    func testNearlyTheSameName() {
+        XCTAssertTrue(Person.sameOrNearlySame("Dana Whitfiel", "Dana Whitfield"))
+        XCTAssertTrue(Person.sameOrNearlySame("Jordan Carver", "J. Carver"))
+        XCTAssertFalse(Person.sameOrNearlySame("Dana Lee", "Dan Lee"))        // too short to call a slip
+        XCTAssertFalse(Person.sameOrNearlySame("Mara Whitlock", "Dana Whitfield"))
+        // A second profile of the same person does not hold a match back; a different person does.
+        let voice: [Float] = [1, 0, 0]
+        var a = SpeakerMatcher.makeProfile(name: "Dana Whitfield", embedding: [1, 0.1, 0]); a.samples = 3
+        let twin = SpeakerMatcher.makeProfile(name: "Dana Whitfiel", embedding: [1, 0, 0.2])
+        let other = SpeakerMatcher.makeProfile(name: "Lee Wong", embedding: [1, 0, 0.2])
+        XCTAssertEqual(SpeakerMatcher.match(voices: ["S1": voice], profiles: [a, twin])["S1"]?.confident, true)
+        let held = SpeakerMatcher.match(voices: ["S1": voice], profiles: [a, other])["S1"]
+        XCTAssertEqual(held?.confident, false)
+        XCTAssertTrue(held?.rival?.hasPrefix("Lee Wong at 0.9") ?? false, held?.rival ?? "")
+    }
+
     /// Typing one's own name (or that of a voice already recognized) does not make the app look
     /// for another voice with that name.
     func testTypedOwnNameIsNotLookingForAnotherVoice() async throws {

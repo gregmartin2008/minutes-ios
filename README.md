@@ -32,7 +32,9 @@ the email arriving, and the speech pipeline has been measured on 154 recorded me
   match closely to be named again. A voice that only resembles someone known is offered as a
   suggestion to confirm, never applied. Type who you are meeting with before you tap Record
   ("With: Dana, Lee") and the voices that are not recognized get those names from the first
-  email. After naming voices in the Speakers tab, the app offers to email the corrected notes.
+  email. A voice that only sounds somewhat like a person who was invited is named
+  as that person, and voices heard for a few seconds (talk after the call has ended) are left
+  out when the names are matched to the voices. After naming voices in the Speakers tab, the app offers to email the corrected notes.
 - **Transcribes** on the phone, with a time on every passage; tap a time to hear that moment.
 - **Writes notes**: a summary, next steps, decisions, and the meeting part by part. A sentence
   citing a number that was never said is left out. See "What the notes look like" below.
@@ -257,6 +259,12 @@ one meeting for the same 0.80 before it names anyone cost 0.2 points.
 synthetic voices, is transcribed with 4.6% word error, and five of the six voices are told apart.
 This runs with every build, through the app itself in the iPhone simulator, as a check that
 nothing has broken.
+
+**Other builds of the recognizer.** On 40 of the evaluation meetings (`benchmark-asr`
+workflow), the Parakeet "ultra" build the app uses got 31.9% of the words wrong, the standard v3
+build 33.4% and the small "redux" build (a third of the size) 36.9%; ultra was also the fastest.
+The "phonon2" build did not run on GitHub's Macs. How long each takes to load on the iPhone
+cannot be measured there.
 
 **An alternative that was tried.** A different kind of speaker-separation model (LS-EEND, which
 tracks up to ten voices directly) scored 73.8% tcpWER on the same 129 meetings, against 48.9% for
