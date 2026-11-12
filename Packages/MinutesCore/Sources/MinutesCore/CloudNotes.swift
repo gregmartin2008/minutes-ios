@@ -96,6 +96,8 @@ public struct GeminiNotesWriter: CloudNotesWriting {
     /// A model to try once, briefly, before `model`; nil for `model` alone.
     public var first: String?
     public var firstTimeout: TimeInterval = 45
+    /// How long to wait before the larger model's second try.
+    public var firstRetryWait: TimeInterval = 4
 
     public var name: String { Self.displayName(model) }
 
@@ -170,21 +172,64 @@ public struct GeminiNotesWriter: CloudNotesWriting {
     public func write(transcript: String, title: String?, spellings: [String], brief: NotesBrief) async throws -> MeetingNotes {
         let prompt = Self.prompt(transcript: transcript, title: title, spellings: spellings, brief: brief)
         if let first, first != model {
-            do {
-                let json = try await generateOnce(prompt: prompt, schema: Self.schema, model: first, timeout: firstTimeout)
-                var notes = try Self.notes(from: json, transcript: transcript)
-                notes.writer = Self.displayName(first)
-                return notes
-            } catch is CancellationError {
-                throw CancellationError()
-            } catch {
-                Log.shared.warn("gemini: \(first) did not write the notes (\(error.localizedDescription)); using \(model)")
+            // The larger model gets two tries a few seconds apart: when it is busy it says so at
+            // once, and a second try often gets through.
+            for attempt in 1...2 {
+                do {
+                    let json = try await generateOnce(prompt: prompt, schema: Self.schema, model: first, timeout: firstTimeout)
+                    var notes = try Self.notes(from: json, transcript: transcript)
+                    notes.writer = Self.displayName(first)
+                    return await withCommitments(notes, transcript: transcript, model: first)
+                } catch is CancellationError {
+                    throw CancellationError()
+                } catch {
+                    let again = attempt == 1 && ((error as? CloudNotesError)?.isTransient ?? false)
+                    Log.shared.warn("gemini: \(first) did not write the notes (\(error.localizedDescription)); \(again ? "trying it once more" : "using \(model)")")
+                    guard again else { break }
+                    try await Task.sleep(nanoseconds: UInt64(firstRetryWait * 1_000_000_000))
+                }
             }
         }
         let json = try await generate(prompt: prompt, schema: Self.schema)
         var notes = try Self.notes(from: json, transcript: transcript)
         notes.writer = name
-        return notes
+        return await withCommitments(notes, transcript: transcript, model: model)
+    }
+
+    /// A long meeting whose notes came back with no next steps and no decisions is asked about
+    /// those alone, once: with the whole set of notes to write, the lighter model tends to leave
+    /// them out. Whatever comes back passes the same checks; a failure leaves the notes as they are.
+    func withCommitments(_ notes: MeetingNotes, transcript: String, model: String) async -> MeetingNotes {
+        guard notes.actionItems.isEmpty, notes.decisions.isEmpty, transcript.split(separator: " ").count >= 1_200 else { return notes }
+        let prompt = """
+        Below is a meeting transcript. Each line is "Name [m:ss]: what they said". Read it for two things only.
+        - nextSteps: what someone said they will do after this meeting, or was asked to do and accepted, \
+        with that person's name as written in the transcript as the owner ("The group" when everyone) \
+        and the deadline if one was said: an offer or message to send, a call to make, something to test, check or prepare, a time to talk again.
+        - decisions: what the people settled by the end, including to try something, to hold off, or not to proceed.
+        Use only what the transcript says, with the figures as spoken. Empty lists if there truly are none.
+
+        TRANSCRIPT
+        \(transcript)
+        """
+        let whole = Self.schema["properties"] as? [String: Any] ?? [:]
+        let schema: [String: Any] = [
+            "type": "OBJECT",
+            "properties": ["nextSteps": whole["nextSteps"] ?? [:], "decisions": whole["decisions"] ?? [:]],
+            "required": ["nextSteps", "decisions"],
+        ]
+        do {
+            let json = try await generateOnce(prompt: prompt, schema: schema, model: model, timeout: 60)
+            let found = try Self.notes(from: json.merging(["summary": notes.summary]) { a, _ in a }, transcript: transcript)
+            var out = notes
+            out.actionItems = found.actionItems
+            out.decisions = found.decisions
+            Log.shared.info("gemini: asked again for next steps and decisions: \(found.actionItems.count) and \(found.decisions.count)")
+            return out
+        } catch {
+            Log.shared.warn("gemini: the second look for next steps did not work (\(error.localizedDescription))")
+            return notes
+        }
     }
 
     // MARK: Prompt and schema

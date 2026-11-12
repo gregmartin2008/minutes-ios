@@ -34,9 +34,27 @@ public enum TranscriptAssembler {
         var support: Double
     }
 
+    /// The recognizer has no "&": it writes "A<unk>M" and "P<unk>L". Between letters the missing
+    /// character is an ampersand; anywhere else the marker is dropped.
+    static func unknownsRepaired(_ text: String) -> String {
+        guard text.contains("<unk>") else { return text }
+        let parts = text.components(separatedBy: "<unk>")
+        var out = parts[0]
+        for part in parts.dropFirst() {
+            if let before = out.last, before.isLetter, let after = part.first, after.isLetter { out += "&" }
+            out += part
+        }
+        return out
+    }
+
     public static func assemble(words: [Word], turns: [SpeakerTurn], options: Options = Options()) -> [Utterance] {
-        let cleaned = words.filter { !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
-            .sorted { $0.start < $1.start }
+        let cleaned = words.map { word -> Word in
+            var w = word
+            w.text = unknownsRepaired(word.text)
+            return w
+        }
+        .filter { !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+        .sorted { $0.start < $1.start }
         guard !cleaned.isEmpty else { return [] }
 
         var attributed = attribute(words: cleaned, turns: turns, options: options)

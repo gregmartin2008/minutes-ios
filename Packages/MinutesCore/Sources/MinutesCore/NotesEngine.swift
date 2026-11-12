@@ -975,6 +975,15 @@ public struct NotesEngine: Sendable {
             var unit = ""
             while k < chars.count, chars[k].isLetter { unit.append(chars[k]); k += 1 }
             if let value {
+                // "16 and a half", and "16. 5" where the recognizer broke the figure in two.
+                let rest = String(chars[j..<min(chars.count, j + 22)])
+                if rest.hasPrefix(" and a half") || rest.hasPrefix(" and one half") || rest.hasPrefix(" and half") { add(value + 0.5) }
+                if rest.hasPrefix(" and a quarter") || rest.hasPrefix(" and one quarter") { add(value + 0.25) }
+                if rest.hasPrefix(" and three quarters") { add(value + 0.75) }
+                if value == value.rounded(), rest.count >= 3, rest.hasPrefix(". "), let digit = rest.dropFirst(2).first, digit.isNumber,
+                   !(rest.dropFirst(3).first?.isNumber ?? false) {
+                    add(value + Double(String(digit))! / 10)
+                }
                 switch unit {
                 case "k", "grand", "thousand": add(value * 1_000)
                 case "m", "mm", "mil", "million": add(value * 1_000_000)

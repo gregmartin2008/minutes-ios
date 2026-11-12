@@ -513,6 +513,19 @@ final class NotesCleaningTests: XCTestCase {
         XCTAssertFalse(said.contains("60000"))
     }
 
+    /// "16 and a half" and a figure the recognizer broke in two ("16. 5 plus eight").
+    func testHalvesAndBrokenFigures() {
+        let said = NotesEngine.saidNumbers(in: [
+            "Dana Lee [1:02:56]: Do I go 16 and a half plus eight? Or 7 and a quarter.",
+            "Dana Lee [1:03:22]: 16. 5 plus eight is 24. Then 12. 16 percent on the other.",
+        ])
+        for n in ["16.5", "7.25", "8", "24", "16"] { XCTAssertTrue(said.contains(n), n) }
+        XCTAssertFalse(said.contains("12.1"), "two figures either side of a full stop are not one")
+        XCTAssertEqual(TranscriptAssembler.unknownsRepaired("A<unk>M"), "A&M")
+        XCTAssertEqual(TranscriptAssembler.unknownsRepaired("<unk>"), "")
+        XCTAssertEqual(TranscriptAssembler.unknownsRepaired("so<unk>,"), "so,")
+    }
+
     func testNumbersAreNormalized() {
         XCTAssertEqual(NotesEngine.numbers("$12,500 per month and 4.80% by Q2 2027."), ["12500", "4.8", "2", "2027"])
         XCTAssertEqual(NotesEngine.numbers("1.75 million, then 1,750,000"), ["1.75", "1750000"])

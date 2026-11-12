@@ -28,6 +28,10 @@ final class CloudNotesTests: XCTestCase {
             ],
         ]
 
+        /// What to answer the second generate request with, when set.
+        var second: [String: Any]?
+        private var generated = 0
+
         /// Statuses to answer with before `status`, one per request, for overload tests.
         var first: [Int] = []
 
@@ -47,7 +51,10 @@ final class CloudNotesTests: XCTestCase {
             if status != 200 {
                 return (try JSONSerialization.data(withJSONObject: ["error": ["message": "API key not valid", "status": "INVALID_ARGUMENT"]]), status)
             }
-            let text = String(decoding: try JSONSerialization.data(withJSONObject: answer), as: UTF8.self)
+            generated += 1
+            let body = String(decoding: request.httpBody ?? Data(), as: UTF8.self)
+            let object = body.contains("two things only") ? (second ?? answer) : answer
+            let text = String(decoding: try JSONSerialization.data(withJSONObject: object), as: UTF8.self)
             let reply: [String: Any] = ["candidates": [["content": ["parts": [["text": text]]], "finishReason": "STOP"]]]
             return (try JSONSerialization.data(withJSONObject: reply), 200)
         }
@@ -146,14 +153,16 @@ final class CloudNotesTests: XCTestCase {
 
     func testOverloadIsRetriedThenGivenUpOn() async throws {
         let fake = Fake()
-        fake.first = [503, 503]
+        fake.first = [503, 503, 503]
         var writer = GeminiNotesWriter(apiKey: "k", transport: { try fake.handle($0) })
         writer.retryWaits = [0.01, 0.01, 0.01]
+        writer.firstRetryWait = 0.01
         let notes = try await writer.write(transcript: transcript, title: nil, spellings: [])
         XCTAssertEqual(notes.title, "Veltrona offer options")
-        // The larger model is tried once; the usual one takes over and is retried.
+        // The larger model is tried twice; the usual one takes over and is retried.
         XCTAssertEqual(fake.requests.map { $0.url!.lastPathComponent }, [
-            "gemini-3.8-flash:generateContent", "gemini-3.5-flash-lite:generateContent", "gemini-3.5-flash-lite:generateContent",
+            "gemini-3.8-flash:generateContent", "gemini-3.8-flash:generateContent",
+            "gemini-3.5-flash-lite:generateContent", "gemini-3.5-flash-lite:generateContent",
         ])
         XCTAssertEqual(notes.writer, "Gemini 3.5 Flash Lite")
 
@@ -165,14 +174,38 @@ final class CloudNotesTests: XCTestCase {
         XCTAssertEqual(fake.requests.last?.url?.lastPathComponent, "gemini-3.8-pro:generateContent")
         fake.requests.removeLast()
 
-        fake.first = [503, 503, 503, 503, 503]
+        fake.first = [503, 503, 503, 503, 503, 503]
         do {
             _ = try await writer.write(transcript: transcript, title: nil, spellings: [])
             XCTFail("expected an error")
         } catch {
             XCTAssertTrue(error.localizedDescription.hasPrefix("Gemini is overloaded right now"), error.localizedDescription)
         }
-        XCTAssertEqual(fake.requests.count, 8)
+        XCTAssertEqual(fake.requests.count, 10)
+    }
+
+    /// A long meeting whose notes come back with no next steps and no decisions is asked about
+    /// those alone, once, and the answer passes the same checks.
+    func testALongMeetingWithNoNextStepsIsAskedAgain() async throws {
+        let fake = Fake()
+        let commitments = fake.answer
+        fake.answer["nextSteps"] = [[String: Any]]()
+        fake.answer["decisions"] = [String]()
+        fake.second = ["nextSteps": commitments["nextSteps"]!, "decisions": ["Test an offer of $16.5 million.", "Pay $99 million."]]
+        let long = transcript + "\nGreg Martin [1:05:38]: I think it's 16 and a half plus eight. " + String(repeating: "and so on ", count: 500)
+        let writer = GeminiNotesWriter(apiKey: "k", transport: { try fake.handle($0) })
+        let notes = try await writer.write(transcript: long, title: nil, spellings: [])
+        XCTAssertEqual(fake.requests.count, 2)
+        XCTAssertEqual(notes.actionItems.count, 3)
+        XCTAssertEqual(notes.decisions, ["Test an offer of $16.5 million."], "a figure never said is still left out")
+        XCTAssertEqual(notes.details?.count, 2)
+        let asked = String(decoding: fake.requests[1].httpBody ?? Data(), as: UTF8.self)
+        XCTAssertTrue(asked.contains("Read it for two things only"))
+
+        // A short meeting is not asked again.
+        fake.requests = []
+        _ = try await writer.write(transcript: transcript, title: nil, spellings: [])
+        XCTAssertEqual(fake.requests.count, 1)
     }
 
     func testTheCheckListsModelsRatherThanGenerating() async throws {
