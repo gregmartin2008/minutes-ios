@@ -51,9 +51,10 @@ final class BackgroundKeeper {
     private(set) var lingering = false
 
     /// Keeps the app running after a meeting has been processed, so that notes Gemini was too
-    /// busy to write can be tried again with the phone locked. Call it before the microphone is
-    /// let go: iOS does not let an app in the background start playing from nothing.
-    func linger() {
+    /// busy to write can be tried again with the phone locked. With `microphoneHeld`, the caller
+    /// keeps the microphone it already holds and that alone keeps the app running: on the phone,
+    /// silent audio would not start from behind a held microphone ("insufficient priority").
+    func linger(microphoneHeld: Bool) {
         guard !lingering else { return }
         lingering = true
         if backgroundToken == .invalid {
@@ -61,7 +62,7 @@ final class BackgroundKeeper {
                 self?.endToken()
             }
         }
-        startSilentAudio()
+        if !microphoneHeld { startSilentAudio() }
     }
 
     func stopLingering() {

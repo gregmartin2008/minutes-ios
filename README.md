@@ -141,7 +141,8 @@ there are no notes.
   Settings is used alone. If Gemini is overloaded at the moment a meeting ends, the transcript
   is emailed at once and Minutes keeps trying while it is open, sending the notes in a second
   email when Gemini gets through; if it never does, or the key is refused, the iPhone writes
-  them. For the first quarter of an hour those tries go on with the phone locked. The foot of
+  them. For the first ten minutes those tries go on with the phone locked (the microphone dot
+  stays on for that time; nothing is recorded). The foot of
   the notes names which model wrote them. When the transcript itself gives away who an unnamed
   voice is ("Thanks, Dana"), the Speakers tab offers that name with the line it came from;
   nothing is named without a tap. A line about you and your firm, typed once in Settings, goes

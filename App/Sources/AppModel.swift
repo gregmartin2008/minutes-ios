@@ -186,9 +186,10 @@ final class AppModel: ObservableObject {
     /// Until when the app keeps itself running in the background to try Gemini again.
     private var cloudLingerUntil: Date?
 
-    /// For a quarter of an hour after a meeting whose notes Gemini was too busy to write, the
-    /// app keeps itself running (silent audio, as for an imported recording) so the later tries
-    /// happen with the phone locked. After that they wait for Minutes to be opened.
+    /// For ten minutes after a meeting whose notes Gemini was too busy to write, the app keeps
+    /// itself running so the later tries happen with the phone locked: it keeps the microphone it
+    /// held for processing (nothing is recorded; the orange dot stays on), or plays silence when
+    /// there is no microphone to keep. After that the tries wait for Minutes to be opened.
     private func updateCloudLinger() {
         let waiting = meetings.contains {
             $0.status == .done && $0.cloudPending == true && ($0.cloudRetries ?? 0) < MeetingPipeline.cloudRetryLimit
@@ -197,18 +198,19 @@ final class AppModel: ObservableObject {
             // Not while a meeting is being processed with the microphone held: that run decides
             // again when it ends.
             if !BackgroundKeeper.shared.lingering, !BackgroundKeeper.shared.isActive {
-                Log.shared.info("staying awake until \(Render.time(until)) to try Gemini again")
-                BackgroundKeeper.shared.linger()
+                Log.shared.info("staying awake until \(Render.time(until)) to try Gemini again\(recorder.holding ? ", with the microphone kept (nothing is recorded)" : "")")
+                BackgroundKeeper.shared.linger(microphoneHeld: recorder.holding)
             }
         } else {
             if BackgroundKeeper.shared.lingering { Log.shared.info("no longer staying awake for Gemini") }
             if !waiting { cloudLingerUntil = nil }
             BackgroundKeeper.shared.stopLingering()
+            if recording == nil, !BackgroundKeeper.shared.isActive { recorder.release() }
         }
     }
 
     /// Notes that Gemini could not write at the time (overloaded) are tried again every few
-    /// minutes, and sent when it gets through: for the first quarter of an hour with the phone
+    /// minutes, and sent when it gets through: for the first ten minutes with the phone
     /// locked too, after that while the app is open and whenever it comes to the foreground.
     func retryCloudNotes() async {
         guard !isDemo else { return }
@@ -838,9 +840,9 @@ final class AppModel: ObservableObject {
             BackgroundKeeper.shared.end(success: allSucceeded)
             UIApplication.shared.isIdleTimerDisabled = false
         }
-        // Decided before the microphone is let go, so the silent audio takes over a live session.
+        // Decided before the microphone is let go: while Gemini is being tried again, it is kept.
         updateCloudLinger()
-        if recording == nil { recorder.release(keepingSession: BackgroundKeeper.shared.lingering) }
+        if recording == nil, !BackgroundKeeper.shared.lingering { recorder.release() }
         // The models stay loaded for the next meeting; a memory warning releases them.
     }
 
@@ -858,7 +860,7 @@ final class AppModel: ObservableObject {
     private func announce(_ m: Meeting) {
         Log.shared.info("meeting \(m.id) ended run as \(m.status.rawValue) at \(m.stage.rawValue)")
         if m.cloudPending == true {
-            cloudLingerUntil = Date().addingTimeInterval(15 * 60)
+            cloudLingerUntil = Date().addingTimeInterval(10 * 60)
             Task { await retryCloudNotes() }
         }
         guard !isDemo, UIApplication.shared.applicationState != .active else { return }
