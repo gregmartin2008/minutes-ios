@@ -198,7 +198,7 @@ public struct GeminiNotesWriter: CloudNotesWriting {
 
     /// A long meeting whose notes came back with no next steps and no decisions is asked about
     /// those alone, once: with the whole set of notes to write, the lighter model tends to leave
-    /// them out. Whatever comes back passes the same checks; a failure leaves the notes as they are.
+    /// them out. A failure leaves the notes as they are.
     func withCommitments(_ notes: MeetingNotes, transcript: String, model: String) async -> MeetingNotes {
         guard notes.actionItems.isEmpty, notes.decisions.isEmpty, transcript.split(separator: " ").count >= 1_200 else { return notes }
         let prompt = """
