@@ -28,6 +28,17 @@ struct SMTPMailer: MailSending {
         }
     }
 
+    /// The diagnostics file, sent to the person's own address like a meeting's notes.
+    static func sendDiagnostics(_ file: URL, summary: String, settings: MailSettings, password: String) async throws {
+        let data = try Data(contentsOf: file)
+        let message = EmailMessage(
+            from: settings.address, fromName: "Minutes", to: settings.recipients,
+            subject: "Minutes diagnostics",
+            text: "The diagnostics file is attached.\n\n\(summary)",
+            attachments: [.init(filename: "Minutes diagnostics.txt", mimeType: "text/plain; charset=utf-8", data: data)])
+        try await deliver(message, settings: settings, password: password)
+    }
+
     /// A short message to prove the account settings work.
     static func sendTest(settings: MailSettings, password: String) async throws {
         let message = EmailMessage(

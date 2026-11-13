@@ -1064,6 +1064,19 @@ final class AppModel: ObservableObject {
         }
     }
 
+    /// Emails the diagnostics file to the person's own address. Returns nil on success.
+    func emailDiagnostics() async -> String? {
+        guard AppSettings.shared.mailIsConfigured else { return "Set up email first." }
+        guard let file = diagnosticsFile() else { return "The diagnostics file could not be written." }
+        do {
+            try await SMTPMailer.sendDiagnostics(
+                file, summary: Self.deviceSummary(), settings: AppSettings.shared.mail, password: AppSettings.shared.mailPassword)
+            return nil
+        } catch {
+            return MeetingPipeline.describe(error)
+        }
+    }
+
     /// Sends a finished meeting again, for example after naming the speakers. Returns nil on success.
     func sendEmail(_ id: String) async -> String? {
         guard var m = meeting(id), m.utterances != nil else { return "This meeting has no transcript yet." }

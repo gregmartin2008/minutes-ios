@@ -463,6 +463,90 @@ extension Meeting {
 }
 
 extension Person {
+    /// The names a meeting's title offers: full names ("Pat Lee (Acme) / Greg Marsh (Us)"), and
+    /// first names listed together in brackets ("Us/Acme (Greg/Jacob) Intro").
+    public static func titleNames(_ title: String) -> (full: [String], first: [String]) {
+        var full: [String] = [], first: [String] = []
+        var outside = "", depth = 0, inside = ""
+        for c in title {
+            if c == "(" { depth += 1; if depth == 1 { inside = ""; continue } }
+            if c == ")" , depth > 0 {
+                depth -= 1
+                if depth == 0 {
+                    let pieces = inside.split(separator: "/").map { $0.trimmingCharacters(in: .whitespaces) }
+                    if pieces.count >= 2, pieces.allSatisfy({ isNameWord($0) }) { first += pieces }
+                    outside += " | "
+                    continue
+                }
+            }
+            if depth > 0 { inside.append(c) } else { outside.append(c) }
+        }
+        var segments = [outside]
+        for separator in [" | ", " / ", " - ", "<>", ":", " with ", " and ", " & "] {
+            segments = segments.flatMap { $0.components(separatedBy: separator) }
+        }
+        for segment in segments {
+            let words = segment.split(separator: " ").map(String.init)
+            if (2...3).contains(words.count), words.allSatisfy({ isNameWord($0) }) { full.append(words.joined(separator: " ")) }
+        }
+        return (full, first)
+    }
+
+    private static let notNames: Set<String> = [
+        "intro", "call", "meeting", "catchup", "catch", "reconnect", "discussion", "review", "update", "sync", "project",
+        "capital", "partners", "group", "holdings", "management", "advisors", "equity", "credit", "investment",
+        "investments", "ventures", "fund", "company", "industries", "research", "allocation", "industry", "offer", "board",
+    ]
+
+    private static func isNameWord(_ word: String) -> Bool {
+        guard (2...14).contains(word.count), word.allSatisfy({ $0.isLetter || $0 == "'" || $0 == "-" }),
+              word.first?.isUppercase == true, word.dropFirst().contains(where: \.isLowercase),
+              !notNames.contains(word.lowercased()) else { return false }
+        return true
+    }
+
+    /// The name a title gives for the mailbox before the "@" of an address: "pm" is Pat Merrick
+    /// when the title names him, and "jvigil" is Jacob Vigil when the title lists a Jacob.
+    public static func name(forMailbox mailbox: String, title: String) -> String? {
+        let local = mailbox.lowercased().filter(\.isLetter)
+        guard local.count >= 2 else { return nil }
+        let names = titleNames(title)
+        for name in names.full {
+            let words = name.lowercased().split(separator: " ").map(String.init)
+            guard let f = words.first, let l = words.last else { continue }
+            let forms = [words.map { String($0.prefix(1)) }.joined(), f.prefix(1) + l, f, f + l, l, f + l.prefix(1)]
+            if forms.contains(local) { return name }
+        }
+        for name in names.first {
+            let f = name.lowercased()
+            if local == f { return name }
+            let rest = local.hasPrefix(f) ? String(local.dropFirst(f.count)) : (local.first == f.first ? String(local.dropFirst()) : "")
+            if rest.count >= 3 { return name + " " + rest.prefix(1).uppercased() + rest.dropFirst() }
+        }
+        return nil
+    }
+
+    /// Gives the people a calendar listed by address alone the names the meeting's title has for
+    /// them. `guessed` are the positions whose names were worked out from the address (or are
+    /// still the address); names from Contacts or the People list are left alone. A title name
+    /// that would fit two people is given to neither.
+    public static func named(fromTitle title: String, people: [Person], guessed: Set<Int>) -> [Person] {
+        var found: [Int: String] = [:]
+        for i in guessed.sorted() where people.indices.contains(i) {
+            guard let email = people[i].email, let at = email.firstIndex(of: "@"),
+                  let name = name(forMailbox: String(email[..<at]), title: title) else { continue }
+            found[i] = name
+        }
+        var out = people
+        for (i, name) in found {
+            let first = name.split(separator: " ").first.map(String.init) ?? name
+            let rivals = found.filter { $0.key != i && ($0.value.split(separator: " ").first.map(String.init) ?? "") == first }
+            let taken = people.enumerated().contains { $0.offset != i && sameName($0.element.name, name) }
+            if rivals.isEmpty, !taken { out[i].name = name }
+        }
+        return out
+    }
+
     /// "Dalton, Jack" → "Jack Dalton"; "DALTON, JACK" → "Jack Dalton". Calendars from corporate
     /// directories list people last name first; the "With" list and the voices need first-last.
     public static func naturalName(_ raw: String) -> String {

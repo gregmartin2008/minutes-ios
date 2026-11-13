@@ -19,6 +19,9 @@ struct SettingsView: View {
     @State private var languageModel = ""
     @State private var languageModelOK = true
     @State private var share: ShareItem?
+    @State private var diagnosticsSending = false
+    @State private var diagnosticsResult: String?
+    @State private var diagnosticsFailed = false
     @State private var confirmRemoveMail = false
     @State private var loaded = false
 
@@ -566,7 +569,28 @@ struct SettingsView: View {
 
     private var aboutSection: some View {
         Section {
-            Button("Share diagnostics") {
+            Button {
+                diagnosticsSending = true
+                diagnosticsResult = nil
+                Task {
+                    let problem = await model.emailDiagnostics()
+                    diagnosticsFailed = problem != nil
+                    diagnosticsResult = problem ?? "Sent to \(AppSettings.shared.mail.recipients.joined(separator: ", "))."
+                    diagnosticsSending = false
+                }
+            } label: {
+                HStack {
+                    Text("Email diagnostics to me")
+                    if diagnosticsSending { Spacer(); ProgressView() }
+                }
+            }
+            .disabled(diagnosticsSending || !model.mailReady)
+            if let diagnosticsResult {
+                Text(diagnosticsResult)
+                    .font(.footnote)
+                    .foregroundStyle(diagnosticsFailed ? Theme.record : Theme.ok)
+            }
+            Button("Share diagnostics another way") {
                 if let url = model.diagnosticsFile() { share = ShareItem(url: url) }
             }
         } header: {

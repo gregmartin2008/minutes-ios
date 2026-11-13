@@ -319,6 +319,28 @@ final class PipelineTests: XCTestCase {
         XCTAssertFalse(second.remarks.contains { $0.contains("were not applied") })
     }
 
+    /// People a calendar lists by address alone get the names the meeting's title has for them.
+    func testTitlesNameInviteesListedByAddress() {
+        XCTAssertEqual(Person.titleNames("Pat Lowell (Acme2) / Greg Marsh (Meridyan)").full, ["Pat Lowell", "Greg Marsh"])
+        XCTAssertEqual(Person.titleNames("Meridyan/Birch (Greg/Jonah) MWISC Intro").first, ["Greg", "Jonah"])
+        XCTAssertEqual(Person.titleNames("Capital Allocation / Industry Research").full, [])
+        XCTAssertEqual(Person.name(forMailbox: "pl", title: "Pat Lowell (Acme2) / Greg Marsh (Meridyan)"), "Pat Lowell")
+        XCTAssertEqual(Person.name(forMailbox: "plowell", title: "Intro: Pat Lowell - Greg Marsh"), "Pat Lowell")
+        XCTAssertEqual(Person.name(forMailbox: "jwhitby", title: "Meridyan/Birch (Greg/Jonah) MWISC Intro"), "Jonah Whitby")
+        XCTAssertNil(Person.name(forMailbox: "swhitby", title: "Meridyan/Birch (Greg/Jonah) MWISC Intro"))
+        XCTAssertNil(Person.name(forMailbox: "info", title: "Pat Lowell (Acme2) / Greg Marsh (Meridyan)"))
+
+        // Only guessed names change; a name that would fit two people goes to neither.
+        let people = [
+            Person(name: "J. Carver", email: "jcarver@meridyancap.example"),
+            Person(name: "Jwhitby", email: "jwhitby@birch.example"),
+        ]
+        let named = Person.named(fromTitle: "Meridyan/Birch (Greg/Jonah) MWISC Intro", people: people, guessed: [1])
+        XCTAssertEqual(named.map(\.name), ["J. Carver", "Jonah Whitby"])
+        let both = Person.named(fromTitle: "Meridyan/Birch (Greg/Jonah) MWISC Intro", people: people, guessed: [0, 1])
+        XCTAssertEqual(both.map(\.name), ["J. Carver", "Jwhitby"])
+    }
+
     func testNearlyTheSameName() {
         XCTAssertTrue(Person.sameOrNearlySame("Dana Whitfiel", "Dana Whitfield"))
         XCTAssertTrue(Person.sameOrNearlySame("Jordan Carver", "J. Carver"))

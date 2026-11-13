@@ -183,7 +183,10 @@ public struct GeminiNotesWriter: CloudNotesWriting {
                 } catch is CancellationError {
                     throw CancellationError()
                 } catch {
-                    let again = attempt == 1 && ((error as? CloudNotesError)?.isTransient ?? false)
+                    // Only when it said at once that it is busy: after a timeout a second try
+                    // would cost the best part of another minute.
+                    let status = (error as? CloudNotesError)?.status
+                    let again = attempt == 1 && (status == 503 || status == 429)
                     Log.shared.warn("gemini: \(first) did not write the notes (\(error.localizedDescription)); \(again ? "trying it once more" : "using \(model)")")
                     guard again else { break }
                     try await Task.sleep(nanoseconds: UInt64(firstRetryWait * 1_000_000_000))

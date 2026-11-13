@@ -81,6 +81,7 @@ final class MeetingCalendar {
 
     private static func convert(_ event: EKEvent) -> CalendarEvent {
         var people: [Person] = []
+        var guessed: Set<Int> = []
         func add(_ participant: EKParticipant?, organizer: Bool) {
             guard let participant, !participant.isCurrentUser else { return }
             switch participant.participantType {
@@ -97,6 +98,7 @@ final class MeetingCalendar {
             // Google calendars often list an invitee by address only. The People list knows
             // some of them; "first.last@" gives a name; a bare address stays an address.
             var card: Person?
+            var wasGuessed = false
             if name.isEmpty || name.contains("@") {
                 if let email, let known = AppSettings.shared.directory.first(where: { $0.email?.lowercased() == email.lowercased() }) {
                     name = known.name
@@ -106,8 +108,10 @@ final class MeetingCalendar {
                     Log.shared.info("calendar: \(email) is \(fromContacts.name) in Contacts")
                 } else if let email, let derived = Self.nameFromAddress(email) {
                     name = derived
+                    wasGuessed = true
                 } else {
                     name = email ?? ""
+                    wasGuessed = true
                 }
             }
             let shown = Person.naturalName(name)
@@ -117,12 +121,15 @@ final class MeetingCalendar {
                 if people[i].email == nil { people[i].email = email }
                 return
             }
+            if wasGuessed { guessed.insert(people.count) }
             people.append(Person(
                 name: shown, email: email, organizer: organizer ? true : nil, company: card?.company, title: card?.title))
         }
         add(event.organizer, organizer: true)
         for participant in event.attendees ?? [] { add(participant, organizer: false) }
         let title = (event.title ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        // A name guessed from an address gives way to the one the meeting's title has for it.
+        people = Person.named(fromTitle: title, people: people, guessed: guessed)
         return CalendarEvent(
             id: event.eventIdentifier ?? UUID().uuidString, title: title.isEmpty ? "Calendar meeting" : title,
             start: event.startDate, end: event.endDate, people: people, calendar: event.calendar?.title)
