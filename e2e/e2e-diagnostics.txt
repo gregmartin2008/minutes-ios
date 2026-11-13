@@ -1,0 +1,31 @@
+Minutes diagnostics
+Minutes 1.30, arm64, iOS 26.5, 7168 MB RAM, bundle app.minutes.recorder
+models ready: true, mail configured: true, voices: 0, meetings: 1
+language model: available
+- 469C80DC done/finished 115s speakers=5 assemble=0s email=1s separateSpeakers=48s transcribe=27s writeNotes=4s Apple's language model couldn't write the notes: it reported an error Minutes doesn't recognize.
+
+--- log ---
+2026-11-13 18:21:41.511 [info] launch: Minutes 1.30, arm64, iOS 26.5, 7168 MB RAM, bundle app.minutes.recorder
+2026-11-13 18:21:41.626 [info] calendar: on, access not asked yet
+2026-11-13 18:21:41.762 [info] app came to the foreground
+2026-11-13 18:22:08.917 [info] transcription model ready in 25.3s (files 25.3s, load 0.0s; Preprocessor 0s, Encoder 7s, Decoder 0s, JointDecisionv3 0s, Preprocessor 0s, Encoder 0s, Decoder 0s, JointDecisionv3 0s; caches 1169 MB, newest 0 min ago)
+2026-11-13 18:22:16.470 [info] speaker-separation models ready in 7.6s
+2026-11-13 18:22:20.673 [info] transcription model warmed up in 4.2s
+2026-11-13 18:22:20.675 [info] speech models downloaded
+2026-11-13 18:22:21.081 [info] imported 115s of audio as meeting 469C80DC-4A61-4ED9-A913-0116C8BDA6E3
+2026-11-13 18:22:23.058 [info] meeting 469C80DC-4A61-4ED9-A913-0116C8BDA6E3: starting separateSpeakers
+2026-11-13 18:23:10.719 [info] meeting 469C80DC-4A61-4ED9-A913-0116C8BDA6E3: finished separateSpeakers in 47.7s
+2026-11-13 18:23:10.726 [info] meeting 469C80DC-4A61-4ED9-A913-0116C8BDA6E3: starting transcribe
+2026-11-13 18:23:37.472 [info] meeting 469C80DC-4A61-4ED9-A913-0116C8BDA6E3: finished transcribe in 26.7s
+2026-11-13 18:23:37.473 [info] meeting 469C80DC-4A61-4ED9-A913-0116C8BDA6E3: starting assemble
+2026-11-13 18:23:37.913 [info] meeting 469C80DC-4A61-4ED9-A913-0116C8BDA6E3: voice levels Speaker 1 -17 dBFS, Speaker 2 -20 dBFS, Speaker 3 -18 dBFS, Speaker 4 -18 dBFS, Speaker 5 -18 dBFS; room floor -60 dBFS
+2026-11-13 18:23:37.917 [info] meeting 469C80DC-4A61-4ED9-A913-0116C8BDA6E3: finished assemble in 0.4s
+2026-11-13 18:23:37.917 [info] meeting 469C80DC-4A61-4ED9-A913-0116C8BDA6E3: starting writeNotes
+2026-11-13 18:23:42.307 [error] language model error: Error Domain=FoundationModels.LanguageModelSession.GenerationError Code=-1 "(null)" UserInfo={NSMultipleUnderlyingErrorsKey=(
+    "Error Domain=FoundationModels.LanguageModelSession.GenerationError Code=-1 \"(null)\" UserInfo={NSMultipleUnderlyingErrorsKey=(\n    \"Error Domain=ModelManagerServices.ModelManagerError Code=1026 \\\"(null)\\\" UserInfo={NSMultipleUnderlyingErrorsKey=(\\n)}\"\n)}"
+)}
+2026-11-13 18:23:42.329 [info] meeting 469C80DC-4A61-4ED9-A913-0116C8BDA6E3: finished writeNotes in 4.4s
+2026-11-13 18:23:42.329 [info] meeting 469C80DC-4A61-4ED9-A913-0116C8BDA6E3: starting email
+2026-11-13 18:23:43.258 [info] mail accepted by 127.0.0.1: 2.0.0 OK queued
+2026-11-13 18:23:43.260 [info] meeting 469C80DC-4A61-4ED9-A913-0116C8BDA6E3: finished email in 0.9s
+2026-11-13 18:23:43.283 [info] meeting 469C80DC-4A61-4ED9-A913-0116C8BDA6E3 ended run as done at finished
