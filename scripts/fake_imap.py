@@ -3,7 +3,7 @@
 It speaks just enough IMAP for the Minutes app and the desktop program to pass messages through
 a folder. usage: fake_imap.py PORT [STATE.json]   (STATE.json is rewritten after every change)
 """
-import json, re, socketserver, sys, threading
+import json, os, re, socketserver, sys, threading
 
 LOCK = threading.Lock()
 FOLDERS = {"INBOX": [], "[Gmail]/Trash": []}     # name -> [{"uid", "data", "deleted"}]
@@ -13,8 +13,10 @@ STATE = sys.argv[2] if len(sys.argv) > 2 else None
 
 def save():
     if STATE:
-        with open(STATE, "w") as f:
+        # Written whole and swapped in, so a reader never sees half a file.
+        with open(STATE + ".new", "w") as f:
             json.dump({k: [{"uid": m["uid"], "subject": subject(m["data"])} for m in v] for k, v in FOLDERS.items()}, f)
+        os.replace(STATE + ".new", STATE)
 
 
 def subject(data):
