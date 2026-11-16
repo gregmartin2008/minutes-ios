@@ -49,6 +49,21 @@ final class NetworkTransportTests: XCTestCase {
         XCTAssertTrue(bye.hasPrefix("221"), bye)
     }
 
+    /// The mailbox client against Gmail's real IMAP server: the encrypted connection, the
+    /// greeting, and a made-up password turned away with Gmail's own words.
+    func testTheMailboxClientReachesGmailAndIsRefusedWithAMadeUpPassword() async throws {
+        try requireLive()
+        let client = IMAPClient(transport: NetworkSMTPTransport(host: "imap.gmail.com", port: 993, timeout: 20))
+        try await client.connect()
+        do {
+            try await client.login(user: "minutes.app.test@gmail.com", password: "not-a-real-password")
+            XCTFail("Gmail accepted a made-up password")
+        } catch {
+            XCTAssertTrue(error.localizedDescription.contains("the mailbox could not be used"), error.localizedDescription)
+        }
+        await client.logout()
+    }
+
     func testWrongPasswordAgainstGmailIsReportedAsSignInFailure() async throws {
         try requireLive()
         let transport = NetworkSMTPTransport(host: "smtp.gmail.com", port: 465, timeout: 20)

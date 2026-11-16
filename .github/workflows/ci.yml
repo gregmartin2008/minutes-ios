@@ -33,11 +33,15 @@ jobs:
           /usr/bin/python3 -m venv /tmp/venv && /tmp/venv/bin/pip -q install aiosmtpd
           /tmp/venv/bin/python scripts/smtp_integration.py Packages/MinutesCore 2>&1 | tee out/smtp-integration.log | grep -E "PASS|FAIL|checks passed"
           grep -q "14/14 checks passed" out/smtp-integration.log
+      - name: Notes written by the desktop, through a mail folder
+        run: |
+          /usr/bin/python3 scripts/desktop_integration.py Packages/MinutesCore 2>&1 | tee out/desktop-integration.log | grep -E "PASS|FAIL|checks passed"
+          grep -q "12/12 checks passed" out/desktop-integration.log
       - name: Encrypted connection to Gmail
         run: |
           cd Packages/MinutesCore
           MINUTES_LIVE_SMTP=1 swift test --filter NetworkTransportTests 2>&1 | tee ../../out/live-smtp.log | grep -E "error|passed|failed|Executed" || true
-          grep -q "Executed 3 tests, with 0 failures" ../../out/live-smtp.log
+          grep -q "Executed 4 tests, with 0 failures" ../../out/live-smtp.log
       - name: Publish results
         if: always()
         run: scripts/ci_publish.sh out ci-core

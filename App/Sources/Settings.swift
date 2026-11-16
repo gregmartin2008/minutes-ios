@@ -96,6 +96,33 @@ final class AppSettings {
         set { defaults.set(newValue, forKey: "aboutRecorder") }
     }
 
+    /// Whether the notes are written by the person's own computer (the Minutes Desktop program),
+    /// reached through a folder in their mailbox. Gemini, when a key is saved, is the fallback.
+    var desktopNotes: Bool {
+        get { defaults.bool(forKey: "desktopNotes") }
+        set { defaults.set(newValue, forKey: "desktopNotes") }
+    }
+
+    /// The desktop as a notes writer, or nil when it is off or email is not set up.
+    func desktopWriter() -> DesktopNotesWriter? {
+        guard desktopNotes, mailIsConfigured, mail.unencrypted != true else { return nil }
+        let host = DesktopNotesWriter.imapHost(forSMTP: mail.host)
+        // Google shows app passwords in four groups separated by spaces; the spaces are not part of it.
+        let secret = mail.isGmail ? mailPassword.filter { !$0.isWhitespace } : mailPassword
+        return DesktopNotesWriter(
+            mailbox: .init(address: mail.address, password: secret),
+            transport: { NetworkSMTPTransport(host: host, port: 993, useTLS: true, timeout: 30) })
+    }
+
+    /// Whoever writes the notes from the finished transcript: the desktop, then Gemini; nil when
+    /// neither is set up and the phone writes them itself.
+    func notesWriter() -> CloudNotesWriting? {
+        let gemini: CloudNotesWriting? = geminiKey.isEmpty ? nil : GeminiNotesWriter(apiKey: geminiKey, model: geminiModel)
+        guard let desktop = desktopWriter() else { return gemini }
+        guard let gemini else { return desktop }
+        return FallbackNotesWriter(first: desktop, second: gemini)
+    }
+
     /// The Gemini model name; empty means the default.
     var geminiModel: String {
         get { defaults.string(forKey: "geminiModel") ?? "" }

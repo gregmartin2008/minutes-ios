@@ -640,14 +640,14 @@ final class AppModel: ObservableObject {
     /// Starts transcribing and analyzing the meeting as it is recorded.
     private func startLiveWork(for id: String) {
         guard setup.ready, !isDemo else { return }
-        // With a Gemini key saved, Gemini writes the notes from the finished transcript, so the
-        // phone's own model does not draft them during the meeting: those drafts were thrown away
-        // (about thirteen runs of the model in a 25-minute meeting) and warmed the phone.
+        // When the desktop or Gemini writes the notes from the finished transcript, the phone's
+        // own model does not draft them during the meeting: those drafts were thrown away (about
+        // thirteen runs of the model in a 25-minute meeting) and warmed the phone.
         var notesModel: NotesModel?
-        if AppSettings.shared.geminiKey.isEmpty {
+        if AppSettings.shared.notesWriter() == nil {
             if case .success(let model) = FoundationNotesModel.make() { notesModel = model }
         } else {
-            Log.shared.info("meeting \(id): notes are not drafted on the iPhone during the meeting; Gemini writes them at the end")
+            Log.shared.info("meeting \(id): notes are not drafted on the iPhone during the meeting; they are written at the end")
         }
         let live = LiveMeeting(
             meetingID: id, models: models, vocabulary: AppSettings.shared.vocabulary,
@@ -775,10 +775,7 @@ final class AppModel: ObservableObject {
             vocabulary: { AppSettings.shared.vocabulary },
             liveWork: { [liveWork] id in liveWork.get(id) },
             ownProfileID: { [own] in own },
-            cloudNotes: {
-                let key = AppSettings.shared.geminiKey
-                return key.isEmpty ? nil : GeminiNotesWriter(apiKey: key, model: AppSettings.shared.geminiModel)
-            },
+            cloudNotes: { AppSettings.shared.notesWriter() },
             aboutRecorder: { AppSettings.shared.aboutRecorder },
             stageWillStart: { [liveWork] stage, id in
                 // For an imported recording, load the transcription model while the speakers are

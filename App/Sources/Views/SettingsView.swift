@@ -35,6 +35,7 @@ struct SettingsView: View {
             vocabularySection
             calendarSection
             notesSection
+            desktopSection
             peopleSection
             hubspotSection
             voicesSection
@@ -236,7 +237,7 @@ struct SettingsView: View {
 
     private var notesSection: some View {
         Section {
-            if geminiSaved {
+            if geminiSaved || desktopOn {
                 TextField(
                     "About you and your firm", text: $aboutRecorder,
                     prompt: Text("Dana Lee is a partner at Larkfield Capital (larkfield.example), a private equity firm that buys founder-led companies. Colleagues: Sam Park, Lee Ortiz."),
@@ -280,6 +281,57 @@ struct SettingsView: View {
             Text(geminiSaved
                 ? "The notes are written by Google's Gemini from the whole transcript, which is sent as text after each meeting (never the audio). The line about you goes with it, so the notes know which side of the table you sit on and don't call your firm the seller. Leave Model empty and the larger Gemini model is asked first, the lighter one when it is busy. If Gemini is busy when a meeting ends, the transcript is emailed at once and the notes follow in a second email. The key is kept in this iPhone's Keychain."
                 : "By default the notes are written on this iPhone by Apple's model, which runs short on long meetings. A Gemini API key (free at aistudio.google.com) has Google's model write them from the whole transcript instead; the transcript text is sent after each meeting, never the audio.")
+        }
+    }
+
+    // MARK: Notes on the desktop
+
+    @State private var desktopOn = AppSettings.shared.desktopNotes
+    @State private var desktopChecking = false
+    @State private var desktopResult: String?
+    @State private var desktopFailed = false
+
+    private var desktopSection: some View {
+        Section {
+            Toggle("Notes written by my PC", isOn: $desktopOn)
+                .onChange(of: desktopOn) { _, on in
+                    AppSettings.shared.desktopNotes = on
+                    desktopResult = nil
+                }
+                .disabled(!model.mailReady)
+            if desktopOn {
+                Button {
+                    desktopChecking = true
+                    desktopResult = nil
+                    Task {
+                        do {
+                            guard let writer = AppSettings.shared.desktopWriter() else { throw DesktopNotesError.mailbox("email is not set up") }
+                            desktopResult = try await writer.check()
+                            desktopFailed = false
+                        } catch {
+                            desktopResult = "No answer: \(error.localizedDescription)."
+                            desktopFailed = true
+                        }
+                        desktopChecking = false
+                    }
+                } label: {
+                    HStack(spacing: 10) {
+                        if desktopChecking { ProgressView() }
+                        Text(desktopChecking ? "Asking the PC" : "Check that the PC answers")
+                    }
+                }
+                .disabled(desktopChecking)
+                if let desktopResult {
+                    Label(desktopResult, systemImage: desktopFailed ? "exclamationmark.triangle" : "checkmark.circle")
+                        .font(.subheadline)
+                        .foregroundStyle(desktopFailed ? Theme.record : Theme.ok)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        } footer: {
+            Text(model.mailReady
+                ? "The Minutes Desktop program on your own computer writes the notes with a model that runs there. The transcript text is left in a folder of your mailbox called Minutes Desktop, the PC picks it up and leaves the notes, and both are then removed; nothing is sent to anyone else and the audio never leaves the phone. If the PC does not answer within half a minute, \(geminiSaved ? "Gemini writes the notes" : "the iPhone writes the notes")."
+                : "Set up email first: the PC is reached through your mailbox.")
         }
     }
 

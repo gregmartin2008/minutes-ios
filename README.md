@@ -124,6 +124,13 @@ there are no notes.
 - If the iPhone is hot when the meeting ends, the notes are finished without the language
   model's final pass (the lists stay as drafted during the meeting, the summary is their gists)
   rather than running it for minutes on a throttled phone; the email says so.
+- **Notes written by your own computer.** With "Notes written by my PC" on, the transcript goes
+  to a program on your desktop ([desktop/](desktop/README.md)) that writes the notes with a model
+  running on its graphics card; no model provider sees it. The phone and the desktop never
+  connect to each other: they pass the transcript and the notes through a folder in your own
+  mailbox. If the desktop does not answer within half a minute, Gemini (or the iPhone) writes
+  the notes. On five recorded meetings, an open 27-billion-parameter model on a 16 GB card wrote
+  notes at least as complete as the lighter Gemini model, in 30 to 75 seconds.
 - **What the notes look like.** A summary of a few sentences; *Next steps*, each a named
   person's commitment; *Decisions*, only what was actually agreed; *Open questions* (with
   Gemini), what was asked and left unanswered; then *Details*: the meeting
