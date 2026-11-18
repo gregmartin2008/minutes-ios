@@ -262,4 +262,45 @@ final class CloudNotesTests: XCTestCase {
         XCTAssertNil(GeminiNotesWriter.nextStep(fromDecision: "Dana prefers option one.", speakers: speakers))
         XCTAssertNil(GeminiNotesWriter.nextStep(fromDecision: "Dana will", speakers: speakers))
     }
+
+    /// The key terms and numbers come out as "Label: value" lines, shown before everything else;
+    /// one citing a number nobody said is left out, and a unit the speaker dropped may be written in.
+    func testKeyFactsAreKeptCheckedAndShownFirst() throws {
+        let transcript = """
+        Dana Whitfield [0:05]: We write control equity checks between 15 and 75 per deal.
+        Dana Whitfield [0:20]: Our smaller checks ran anywhere from 250 to like 5 million.
+        Dana Whitfield [0:41]: Most of what we have bid is between 6 and 10 times, and six or seven turns of leverage makes us nervous.
+        Jordan Carver [1:02]: Understood. We like three to eight million of EBITDA.
+        """
+        let json: [String: Any] = [
+            "title": "Capital partner introduction", "summary": "Dana Whitfield described what her family office invests in.",
+            "keyFacts": [
+                ["label": "Control equity check", "value": "$15 million to $75 million per deal"],
+                ["label": "Smaller checks:", "value": "$250,000 to $5 million"],
+                ["label": "Valuation", "value": "6 to 10 times EBITDA"],
+                ["label": "Fund size", "value": "$400 million"],
+                ["label": "Not covered", "value": "hold period; industries avoided"],
+                ["label": " ", "value": "nothing"],
+            ],
+            "nextSteps": [["owner": "Jordan Carver", "action": "send the pipeline"]], "decisions": [], "details": [],
+        ]
+        let notes = try GeminiNotesWriter.notes(from: json, transcript: transcript)
+        XCTAssertEqual(notes.figures, [
+            "Control equity check: $15 million to $75 million per deal",
+            "Smaller checks: $250,000 to $5 million",
+            "Valuation: 6 to 10 times EBITDA",
+            "Not covered: hold period; industries avoided",
+        ])
+        let sections = Render.sections(notes)
+        XCTAssertEqual(sections.map(\.kind), [.figures, .actionItems])
+        XCTAssertEqual(NoteKind.figures.title, "Key terms and numbers")
+        XCTAssertTrue(GeminiNotesWriter.prompt(transcript: transcript, title: nil, spellings: []).contains("keyFacts"))
+    }
+
+    func testARoundNumberIsVouchedForByTheSameDigitsWithoutTheUnit() {
+        let said = NotesEngine.saidNumbers(in: ["Dana Whitfield [0:05]: Between 15 and 75, and 250 at the low end."])
+        XCTAssertTrue(NotesEngine.numbersWereSaid(in: "Checks of $15,000,000 to $75 million, or $250,000.", said: said))
+        XCTAssertFalse(NotesEngine.numbersWereSaid(in: "A check of $40,000,000.", said: said))
+        XCTAssertFalse(NotesEngine.numbersWereSaid(in: "A check of $15,500.", said: said))
+    }
 }

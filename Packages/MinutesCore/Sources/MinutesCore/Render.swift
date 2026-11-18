@@ -104,12 +104,12 @@ public enum Render {
         return out.joined(separator: "\n\n")
     }
 
-    /// The lists of the notes, in the order they are shown: next steps first, since they are what
-    /// the reader acts on. The other lists only appear in notes written by earlier versions.
+    /// The lists of the notes, in the order they are shown: the key terms and numbers first, then
+    /// the next steps. The other lists only appear in notes written by earlier versions.
     public static func sections(_ notes: MeetingNotes) -> [(kind: NoteKind, items: [String])] {
         [
-            (.actionItems, notes.actionItems), (.decisions, notes.decisions), (.keyPoints, notes.keyPoints),
-            (.openQuestions, notes.openQuestions), (.figures, notes.figures),
+            (.figures, notes.figures), (.actionItems, notes.actionItems), (.decisions, notes.decisions),
+            (.keyPoints, notes.keyPoints), (.openQuestions, notes.openQuestions),
         ].filter { !$0.1.isEmpty }
     }
 

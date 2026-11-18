@@ -80,7 +80,7 @@ final class RenderTests: XCTestCase {
 
     func testNotesText() {
         let text = Render.notesText(sample())
-        XCTAssertTrue(text.hasPrefix("SUMMARY\nWe reviewed diligence.\n\nNEXT STEPS\n- Dana: schedule calls (due Oct 20)\n\nDECISIONS\n- Hold at 6.5x\n\nKEY POINTS\n- Concentration is 41%\n\nFIGURES AND DATES\n- 6.5x"), text)
+        XCTAssertTrue(text.hasPrefix("SUMMARY\nWe reviewed diligence.\n\nKEY TERMS AND NUMBERS\n- 6.5x\n\nNEXT STEPS\n- Dana: schedule calls (due Oct 20)\n\nDECISIONS\n- Hold at 6.5x\n\nKEY POINTS\n- Concentration is 41%"), text)
         XCTAssertFalse(text.contains("OPEN QUESTIONS"))
         XCTAssertTrue(text.hasSuffix("1 of 4 parts of the transcript could not be summarized and are missing from these notes."))
     }

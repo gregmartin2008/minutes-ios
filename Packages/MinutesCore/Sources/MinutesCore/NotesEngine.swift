@@ -9,7 +9,7 @@ public enum NoteKind: String, CaseIterable, Codable, Sendable {
         case .decisions: return "Decisions"
         case .actionItems: return "Next steps"
         case .openQuestions: return "Open questions"
-        case .figures: return "Figures and dates"
+        case .figures: return "Key terms and numbers"
         }
     }
 }
@@ -1011,6 +1011,19 @@ public struct NotesEngine: Sendable {
             return String(trimmed[trimmed.index(after: colon)...])
         }
         return trimmed
+    }
+
+    /// True when every number a sentence of the notes cites was said. People drop the unit when
+    /// it is understood ("checks from 250 to 5 million", "between 15 and 75 a deal"), and the notes
+    /// write it back in, so a round 250,000 or 15,000,000 is also vouched for by a spoken 250 or 15.
+    static func numbersWereSaid(in text: String, said: Set<String>, speakers: Set<String> = []) -> Bool {
+        citedNumbers(in: text, speakers: speakers).allSatisfy { cited in
+            if said.contains(cited) { return true }
+            guard let value = Int64(cited), value >= 1_000 else { return false }
+            if value % 1_000 == 0, said.contains(String(value / 1_000)) { return true }
+            if value % 1_000_000 == 0, said.contains(String(value / 1_000_000)) { return true }
+            return false
+        }
     }
 
     /// The numbers a sentence of the notes cites. The number in an unnamed speaker's label

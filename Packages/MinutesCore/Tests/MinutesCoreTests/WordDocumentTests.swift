@@ -14,7 +14,7 @@ final class WordDocumentTests: XCTestCase {
     func testParagraphsFollowTheNotesThenTheTranscript() {
         let p = MeetingDocumentText.paragraphs(meeting())
         XCTAssertEqual(p.first, DocumentParagraph(.title, "Harbor Tools <add-on> & \"diligence\""))
-        XCTAssertEqual(p.filter { $0.style == .heading }.map(\.text), ["Summary", "Next steps", "Decisions", "Key points", "Open questions", "Figures and dates", "Details", "Transcript"])
+        XCTAssertEqual(p.filter { $0.style == .heading }.map(\.text), ["Summary", "Key terms and numbers", "Next steps", "Decisions", "Key points", "Open questions", "Details", "Transcript"])
         XCTAssertTrue(p.contains(DocumentParagraph(.bullet, "Who signs for the seller?")))
         XCTAssertTrue(p.contains(DocumentParagraph(.subheading, "Diligence  1:02")))
         XCTAssertTrue(p.contains(DocumentParagraph(.caution, "Recording paused for 2 min: a phone call took the microphone")))

@@ -249,6 +249,23 @@ public struct GeminiNotesWriter: CloudNotesWriting {
         keep every number, date and name exactly as said.
         - summary: 2 to 4 sentences. Who met about what, the one or two most important things each side \
         said, and where it ended up. Specific, no filler like "met to discuss".
+        - keyFacts: the terms and numbers the reader will look up later, one per entry, as a short \
+        label and its value ("Control equity check", "$15 million to $75 million per deal"). This is \
+        the most important list: go through the whole transcript for it and leave out nothing that was stated. \
+        When the other side is an investor, a capital partner, a family office or a lender, give every \
+        one of these that was said, each as its own entry: who they are and whose money it is; the size \
+        of company they invest in (revenue or EBITDA); check size, for each kind of deal they do; control \
+        or minority, and whether they need a majority; the board seat and governance they require; \
+        industries they pursue, and industries they avoid; the valuation multiples they pay and their \
+        limit; the debt they are comfortable with and their limit; hold period; how many such deals they \
+        have done; fees, carry and how a sponsor is paid; how early they want to see a deal and how fast \
+        they decide. When the other side is a seller or a company: revenue, EBITDA and margins, growth, \
+        the price or multiple asked or offered, customer concentration, employees, ownership, debt and \
+        timing. For any other meeting: the figures, dates and terms that matter. Write each amount with \
+        the unit the speaker meant ("15 to 75" said about check sizes is "$15 million to $75 million"); \
+        when the unit is not clear, keep the words as said. For an investor, lender, seller or company \
+        meeting, finish with one entry labeled "Not covered" whose value names the items above that \
+        nobody stated, so the reader knows what to ask next; leave that entry out when all were covered.
         - nextSteps: only concrete things a named person committed to do after the meeting (send, \
         schedule, introduce, review, revise, submit, call). Owner is the person's name as in the \
         transcript; "The group" when everyone. Include the deadline if one was said. An agreement to \
@@ -299,6 +316,11 @@ public struct GeminiNotesWriter: CloudNotesWriting {
                 "properties": ["owner": ["type": "STRING"], "action": ["type": "STRING"], "when": ["type": "STRING"]],
                 "required": ["owner", "action"],
             ]],
+            "keyFacts": ["type": "ARRAY", "items": [
+                "type": "OBJECT",
+                "properties": ["label": ["type": "STRING"], "value": ["type": "STRING"]],
+                "required": ["label", "value"],
+            ]],
             "decisions": ["type": "ARRAY", "items": ["type": "STRING"]],
             "openQuestions": ["type": "ARRAY", "items": ["type": "STRING"]],
             "speakerNames": ["type": "ARRAY", "items": [
@@ -312,7 +334,7 @@ public struct GeminiNotesWriter: CloudNotesWriting {
                 "required": ["topic", "text"],
             ]],
         ],
-        "required": ["title", "summary", "nextSteps", "decisions", "details"],
+        "required": ["title", "summary", "keyFacts", "nextSteps", "decisions", "details"],
     ]
 
     /// A "decision" that is really one speaker promising to do something ("Jordan Carver will add
@@ -374,24 +396,33 @@ public struct GeminiNotesWriter: CloudNotesWriting {
         }
         // An open question citing a number that was never said is left out, like any other sentence.
         let open = (json["openQuestions"] as? [String] ?? []).map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { q in !q.isEmpty && NotesEngine.citedNumbers(in: q, speakers: speakers).allSatisfy { said.contains($0) } }
-        var details: [NotesDetail] = []
+            .filter { q in !q.isEmpty && NotesEngine.numbersWereSaid(in: q, said: said, speakers: speakers) }
         var dropped = 0
+        // The key terms and numbers, each "Label: value". One citing a number nobody said is left out.
+        var facts: [String] = []
+        for item in json["keyFacts"] as? [[String: Any]] ?? [] {
+            let label = (item["label"] as? String ?? "").trimmingCharacters(in: CharacterSet.whitespacesAndNewlines.union(CharacterSet(charactersIn: ":")))
+            let value = (item["value"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !label.isEmpty, !value.isEmpty else { continue }
+            let line = "\(label): \(value)"
+            if NotesEngine.numbersWereSaid(in: line, said: said, speakers: speakers) { facts.append(line) } else { dropped += 1 }
+        }
+        var details: [NotesDetail] = []
         for item in json["details"] as? [[String: Any]] ?? [] {
             guard let topic = item["topic"] as? String, let text = item["text"] as? String else { continue }
             let all = NotesEngine.sentences(text)
-            let kept = all.filter { s in NotesEngine.citedNumbers(in: s, speakers: speakers).allSatisfy { said.contains($0) } }
+            let kept = all.filter { s in NotesEngine.numbersWereSaid(in: s, said: said, speakers: speakers) }
             dropped += all.count - kept.count
             guard !kept.isEmpty else { continue }
             details.append(NotesDetail(topic: NotesEngine.tidyTopic(topic), text: kept.joined(separator: " "), startSeconds: Self.seconds(item["start"] as? String)))
         }
-        if dropped > 0 { Log.shared.info("notes: \(dropped) sentence(s) left out for citing a number the transcript does not have") }
+        if dropped > 0 { Log.shared.info("notes: \(dropped) sentence(s) or key fact(s) left out for citing a number the transcript does not have") }
         return MeetingNotes(
             title: NotesEngine.tidyTitle(json["title"] as? String ?? ""),
             summary: summary.trimmingCharacters(in: .whitespacesAndNewlines),
             decisions: NotesEngine.dedupe(decisions),
             actionItems: NotesEngine.dedupe(next),
-            openQuestions: NotesEngine.dedupe(open),
+            openQuestions: NotesEngine.dedupe(open), figures: NotesEngine.dedupe(facts),
             skippedSections: 0, totalSections: 1,
             details: details, speakerHints: Self.hints(from: json, lines: lines, speakers: speakers))
     }
