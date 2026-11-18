@@ -72,8 +72,8 @@ public actor LiveAnalyzer {
 
     private func transcriberForPieces() async throws -> PieceTranscriber {
         if let pieceTranscriber { return pieceTranscriber }
-        let asr = try await models.transcriber()
-        let t = PieceTranscriber(asr: asr, log: log)
+        _ = try await models.transcriber()
+        let t = PieceTranscriber(models: models, log: log)
         pieceTranscriber = t
         return t
     }

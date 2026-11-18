@@ -38,6 +38,17 @@ public struct SpeechOptions: Sendable {
     /// Which build of the Parakeet recognizer transcribes: "ultra" (what the app ships), or
     /// "v3", "redux" or "phonon2", which the benchmark tool compares it with.
     public var transcriptionModel = "ultra"
+    /// Start transcribing on the processor while the Neural Engine copy of the recognizer is
+    /// still being prepared. Preparing that copy has taken from a minute and a half to twelve
+    /// minutes after every cold start of the app; the processor copy is ready in seconds and
+    /// produces the same words. The app switches over as soon as the Neural Engine copy is ready.
+    public var quickStart: Bool = {
+        #if os(iOS)
+        return true
+        #else
+        return false
+        #endif
+    }()
 
     public init() {}
 
@@ -62,9 +73,20 @@ public enum SpeechModelKind: String, Sendable {
 /// and releases them afterward so only one large model is in memory at a time.
 public actor SpeechModels {
     public let options: SpeechOptions
+    /// The recognizer on the compute units the options ask for (the Neural Engine on a phone).
     private var asr: AsrManager?
     /// A load already under way, so two callers (a preload and the transcribe stage) share one.
     private var asrLoading: Task<AsrManager, Error>?
+    /// The same recognizer on the processor alone, used until `asr` is ready. See `quickStart`.
+    private var standIn: AsrManager?
+    private var standInLoading: Task<AsrManager, Error>?
+    /// Goes up at every unload, so a load that finishes afterward is not kept.
+    private var generation = 0
+    /// What the stand-in transcribed, for the diagnostics line written when it is retired.
+    private var standInAudio = 0.0
+    private var standInTook = 0.0
+    private var mainAudio = 0.0
+    private var mainTook = 0.0
     private var diarizerModels: OfflineDiarizerModels?
     private var diarizerLoading: Task<OfflineDiarizerModels, Error>?
     private let log: Log
@@ -83,7 +105,7 @@ public actor SpeechModels {
     /// `progress` receives the model being prepared, a fraction from 0 to 1, and whether the download
     /// is over and the model is now being compiled for this device (which has no meaningful fraction).
     public func prepareAll(progress: @escaping @Sendable (SpeechModelKind, Double, Bool) -> Void) async throws {
-        _ = try await transcriber { progress(.transcription, $0, $1) }
+        _ = try await mainTranscriber { progress(.transcription, $0, $1) }
         progress(.transcription, 1, false)
         _ = try await separationModels { progress(.separation, $0, $1) }
         progress(.separation, 1, false)
@@ -111,37 +133,131 @@ public actor SpeechModels {
         return false
     }
 
-    func transcriber(progress: (@Sendable (Double, Bool) -> Void)? = nil) async throws -> AsrManager {
-        if let asr { return asr }
-        if let asrLoading { return try await asrLoading.value }
+    /// Loads the recognizer on the given compute units and reports how long each part took.
+    private static func load(
+        options: SpeechOptions, units: MLComputeUnits, label: String, log: Log,
+        progress: (@Sendable (Double, Bool) -> Void)?
+    ) async throws -> AsrManager {
+        let started = Date()
+        let configuration = MLModelConfiguration()
+        configuration.computeUnits = units
+        let models = try await AsrModels.downloadAndLoad(
+            configuration: configuration, version: options.asrVersion,
+            progressHandler: { p in progress?(p.fractionCompleted, Self.isCompiling(p.phase)) })
+        let loaded = Date()
+        let manager = AsrManager(config: .default)
+        try await manager.loadModels(models)
+        // Which part took the time, and whether iOS kept a compiled copy of the model between
+        // launches (the compiled copies live in the app's caches directory).
+        let parts = ModelHub.takeLoadTimings()
+            .map { String(format: "%@ %.0fs", $0.name.replacingOccurrences(of: ".mlmodelc", with: ""), $0.seconds) }
+            .joined(separator: ", ")
+        log.info(String(
+            format: "%@ ready in %.1fs (files %.1fs, load %.1fs; %@; caches %@)",
+            label, Date().timeIntervalSince(started), loaded.timeIntervalSince(started), Date().timeIntervalSince(loaded),
+            parts, Self.cachesSummary()))
+        return manager
+    }
+
+    /// Starts loading the recognizer the options ask for, unless it is loaded or loading already.
+    private func mainLoad(progress: (@Sendable (Double, Bool) -> Void)? = nil) -> Task<AsrManager, Error> {
+        if let asrLoading { return asrLoading }
         let options = self.options
         let log = self.log
+        let generation = self.generation
         let task = Task<AsrManager, Error> {
-            let started = Date()
-            let configuration = MLModelConfiguration()
-            configuration.computeUnits = options.computeUnits
-            let models = try await AsrModels.downloadAndLoad(
-                configuration: configuration, version: options.asrVersion,
-                progressHandler: { p in progress?(p.fractionCompleted, Self.isCompiling(p.phase)) })
-            let loaded = Date()
-            let manager = AsrManager(config: .default)
-            try await manager.loadModels(models)
-            // Which part took the time, and whether iOS kept a compiled copy of the model between
-            // launches (the compiled copies live in the app's caches directory).
-            let parts = ModelHub.takeLoadTimings()
-                .map { String(format: "%@ %.0fs", $0.name.replacingOccurrences(of: ".mlmodelc", with: ""), $0.seconds) }
-                .joined(separator: ", ")
-            log.info(String(
-                format: "transcription model ready in %.1fs (files %.1fs, load %.1fs; %@; caches %@)",
-                Date().timeIntervalSince(started), loaded.timeIntervalSince(started), Date().timeIntervalSince(loaded),
-                parts, Self.cachesSummary()))
-            return manager
+            do {
+                let manager = try await Self.load(
+                    options: options, units: options.computeUnits, label: "transcription model", log: log, progress: progress)
+                await self.adopt(manager, generation: generation)
+                return manager
+            } catch {
+                await self.mainLoadFailed(generation: generation)
+                throw error
+            }
         }
         asrLoading = task
-        defer { asrLoading = nil }
-        let manager = try await task.value
+        return task
+    }
+
+    private func adopt(_ manager: AsrManager, generation: Int) {
+        guard generation == self.generation else { return }
         asr = manager
-        return manager
+        asrLoading = nil
+        // The stand-in is only let go of here, not shut down: a piece it is in the middle of
+        // transcribing finishes normally, and its memory is freed when that piece is done.
+        if standIn != nil || standInLoading != nil {
+            log.info(String(
+                format: "switched to the Neural Engine recognizer; the processor one transcribed %.0fs of audio in %.1fs",
+                standInAudio, standInTook))
+        }
+        standIn = nil
+        standInLoading?.cancel()
+        standInLoading = nil
+    }
+
+    private func mainLoadFailed(generation: Int) {
+        guard generation == self.generation else { return }
+        asrLoading = nil
+    }
+
+    private func standInLoad() -> Task<AsrManager, Error> {
+        if let standInLoading { return standInLoading }
+        let options = self.options
+        let log = self.log
+        let generation = self.generation
+        let task = Task<AsrManager, Error> {
+            let manager = try await Self.load(
+                options: options, units: .cpuOnly, label: "stand-in transcription model (processor only)", log: log, progress: nil)
+            await self.adoptStandIn(manager, generation: generation)
+            return manager
+        }
+        standInLoading = task
+        return task
+    }
+
+    private func adoptStandIn(_ manager: AsrManager, generation: Int) {
+        guard generation == self.generation else { return }
+        standInLoading = nil
+        if asr == nil { standIn = manager }
+    }
+
+    /// The recognizer to use right now. While the Neural Engine copy is still being prepared this
+    /// is the processor copy, so ask again for each piece of audio rather than keeping the answer.
+    func transcriber(progress: (@Sendable (Double, Bool) -> Void)? = nil) async throws -> AsrManager {
+        if let asr { return asr }
+        // The stand-in needs the files on the phone already (two loads at once must not both
+        // download them) and only makes sense when the main copy is headed for the Neural Engine.
+        guard options.quickStart, options.useNeuralEngine, transcriptionModelIsDownloaded() else {
+            return try await mainLoad(progress: progress).value
+        }
+        let main = mainLoad(progress: progress)
+        if let standIn { return standIn }
+        do {
+            let quick = try await standInLoad().value
+            return asr ?? quick
+        } catch {
+            if asr == nil { log.warn("stand-in transcription model failed, waiting for the main one: \(error)") }
+            if let asr { return asr }
+            return try await main.value
+        }
+    }
+
+    /// The recognizer on the compute units the options ask for, waiting for it if need be.
+    func mainTranscriber(progress: (@Sendable (Double, Bool) -> Void)? = nil) async throws -> AsrManager {
+        if let asr { return asr }
+        return try await mainLoad(progress: progress).value
+    }
+
+    /// Notes how long a piece took, so the diagnostics show how the two copies compare.
+    func record(_ manager: AsrManager, audioSeconds: Double, took: Double) {
+        if let standIn, manager === standIn {
+            standInAudio += audioSeconds
+            standInTook += took
+        } else {
+            mainAudio += audioSeconds
+            mainTook += took
+        }
     }
 
     /// Starts loading the transcription model so it is ready when the transcribe stage comes.
@@ -159,7 +275,7 @@ public actor SpeechModels {
     /// a device can take minutes while the system specializes it for the Neural Engine; doing it
     /// here, right after the download, keeps that out of the first real meeting.
     public func warmUpTranscriber() async throws {
-        let manager = try await transcriber()
+        let manager = try await mainTranscriber()
         let started = Date()
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("warmup-\(UUID().uuidString).wav")
         try WAVWriter.silence(seconds: 4).write(to: url)
@@ -200,8 +316,18 @@ public actor SpeechModels {
     public func unload(_ kind: SpeechModelKind) async {
         switch kind {
         case .transcription:
+            generation += 1
             asrLoading?.cancel()
             asrLoading = nil
+            standInLoading?.cancel()
+            standInLoading = nil
+            standIn = nil
+            if standInAudio > 0 || mainAudio > 0 {
+                log.info(String(
+                    format: "recognizer use: processor %.0fs of audio in %.1fs, Neural Engine %.0fs in %.1fs",
+                    standInAudio, standInTook, mainAudio, mainTook))
+            }
+            standInAudio = 0; standInTook = 0; mainAudio = 0; mainTook = 0
             if let asr { await asr.cleanup() }
             asr = nil
         case .separation:

@@ -15,8 +15,7 @@ public struct FluidTranscriber: Transcribing {
     }
 
     public func transcribe(audio: URL, progress: @escaping @Sendable (Double) -> Void) async throws -> [Word] {
-        let asr = try await models.transcriber()
-        let pieces = PieceTranscriber(asr: asr, log: .shared)
+        let pieces = PieceTranscriber(models: models, log: .shared)
         let options = LiveAnalyzer.Options()
         let rate = 16_000
         let (source, _) = try AudioSourceFactory().makeDiskBackedSource(from: audio, targetSampleRate: rate)

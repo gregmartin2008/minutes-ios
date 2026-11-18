@@ -627,8 +627,9 @@ final class AppModel: ObservableObject {
     }
 
     /// Loads the speech models ahead of a recording, so the first minutes of a meeting are not
-    /// spent loading. Loading the transcription model has taken five to eight minutes on this
-    /// phone whenever iOS had dropped its compiled copy, and seconds otherwise.
+    /// spent loading. Preparing the Neural Engine copy of the transcription model has taken from
+    /// a minute and a half to twelve minutes after every cold start; until it is ready the
+    /// processor copy, which loads in seconds, does the transcribing.
     func warmModels() {
         guard setup.ready, !isDemo, live == nil, runningID == nil else { return }
         let models = self.models
