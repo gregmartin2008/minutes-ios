@@ -1,0 +1,566 @@
+[0/1] Planning build
+Building for debugging...
+[0/3] Write swift-version-7974D3F7F03D5E95.txt
+[2/18] Compiling MinutesCore Naming.swift
+[3/18] Compiling MinutesCore NetworkTransport.swift
+[4/18] Compiling MinutesCore NotesEngine.swift
+[5/18] Compiling MinutesCore Pipeline.swift
+[6/18] Compiling MinutesCore Render.swift
+[7/18] Compiling MinutesCore SMTPClient.swift
+[8/18] Compiling MinutesCore SpeakerCounter.swift
+[9/24] Compiling MinutesCore CloudNotes.swift
+[10/24] Compiling MinutesCore DesktopNotes.swift
+[11/24] Compiling MinutesCore EmailMessage.swift
+[12/24] Compiling MinutesCore HubSpot.swift
+[13/24] Compiling MinutesCore LiveWork.swift
+[14/24] Compiling MinutesCore MemoryUse.swift
+[15/24] Compiling MinutesCore Models.swift
+[16/24] Emitting module MinutesCore
+[17/24] Compiling MinutesCore SpeakerMatcher.swift
+[18/24] Compiling MinutesCore Storage.swift
+[19/24] Compiling MinutesCore TranscriptAssembler.swift
+[20/24] Compiling MinutesCore Vocabulary.swift
+[21/24] Compiling MinutesCore WAVFile.swift
+[22/24] Compiling MinutesCore WordDocument.swift
+[23/37] Compiling MinutesCoreTests NotesEngineTests.swift
+/Users/runner/work/minutes-ios/minutes-ios/Packages/MinutesCore/Tests/MinutesCoreTests/NotesEngineTests.swift:42:14: warning: instance method 'lock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 40 |         if section.count > rejectSectionsLongerThan { throw NotesModelError.contextExceeded }
+ 41 |         if let needle = refuseSectionsContaining, section.contains(needle) { throw NotesModelError.refused("unsafe") }
+ 42 |         lock.lock()
+    |              `- warning: instance method 'lock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 43 |         sections.append(section)
+ 44 |         contexts.append(context)
+
+Foundation.NSLock.lock:2:11: note: 'lock()' declared here
+1 | class NSLock {
+2 | open func lock()}
+  |           `- note: 'lock()' declared here
+3 | 
+
+/Users/runner/work/minutes-ios/minutes-ios/Packages/MinutesCore/Tests/MinutesCoreTests/NotesEngineTests.swift:46:14: warning: instance method 'unlock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 44 |         contexts.append(context)
+ 45 |         let n = sections.count
+ 46 |         lock.unlock()
+    |              `- warning: instance method 'unlock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 47 |         let first = section.split(separator: "\n").first.map(String.init) ?? ""
+ 48 |         return NotesFragment(
+
+Foundation.NSLock.unlock:2:11: note: 'unlock()' declared here
+1 | class NSLock {
+2 | open func unlock()}
+  |           `- note: 'unlock()' declared here
+3 | 
+
+/Users/runner/work/minutes-ios/minutes-ios/Packages/MinutesCore/Tests/MinutesCoreTests/NotesEngineTests.swift:62:14: warning: instance method 'lock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 60 |         try gate()
+ 61 |         if failConsolidate { throw NotesModelError.other("boom") }
+ 62 |         lock.lock()
+    |              `- warning: instance method 'lock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 63 |         consolidations.append((kind, items, limit))
+ 64 |         lock.unlock()
+
+Foundation.NSLock.lock:2:11: note: 'lock()' declared here
+1 | class NSLock {
+2 | open func lock()}
+  |           `- note: 'lock()' declared here
+3 | 
+
+/Users/runner/work/minutes-ios/minutes-ios/Packages/MinutesCore/Tests/MinutesCoreTests/NotesEngineTests.swift:64:14: warning: instance method 'unlock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 62 |         lock.lock()
+ 63 |         consolidations.append((kind, items, limit))
+ 64 |         lock.unlock()
+    |              `- warning: instance method 'unlock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 65 |         let kept = Array(items.prefix(limit))
+ 66 |         return echoMarkers ? kept.map { "- " + $0 } : kept
+
+Foundation.NSLock.unlock:2:11: note: 'unlock()' declared here
+1 | class NSLock {
+2 | open func unlock()}
+  |           `- note: 'unlock()' declared here
+3 | 
+
+/Users/runner/work/minutes-ios/minutes-ios/Packages/MinutesCore/Tests/MinutesCoreTests/NotesEngineTests.swift:73:14: warning: instance method 'lock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 71 |     func overview(details: [String], decisions: [String], nextSteps: [String], titleHint: String?) async throws -> NotesOverview {
+ 72 |         try gate()
+ 73 |         lock.lock()
+    |              `- warning: instance method 'lock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 74 |         overviewCalls += 1
+ 75 |         overviewDetails = details
+
+Foundation.NSLock.lock:2:11: note: 'lock()' declared here
+1 | class NSLock {
+2 | open func lock()}
+  |           `- note: 'lock()' declared here
+3 | 
+
+/Users/runner/work/minutes-ios/minutes-ios/Packages/MinutesCore/Tests/MinutesCoreTests/NotesEngineTests.swift:76:14: warning: instance method 'unlock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 74 |         overviewCalls += 1
+ 75 |         overviewDetails = details
+ 76 |         lock.unlock()
+    |              `- warning: instance method 'unlock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 77 |         if failOverview { throw NotesModelError.other("boom") }
+ 78 |         return NotesOverview(title: "\"Add-on diligence review.\"", summary: "A summary of \(details.count) parts.")
+
+Foundation.NSLock.unlock:2:11: note: 'unlock()' declared here
+1 | class NSLock {
+2 | open func unlock()}
+  |           `- note: 'unlock()' declared here
+3 | 
+[24/37] Compiling MinutesCoreTests PipelineTests.swift
+/Users/runner/work/minutes-ios/minutes-ios/Packages/MinutesCore/Tests/MinutesCoreTests/NotesEngineTests.swift:42:14: warning: instance method 'lock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 40 |         if section.count > rejectSectionsLongerThan { throw NotesModelError.contextExceeded }
+ 41 |         if let needle = refuseSectionsContaining, section.contains(needle) { throw NotesModelError.refused("unsafe") }
+ 42 |         lock.lock()
+    |              `- warning: instance method 'lock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 43 |         sections.append(section)
+ 44 |         contexts.append(context)
+
+Foundation.NSLock.lock:2:11: note: 'lock()' declared here
+1 | class NSLock {
+2 | open func lock()}
+  |           `- note: 'lock()' declared here
+3 | 
+
+/Users/runner/work/minutes-ios/minutes-ios/Packages/MinutesCore/Tests/MinutesCoreTests/NotesEngineTests.swift:46:14: warning: instance method 'unlock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 44 |         contexts.append(context)
+ 45 |         let n = sections.count
+ 46 |         lock.unlock()
+    |              `- warning: instance method 'unlock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 47 |         let first = section.split(separator: "\n").first.map(String.init) ?? ""
+ 48 |         return NotesFragment(
+
+Foundation.NSLock.unlock:2:11: note: 'unlock()' declared here
+1 | class NSLock {
+2 | open func unlock()}
+  |           `- note: 'unlock()' declared here
+3 | 
+
+/Users/runner/work/minutes-ios/minutes-ios/Packages/MinutesCore/Tests/MinutesCoreTests/NotesEngineTests.swift:62:14: warning: instance method 'lock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 60 |         try gate()
+ 61 |         if failConsolidate { throw NotesModelError.other("boom") }
+ 62 |         lock.lock()
+    |              `- warning: instance method 'lock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 63 |         consolidations.append((kind, items, limit))
+ 64 |         lock.unlock()
+
+Foundation.NSLock.lock:2:11: note: 'lock()' declared here
+1 | class NSLock {
+2 | open func lock()}
+  |           `- note: 'lock()' declared here
+3 | 
+
+/Users/runner/work/minutes-ios/minutes-ios/Packages/MinutesCore/Tests/MinutesCoreTests/NotesEngineTests.swift:64:14: warning: instance method 'unlock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 62 |         lock.lock()
+ 63 |         consolidations.append((kind, items, limit))
+ 64 |         lock.unlock()
+    |              `- warning: instance method 'unlock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 65 |         let kept = Array(items.prefix(limit))
+ 66 |         return echoMarkers ? kept.map { "- " + $0 } : kept
+
+Foundation.NSLock.unlock:2:11: note: 'unlock()' declared here
+1 | class NSLock {
+2 | open func unlock()}
+  |           `- note: 'unlock()' declared here
+3 | 
+
+/Users/runner/work/minutes-ios/minutes-ios/Packages/MinutesCore/Tests/MinutesCoreTests/NotesEngineTests.swift:73:14: warning: instance method 'lock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 71 |     func overview(details: [String], decisions: [String], nextSteps: [String], titleHint: String?) async throws -> NotesOverview {
+ 72 |         try gate()
+ 73 |         lock.lock()
+    |              `- warning: instance method 'lock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 74 |         overviewCalls += 1
+ 75 |         overviewDetails = details
+
+Foundation.NSLock.lock:2:11: note: 'lock()' declared here
+1 | class NSLock {
+2 | open func lock()}
+  |           `- note: 'lock()' declared here
+3 | 
+
+/Users/runner/work/minutes-ios/minutes-ios/Packages/MinutesCore/Tests/MinutesCoreTests/NotesEngineTests.swift:76:14: warning: instance method 'unlock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 74 |         overviewCalls += 1
+ 75 |         overviewDetails = details
+ 76 |         lock.unlock()
+    |              `- warning: instance method 'unlock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 77 |         if failOverview { throw NotesModelError.other("boom") }
+ 78 |         return NotesOverview(title: "\"Add-on diligence review.\"", summary: "A summary of \(details.count) parts.")
+
+Foundation.NSLock.unlock:2:11: note: 'unlock()' declared here
+1 | class NSLock {
+2 | open func unlock()}
+  |           `- note: 'unlock()' declared here
+3 | 
+[25/37] Compiling MinutesCoreTests RenderTests.swift
+/Users/runner/work/minutes-ios/minutes-ios/Packages/MinutesCore/Tests/MinutesCoreTests/NotesEngineTests.swift:42:14: warning: instance method 'lock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 40 |         if section.count > rejectSectionsLongerThan { throw NotesModelError.contextExceeded }
+ 41 |         if let needle = refuseSectionsContaining, section.contains(needle) { throw NotesModelError.refused("unsafe") }
+ 42 |         lock.lock()
+    |              `- warning: instance method 'lock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 43 |         sections.append(section)
+ 44 |         contexts.append(context)
+
+Foundation.NSLock.lock:2:11: note: 'lock()' declared here
+1 | class NSLock {
+2 | open func lock()}
+  |           `- note: 'lock()' declared here
+3 | 
+
+/Users/runner/work/minutes-ios/minutes-ios/Packages/MinutesCore/Tests/MinutesCoreTests/NotesEngineTests.swift:46:14: warning: instance method 'unlock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 44 |         contexts.append(context)
+ 45 |         let n = sections.count
+ 46 |         lock.unlock()
+    |              `- warning: instance method 'unlock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 47 |         let first = section.split(separator: "\n").first.map(String.init) ?? ""
+ 48 |         return NotesFragment(
+
+Foundation.NSLock.unlock:2:11: note: 'unlock()' declared here
+1 | class NSLock {
+2 | open func unlock()}
+  |           `- note: 'unlock()' declared here
+3 | 
+
+/Users/runner/work/minutes-ios/minutes-ios/Packages/MinutesCore/Tests/MinutesCoreTests/NotesEngineTests.swift:62:14: warning: instance method 'lock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 60 |         try gate()
+ 61 |         if failConsolidate { throw NotesModelError.other("boom") }
+ 62 |         lock.lock()
+    |              `- warning: instance method 'lock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 63 |         consolidations.append((kind, items, limit))
+ 64 |         lock.unlock()
+
+Foundation.NSLock.lock:2:11: note: 'lock()' declared here
+1 | class NSLock {
+2 | open func lock()}
+  |           `- note: 'lock()' declared here
+3 | 
+
+/Users/runner/work/minutes-ios/minutes-ios/Packages/MinutesCore/Tests/MinutesCoreTests/NotesEngineTests.swift:64:14: warning: instance method 'unlock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 62 |         lock.lock()
+ 63 |         consolidations.append((kind, items, limit))
+ 64 |         lock.unlock()
+    |              `- warning: instance method 'unlock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 65 |         let kept = Array(items.prefix(limit))
+ 66 |         return echoMarkers ? kept.map { "- " + $0 } : kept
+
+Foundation.NSLock.unlock:2:11: note: 'unlock()' declared here
+1 | class NSLock {
+2 | open func unlock()}
+  |           `- note: 'unlock()' declared here
+3 | 
+
+/Users/runner/work/minutes-ios/minutes-ios/Packages/MinutesCore/Tests/MinutesCoreTests/NotesEngineTests.swift:73:14: warning: instance method 'lock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 71 |     func overview(details: [String], decisions: [String], nextSteps: [String], titleHint: String?) async throws -> NotesOverview {
+ 72 |         try gate()
+ 73 |         lock.lock()
+    |              `- warning: instance method 'lock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 74 |         overviewCalls += 1
+ 75 |         overviewDetails = details
+
+Foundation.NSLock.lock:2:11: note: 'lock()' declared here
+1 | class NSLock {
+2 | open func lock()}
+  |           `- note: 'lock()' declared here
+3 | 
+
+/Users/runner/work/minutes-ios/minutes-ios/Packages/MinutesCore/Tests/MinutesCoreTests/NotesEngineTests.swift:76:14: warning: instance method 'unlock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 74 |         overviewCalls += 1
+ 75 |         overviewDetails = details
+ 76 |         lock.unlock()
+    |              `- warning: instance method 'unlock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 77 |         if failOverview { throw NotesModelError.other("boom") }
+ 78 |         return NotesOverview(title: "\"Add-on diligence review.\"", summary: "A summary of \(details.count) parts.")
+
+Foundation.NSLock.unlock:2:11: note: 'unlock()' declared here
+1 | class NSLock {
+2 | open func unlock()}
+  |           `- note: 'unlock()' declared here
+3 | 
+[26/37] Compiling MinutesCoreTests SMTPIntegrationTests.swift
+/Users/runner/work/minutes-ios/minutes-ios/Packages/MinutesCore/Tests/MinutesCoreTests/NotesEngineTests.swift:42:14: warning: instance method 'lock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 40 |         if section.count > rejectSectionsLongerThan { throw NotesModelError.contextExceeded }
+ 41 |         if let needle = refuseSectionsContaining, section.contains(needle) { throw NotesModelError.refused("unsafe") }
+ 42 |         lock.lock()
+    |              `- warning: instance method 'lock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 43 |         sections.append(section)
+ 44 |         contexts.append(context)
+
+Foundation.NSLock.lock:2:11: note: 'lock()' declared here
+1 | class NSLock {
+2 | open func lock()}
+  |           `- note: 'lock()' declared here
+3 | 
+
+/Users/runner/work/minutes-ios/minutes-ios/Packages/MinutesCore/Tests/MinutesCoreTests/NotesEngineTests.swift:46:14: warning: instance method 'unlock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 44 |         contexts.append(context)
+ 45 |         let n = sections.count
+ 46 |         lock.unlock()
+    |              `- warning: instance method 'unlock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 47 |         let first = section.split(separator: "\n").first.map(String.init) ?? ""
+ 48 |         return NotesFragment(
+
+Foundation.NSLock.unlock:2:11: note: 'unlock()' declared here
+1 | class NSLock {
+2 | open func unlock()}
+  |           `- note: 'unlock()' declared here
+3 | 
+
+/Users/runner/work/minutes-ios/minutes-ios/Packages/MinutesCore/Tests/MinutesCoreTests/NotesEngineTests.swift:62:14: warning: instance method 'lock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 60 |         try gate()
+ 61 |         if failConsolidate { throw NotesModelError.other("boom") }
+ 62 |         lock.lock()
+    |              `- warning: instance method 'lock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 63 |         consolidations.append((kind, items, limit))
+ 64 |         lock.unlock()
+
+Foundation.NSLock.lock:2:11: note: 'lock()' declared here
+1 | class NSLock {
+2 | open func lock()}
+  |           `- note: 'lock()' declared here
+3 | 
+
+/Users/runner/work/minutes-ios/minutes-ios/Packages/MinutesCore/Tests/MinutesCoreTests/NotesEngineTests.swift:64:14: warning: instance method 'unlock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 62 |         lock.lock()
+ 63 |         consolidations.append((kind, items, limit))
+ 64 |         lock.unlock()
+    |              `- warning: instance method 'unlock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 65 |         let kept = Array(items.prefix(limit))
+ 66 |         return echoMarkers ? kept.map { "- " + $0 } : kept
+
+Foundation.NSLock.unlock:2:11: note: 'unlock()' declared here
+1 | class NSLock {
+2 | open func unlock()}
+  |           `- note: 'unlock()' declared here
+3 | 
+
+/Users/runner/work/minutes-ios/minutes-ios/Packages/MinutesCore/Tests/MinutesCoreTests/NotesEngineTests.swift:73:14: warning: instance method 'lock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 71 |     func overview(details: [String], decisions: [String], nextSteps: [String], titleHint: String?) async throws -> NotesOverview {
+ 72 |         try gate()
+ 73 |         lock.lock()
+    |              `- warning: instance method 'lock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 74 |         overviewCalls += 1
+ 75 |         overviewDetails = details
+
+Foundation.NSLock.lock:2:11: note: 'lock()' declared here
+1 | class NSLock {
+2 | open func lock()}
+  |           `- note: 'lock()' declared here
+3 | 
+
+/Users/runner/work/minutes-ios/minutes-ios/Packages/MinutesCore/Tests/MinutesCoreTests/NotesEngineTests.swift:76:14: warning: instance method 'unlock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 74 |         overviewCalls += 1
+ 75 |         overviewDetails = details
+ 76 |         lock.unlock()
+    |              `- warning: instance method 'unlock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 77 |         if failOverview { throw NotesModelError.other("boom") }
+ 78 |         return NotesOverview(title: "\"Add-on diligence review.\"", summary: "A summary of \(details.count) parts.")
+
+Foundation.NSLock.unlock:2:11: note: 'unlock()' declared here
+1 | class NSLock {
+2 | open func unlock()}
+  |           `- note: 'unlock()' declared here
+3 | 
+[27/37] Compiling MinutesCoreTests SMTPTests.swift
+/Users/runner/work/minutes-ios/minutes-ios/Packages/MinutesCore/Tests/MinutesCoreTests/NotesEngineTests.swift:42:14: warning: instance method 'lock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 40 |         if section.count > rejectSectionsLongerThan { throw NotesModelError.contextExceeded }
+ 41 |         if let needle = refuseSectionsContaining, section.contains(needle) { throw NotesModelError.refused("unsafe") }
+ 42 |         lock.lock()
+    |              `- warning: instance method 'lock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 43 |         sections.append(section)
+ 44 |         contexts.append(context)
+
+Foundation.NSLock.lock:2:11: note: 'lock()' declared here
+1 | class NSLock {
+2 | open func lock()}
+  |           `- note: 'lock()' declared here
+3 | 
+
+/Users/runner/work/minutes-ios/minutes-ios/Packages/MinutesCore/Tests/MinutesCoreTests/NotesEngineTests.swift:46:14: warning: instance method 'unlock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 44 |         contexts.append(context)
+ 45 |         let n = sections.count
+ 46 |         lock.unlock()
+    |              `- warning: instance method 'unlock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 47 |         let first = section.split(separator: "\n").first.map(String.init) ?? ""
+ 48 |         return NotesFragment(
+
+Foundation.NSLock.unlock:2:11: note: 'unlock()' declared here
+1 | class NSLock {
+2 | open func unlock()}
+  |           `- note: 'unlock()' declared here
+3 | 
+
+/Users/runner/work/minutes-ios/minutes-ios/Packages/MinutesCore/Tests/MinutesCoreTests/NotesEngineTests.swift:62:14: warning: instance method 'lock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 60 |         try gate()
+ 61 |         if failConsolidate { throw NotesModelError.other("boom") }
+ 62 |         lock.lock()
+    |              `- warning: instance method 'lock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 63 |         consolidations.append((kind, items, limit))
+ 64 |         lock.unlock()
+
+Foundation.NSLock.lock:2:11: note: 'lock()' declared here
+1 | class NSLock {
+2 | open func lock()}
+  |           `- note: 'lock()' declared here
+3 | 
+
+/Users/runner/work/minutes-ios/minutes-ios/Packages/MinutesCore/Tests/MinutesCoreTests/NotesEngineTests.swift:64:14: warning: instance method 'unlock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 62 |         lock.lock()
+ 63 |         consolidations.append((kind, items, limit))
+ 64 |         lock.unlock()
+    |              `- warning: instance method 'unlock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 65 |         let kept = Array(items.prefix(limit))
+ 66 |         return echoMarkers ? kept.map { "- " + $0 } : kept
+
+Foundation.NSLock.unlock:2:11: note: 'unlock()' declared here
+1 | class NSLock {
+2 | open func unlock()}
+  |           `- note: 'unlock()' declared here
+3 | 
+
+/Users/runner/work/minutes-ios/minutes-ios/Packages/MinutesCore/Tests/MinutesCoreTests/NotesEngineTests.swift:73:14: warning: instance method 'lock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 71 |     func overview(details: [String], decisions: [String], nextSteps: [String], titleHint: String?) async throws -> NotesOverview {
+ 72 |         try gate()
+ 73 |         lock.lock()
+    |              `- warning: instance method 'lock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 74 |         overviewCalls += 1
+ 75 |         overviewDetails = details
+
+Foundation.NSLock.lock:2:11: note: 'lock()' declared here
+1 | class NSLock {
+2 | open func lock()}
+  |           `- note: 'lock()' declared here
+3 | 
+
+/Users/runner/work/minutes-ios/minutes-ios/Packages/MinutesCore/Tests/MinutesCoreTests/NotesEngineTests.swift:76:14: warning: instance method 'unlock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 74 |         overviewCalls += 1
+ 75 |         overviewDetails = details
+ 76 |         lock.unlock()
+    |              `- warning: instance method 'unlock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 77 |         if failOverview { throw NotesModelError.other("boom") }
+ 78 |         return NotesOverview(title: "\"Add-on diligence review.\"", summary: "A summary of \(details.count) parts.")
+
+Foundation.NSLock.unlock:2:11: note: 'unlock()' declared here
+1 | class NSLock {
+2 | open func unlock()}
+  |           `- note: 'unlock()' declared here
+3 | 
+[28/37] Compiling MinutesCoreTests SpeakerCounterTests.swift
+/Users/runner/work/minutes-ios/minutes-ios/Packages/MinutesCore/Tests/MinutesCoreTests/NotesEngineTests.swift:42:14: warning: instance method 'lock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 40 |         if section.count > rejectSectionsLongerThan { throw NotesModelError.contextExceeded }
+ 41 |         if let needle = refuseSectionsContaining, section.contains(needle) { throw NotesModelError.refused("unsafe") }
+ 42 |         lock.lock()
+    |              `- warning: instance method 'lock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 43 |         sections.append(section)
+ 44 |         contexts.append(context)
+
+Foundation.NSLock.lock:2:11: note: 'lock()' declared here
+1 | class NSLock {
+2 | open func lock()}
+  |           `- note: 'lock()' declared here
+3 | 
+
+/Users/runner/work/minutes-ios/minutes-ios/Packages/MinutesCore/Tests/MinutesCoreTests/NotesEngineTests.swift:46:14: warning: instance method 'unlock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 44 |         contexts.append(context)
+ 45 |         let n = sections.count
+ 46 |         lock.unlock()
+    |              `- warning: instance method 'unlock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 47 |         let first = section.split(separator: "\n").first.map(String.init) ?? ""
+ 48 |         return NotesFragment(
+
+Foundation.NSLock.unlock:2:11: note: 'unlock()' declared here
+1 | class NSLock {
+2 | open func unlock()}
+  |           `- note: 'unlock()' declared here
+3 | 
+
+/Users/runner/work/minutes-ios/minutes-ios/Packages/MinutesCore/Tests/MinutesCoreTests/NotesEngineTests.swift:62:14: warning: instance method 'lock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 60 |         try gate()
+ 61 |         if failConsolidate { throw NotesModelError.other("boom") }
+ 62 |         lock.lock()
+    |              `- warning: instance method 'lock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 63 |         consolidations.append((kind, items, limit))
+ 64 |         lock.unlock()
+
+Foundation.NSLock.lock:2:11: note: 'lock()' declared here
+1 | class NSLock {
+2 | open func lock()}
+  |           `- note: 'lock()' declared here
+3 | 
+
+/Users/runner/work/minutes-ios/minutes-ios/Packages/MinutesCore/Tests/MinutesCoreTests/NotesEngineTests.swift:64:14: warning: instance method 'unlock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 62 |         lock.lock()
+ 63 |         consolidations.append((kind, items, limit))
+ 64 |         lock.unlock()
+    |              `- warning: instance method 'unlock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 65 |         let kept = Array(items.prefix(limit))
+ 66 |         return echoMarkers ? kept.map { "- " + $0 } : kept
+
+Foundation.NSLock.unlock:2:11: note: 'unlock()' declared here
+1 | class NSLock {
+2 | open func unlock()}
+  |           `- note: 'unlock()' declared here
+3 | 
+
+/Users/runner/work/minutes-ios/minutes-ios/Packages/MinutesCore/Tests/MinutesCoreTests/NotesEngineTests.swift:73:14: warning: instance method 'lock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 71 |     func overview(details: [String], decisions: [String], nextSteps: [String], titleHint: String?) async throws -> NotesOverview {
+ 72 |         try gate()
+ 73 |         lock.lock()
+    |              `- warning: instance method 'lock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 74 |         overviewCalls += 1
+ 75 |         overviewDetails = details
+
+Foundation.NSLock.lock:2:11: note: 'lock()' declared here
+1 | class NSLock {
+2 | open func lock()}
+  |           `- note: 'lock()' declared here
+3 | 
+
+/Users/runner/work/minutes-ios/minutes-ios/Packages/MinutesCore/Tests/MinutesCoreTests/NotesEngineTests.swift:76:14: warning: instance method 'unlock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 74 |         overviewCalls += 1
+ 75 |         overviewDetails = details
+ 76 |         lock.unlock()
+    |              `- warning: instance method 'unlock' is unavailable from asynchronous contexts; Use async-safe scoped locking instead; this is an error in the Swift 6 language mode
+ 77 |         if failOverview { throw NotesModelError.other("boom") }
+ 78 |         return NotesOverview(title: "\"Add-on diligence review.\"", summary: "A summary of \(details.count) parts.")
+
+Foundation.NSLock.unlock:2:11: note: 'unlock()' declared here
+1 | class NSLock {
+2 | open func unlock()}
+  |           `- note: 'unlock()' declared here
+3 | 
+[29/37] Emitting module MinutesCoreTests
+[30/37] Compiling MinutesCoreTests CloudNotesTests.swift
+[31/37] Compiling MinutesCoreTests DesktopNotesTests.swift
+[32/37] Compiling MinutesCoreTests EmailTests.swift
+[33/37] Compiling MinutesCoreTests HubSpotTests.swift
+[34/37] Compiling MinutesCoreTests NamingTests.swift
+[35/37] Compiling MinutesCoreTests NetworkTransportTests.swift
+[36/42] Compiling MinutesCoreTests SpeakerMatcherTests.swift
+[37/42] Compiling MinutesCoreTests TranscriptAssemblerTests.swift
+[38/42] Compiling MinutesCoreTests VocabularyTests.swift
+[39/42] Compiling MinutesCoreTests WAVAndStoreTests.swift
+[40/42] Compiling MinutesCoreTests WordDocumentTests.swift
+[41/44] Compiling MinutesCorePackageTests runner.swift
+[42/44] Emitting module MinutesCorePackageTests
+[42/44] Write Objects.LinkFileList
+[43/44] Linking MinutesCorePackageTests
+Build complete! (14.88s)
+Test Suite 'Selected tests' started at 2026-11-19 18:01:47.169.
+Test Suite 'MinutesCorePackageTests.xctest' started at 2026-11-19 18:01:47.171.
+Test Suite 'NetworkTransportTests' started at 2026-11-19 18:01:47.171.
+Test Case '-[MinutesCoreTests.NetworkTransportTests testTheMailboxClientReachesGmailAndIsRefusedWithAMadeUpPassword]' started.
+Test Case '-[MinutesCoreTests.NetworkTransportTests testTheMailboxClientReachesGmailAndIsRefusedWithAMadeUpPassword]' passed (0.534 seconds).
+Test Case '-[MinutesCoreTests.NetworkTransportTests testTLSHandshakeAndGreetingFromGmail]' started.
+Test Case '-[MinutesCoreTests.NetworkTransportTests testTLSHandshakeAndGreetingFromGmail]' passed (0.079 seconds).
+Test Case '-[MinutesCoreTests.NetworkTransportTests testUnreachableServerFailsInsteadOfHanging]' started.
+Test Case '-[MinutesCoreTests.NetworkTransportTests testUnreachableServerFailsInsteadOfHanging]' passed (0.010 seconds).
+Test Case '-[MinutesCoreTests.NetworkTransportTests testWrongPasswordAgainstGmailIsReportedAsSignInFailure]' started.
+Test Case '-[MinutesCoreTests.NetworkTransportTests testWrongPasswordAgainstGmailIsReportedAsSignInFailure]' passed (0.050 seconds).
+Test Suite 'NetworkTransportTests' passed at 2026-11-19 18:01:47.844.
+	 Executed 4 tests, with 0 failures (0 unexpected) in 0.672 (0.673) seconds
+Test Suite 'MinutesCorePackageTests.xctest' passed at 2026-11-19 18:01:47.844.
+	 Executed 4 tests, with 0 failures (0 unexpected) in 0.672 (0.673) seconds
+Test Suite 'Selected tests' passed at 2026-11-19 18:01:47.844.
+	 Executed 4 tests, with 0 failures (0 unexpected) in 0.672 (0.675) seconds
+◇ Test run started.
+↳ Testing Library Version: 1902
+↳ Target Platform: arm64e-apple-macos14.0
+✔ Test run with 0 tests in 0 suites passed after 0.001 seconds.

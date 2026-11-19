@@ -1,0 +1,14 @@
+PASS the phone's side passed its two tests
+PASS the model was asked once
+PASS the request carries the transcript, accents intact
+PASS the request carries the app's instructions and spellings
+PASS the answer format is plain JSON Schema
+PASS the model is told to answer in the format, without thinking aloud
+PASS nothing is left in the shared folder
+PASS nothing is left in the unanswered folder
+PASS what was removed went to the Trash, not to All Mail
+PASS nothing reached the inbox
+PASS the desktop program logged the ping and the notes
+PASS the desktop program's log holds no transcript text
+
+12/12 checks passed
