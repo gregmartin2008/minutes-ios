@@ -1,0 +1,17 @@
+{
+ "audio_seconds": 115.0,
+ "reference_speakers": 6,
+ "found_speakers": 5,
+ "der": 0.2083,
+ "miss": 0.0009,
+ "false_alarm": 0.034,
+ "confusion": 0.1733,
+ "wer": 0.0465,
+ "cpwer": 0.3576,
+ "reference_words": 344,
+ "utterances": 20,
+ "utterances_marked_crosstalk": 6,
+ "crosstalk_seconds_found": 2.6,
+ "separation_speed_x": 12.2,
+ "transcription_speed_x": 23.1
+}

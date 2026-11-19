@@ -1,0 +1,4 @@
+[Profiling] Segmentation timings: windows=117 prepareTotal=10.21ms (perWindow=0.0873ms) predictionTotal=2347.92ms (perWindow=20.0677ms)
+[Profiling] Embedding timings: fbankTotal=649.23ms (perWindow=5.549ms), maskPrepTotal=0.74ms (perEval=0.002ms), resampleTotal=0.04ms (perValid=0.000ms), embeddingTotal=7597.71ms (perValid=39.988ms), pldaTotal=15.83ms (perValid=0.083ms), batches(fbank=4, plda=6)
+models ready in 11.6s (recognizer: ultra)
+meeting.wav: 115s audio, 5 speakers, 334 words, 20 utterances, 2.6s crosstalk | separation 9.4s (12x), transcription 5.0s (23x)
