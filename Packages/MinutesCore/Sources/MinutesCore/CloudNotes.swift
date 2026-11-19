@@ -285,8 +285,9 @@ public struct GeminiNotesWriter: CloudNotesWriting {
         the unit the speaker meant ("15 to 75" said about check sizes is "$15 million to $75 million"); \
         when the unit is not clear, keep the words as said. Only when the other side is an investor, \
         lender, seller or company, finish with one entry labeled "Not covered" whose value names the \
-        items above that nobody stated, so the reader knows what to ask next; leave that entry out when \
-        all were covered. An internal meeting never has a "Not covered" entry.
+        items above that nobody stated, so the reader knows what to ask next; check every item above one \
+        by one for it, and leave that entry out when all were covered. Give a condition with the term it \
+        belongs to ("Board seat: wanted at around a $10 million check, depending on the size of the raise"). An internal meeting never has a "Not covered" entry.
         - nextSteps: only concrete things a named person committed to do after the meeting (send, \
         schedule, introduce, review, revise, submit, call). Owner is the person's name as in the \
         transcript; "The group" when everyone. Include the deadline if one was said. An agreement to \
@@ -387,6 +388,30 @@ public struct GeminiNotesWriter: CloudNotesWriting {
         return nil
     }
 
+    /// Next steps with one person's repeated step removed. The writer sometimes gives the same
+    /// step twice in different words ("Add Dana to the quarterly pipeline list" and "adding Dana
+    /// to the list for the quarterly pipeline updates"); the first, which carries any deadline, stays.
+    static func withoutRepeatedSteps(_ steps: [String]) -> [String] {
+        func parts(_ step: String) -> (owner: String, words: Set<String>) {
+            let owner = step.range(of: ": ").map { String(step[..<$0.lowerBound]).lowercased() } ?? ""
+            var action = step.range(of: ": ").map { String(step[$0.upperBound...]) } ?? step
+            if action.hasSuffix(")"), let open = action.range(of: " (", options: .backwards) { action = String(action[..<open.lowerBound]) }
+            let words = action.lowercased().split(whereSeparator: { !$0.isLetter && !$0.isNumber })
+                .filter { $0.count >= 4 }.map { String($0.prefix(4)) }
+            return (owner, Set(words))
+        }
+        var kept: [(text: String, owner: String, words: Set<String>)] = []
+        for step in steps {
+            let p = parts(step)
+            let repeated = kept.contains { k in
+                let smaller = min(k.words.count, p.words.count)
+                return k.owner == p.owner && smaller >= 3 && Double(k.words.intersection(p.words).count) / Double(smaller) >= 0.7
+            }
+            if !repeated { kept.append((step, p.owner, p.words)) }
+        }
+        return kept.map(\.text)
+    }
+
     /// The speaker names in a transcript as `Render.cloudTranscript` writes them.
     static func speakers(in lines: [String]) -> Set<String> {
         Set(lines.compactMap { line in
@@ -451,7 +476,7 @@ public struct GeminiNotesWriter: CloudNotesWriting {
             title: NotesEngine.tidyTitle(json["title"] as? String ?? ""),
             summary: summary.trimmingCharacters(in: .whitespacesAndNewlines),
             decisions: NotesEngine.dedupe(decisions),
-            actionItems: NotesEngine.dedupe(next),
+            actionItems: Self.withoutRepeatedSteps(NotesEngine.dedupe(next)),
             openQuestions: NotesEngine.dedupe(open), figures: NotesEngine.dedupe(facts),
             skippedSections: 0, totalSections: 1,
             details: details, speakerHints: Self.hints(from: json, lines: lines, speakers: speakers))

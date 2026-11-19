@@ -328,4 +328,19 @@ final class CloudNotesTests: XCTestCase {
         XCTAssertTrue(prompt.contains("keyFacts holds nothing Jordan Carver's firm said to introduce itself."))
         XCTAssertTrue(prompt.contains("An internal meeting never has a \"Not covered\" entry."))
     }
+
+    func testOnePersonsRepeatedNextStepIsGivenOnce() {
+        XCTAssertEqual(GeminiNotesWriter.withoutRepeatedSteps([
+            "Jordan Carver: Add Dana Whitfield to the quarterly pipeline distribution list (Immediately)",
+            "The group: Maintain quarterly check-in cadence",
+            "Jordan Carver: adding Dana Whitfield to the distribution list for Meridyan's quarterly pipeline updates",
+            "Dana Whitfield: Add Jordan Carver to the quarterly pipeline distribution list",
+            "Jordan Carver: send the model",
+        ]), [
+            "Jordan Carver: Add Dana Whitfield to the quarterly pipeline distribution list (Immediately)",
+            "The group: Maintain quarterly check-in cadence",
+            "Dana Whitfield: Add Jordan Carver to the quarterly pipeline distribution list",
+            "Jordan Carver: send the model",
+        ])
+    }
 }
