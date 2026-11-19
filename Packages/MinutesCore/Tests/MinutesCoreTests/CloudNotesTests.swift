@@ -303,4 +303,28 @@ final class CloudNotesTests: XCTestCase {
         XCTAssertFalse(NotesEngine.numbersWereSaid(in: "A check of $40,000,000.", said: said))
         XCTAssertFalse(NotesEngine.numbersWereSaid(in: "A check of $15,500.", said: said))
     }
+
+    /// A firm whose name holds a number: sentences and key facts naming it are kept, because the
+    /// number is part of a name the meeting's title or invitation gives.
+    func testANumberInsideAFirmNameIsNotAFigure() throws {
+        let transcript = """
+        Dana Whitfield [0:05]: We are a single family office and we write checks between 15 and 75 per deal.
+        Jordan Carver [0:30]: Understood.
+        """
+        let json: [String: Any] = [
+            "title": "Introduction", "summary": "Dana Whitfield described her family office.",
+            "keyFacts": [["label": "1847 Partners control check", "value": "$15 million to $75 million per deal"]],
+            "nextSteps": [], "decisions": [],
+            "details": [["topic": "Strategy", "start": "0:05", "text": "1847 Partners is a single family office. It has $900 million."]],
+        ]
+        let brief = NotesBrief(recorder: "Jordan Carver", people: [Person(name: "Dana Whitfield", email: "dana@1847partners.example")])
+        let names = GeminiNotesWriter.names(title: "1847 Partners x Meridyan - Connect", spellings: [], brief: brief)
+        let notes = try GeminiNotesWriter.notes(from: json, transcript: transcript, names: names)
+        XCTAssertEqual(notes.figures, ["1847 Partners control check: $15 million to $75 million per deal"])
+        XCTAssertEqual(notes.details?.first?.text, "1847 Partners is a single family office.")
+        // Without the names, the firm's own name gets the sentence thrown out.
+        XCTAssertEqual(try GeminiNotesWriter.notes(from: json, transcript: transcript).figures, [])
+        let prompt = GeminiNotesWriter.prompt(transcript: transcript, title: nil, spellings: [], brief: brief)
+        XCTAssertTrue(prompt.contains("keyFacts holds nothing about Jordan Carver's firm."))
+    }
 }

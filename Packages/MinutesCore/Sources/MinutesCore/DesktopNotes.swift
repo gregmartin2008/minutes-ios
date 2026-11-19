@@ -303,7 +303,8 @@ public struct DesktopNotesWriter: CloudNotesWriting {
         guard let notesJSON = result["notes"] as? [String: Any] else {
             throw DesktopNotesError.desktop("the answer held no notes")
         }
-        var notes = try GeminiNotesWriter.notes(from: notesJSON, transcript: transcript)
+        var notes = try GeminiNotesWriter.notes(
+            from: notesJSON, transcript: transcript, names: GeminiNotesWriter.names(title: title, spellings: spellings, brief: brief))
         notes.writer = (result["writer"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? "a model on the desktop"
         return notes
     }

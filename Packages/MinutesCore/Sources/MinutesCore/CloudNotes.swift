@@ -177,7 +177,7 @@ public struct GeminiNotesWriter: CloudNotesWriting {
             for attempt in 1...2 {
                 do {
                     let json = try await generateOnce(prompt: prompt, schema: Self.schema, model: first, timeout: firstTimeout)
-                    var notes = try Self.notes(from: json, transcript: transcript)
+                    var notes = try Self.notes(from: json, transcript: transcript, names: Self.names(title: title, spellings: spellings, brief: brief))
                     notes.writer = Self.displayName(first)
                     return await withCommitments(notes, transcript: transcript, model: first)
                 } catch is CancellationError {
@@ -194,7 +194,7 @@ public struct GeminiNotesWriter: CloudNotesWriting {
             }
         }
         let json = try await generate(prompt: prompt, schema: Self.schema)
-        var notes = try Self.notes(from: json, transcript: transcript)
+        var notes = try Self.notes(from: json, transcript: transcript, names: Self.names(title: title, spellings: spellings, brief: brief))
         notes.writer = name
         return await withCommitments(notes, transcript: transcript, model: model)
     }
@@ -235,6 +235,20 @@ public struct GeminiNotesWriter: CloudNotesWriting {
         }
     }
 
+    /// The names the notes may write that the transcript may not hold as said: the meeting's
+    /// title, the people invited with their firms and email domains, and the spellings to keep.
+    static func names(title: String?, spellings: [String], brief: NotesBrief) -> [String] {
+        var out = spellings
+        if let title { out.append(title) }
+        for p in brief.people {
+            out.append(p.name)
+            if let company = p.company { out.append(company) }
+            if let email = p.email, let at = email.firstIndex(of: "@") { out.append(String(email[email.index(after: at)...])) }
+        }
+        if let about = brief.about { out.append(about) }
+        return out
+    }
+
     // MARK: Prompt and schema
 
     static func prompt(transcript: String, title: String?, spellings: [String], brief: NotesBrief = NotesBrief()) -> String {
@@ -252,6 +266,9 @@ public struct GeminiNotesWriter: CloudNotesWriting {
         - keyFacts: the terms and numbers the reader will look up later, one per entry, as a short \
         label and its value ("Control equity check", "$15 million to $75 million per deal"). This is \
         the most important list: go through the whole transcript for it and leave out nothing that was stated. \
+        It is about the other side only: what the people who are not from the reader's own firm said \
+        about themselves, their firm, their money and their company. The reader already knows their own \
+        firm's numbers, so nothing the reader's own side said about itself goes in this list. \
         When the other side is an investor, a capital partner, a family office or a lender, give every \
         one of these that was said, each as its own entry: who they are and whose money it is; the size \
         of company they invest in (revenue or EBITDA); check size, for each kind of deal they do; control \
@@ -282,7 +299,9 @@ public struct GeminiNotesWriter: CloudNotesWriting {
         hour). Each has a heading of 3 to 8 words, the start time of that part copied from the transcript \
         ("12:43"), and a paragraph of 3 to 7 sentences stating the substance: what each person said as \
         fact, with the numbers. No quotes, no bullet points, no "X asked and Y responded" play-by-play. \
-        Small talk gets one sentence at most, or nothing.
+        Small talk gets one sentence at most, or nothing. Give the most room to what the other side said \
+        about itself, with every number it gave; the reader's own firm describing itself gets two or \
+        three sentences in all, since the reader knows it.
         - speakerNames: only for voices the transcript calls "Speaker 1", "Speaker 2" and so on, and only \
         when the transcript itself shows who that voice is: they say their own name, or someone \
         addresses them by name and that voice answers next. Give the label, the name as spoken, and \
@@ -299,6 +318,8 @@ public struct GeminiNotesWriter: CloudNotesWriting {
                 + "The other participants are the other side: a seller, a lender, an investor or an advisor. "
                 + "Get the sides right: \(recorder)'s firm is the one making the offer, lending or investing unless the transcript plainly says otherwise, "
                 + "and is never called the seller when it is buying. A firm named in the meeting's title is not necessarily the firm the other participants are from."
+            p += "\nThe reader is \(recorder), so \"the reader's own firm\" is \(recorder)'s firm and \"the other side\" is everyone else. "
+                + "keyFacts holds nothing about \(recorder)'s firm."
         }
         if let title, !title.isEmpty { p += "\nThe meeting was named \"\(title)\"; keep that as the title unless it is only a date." }
         if !spellings.isEmpty { p += "\nSpell these exactly as written: " + spellings.prefix(60).joined(separator: ", ") + "." }
@@ -373,10 +394,15 @@ public struct GeminiNotesWriter: CloudNotesWriting {
 
     /// The model's JSON as notes. Numbers in the details are checked against the transcript as
     /// with the on-device model: a sentence citing a figure that was never said is dropped.
-    static func notes(from json: [String: Any], transcript: String) throws -> MeetingNotes {
+    ///
+    /// `names` are the meeting's title, the invited people and firms, and the spellings to keep.
+    /// A number inside one of them ("1932 Capital", "Route 9 Partners") is part of a name and not
+    /// a figure, so a sentence naming that firm is not thrown out because nobody said the number.
+    static func notes(from json: [String: Any], transcript: String, names: [String] = []) throws -> MeetingNotes {
         guard let summary = json["summary"] as? String else { throw CloudNotesError(status: 0, message: "Gemini returned no summary.") }
         let lines = transcript.split(separator: "\n").map(String.init)
-        let said = NotesEngine.saidNumbers(in: lines)
+        var said = NotesEngine.saidNumbers(in: lines)
+        said.formUnion(names.flatMap { NotesEngine.numbers($0) })
         let speakers = Self.speakers(in: lines)
         var next: [String] = []
         for item in json["nextSteps"] as? [[String: Any]] ?? [] {
