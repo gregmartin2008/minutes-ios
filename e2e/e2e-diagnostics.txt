@@ -1,0 +1,31 @@
+Minutes diagnostics
+Minutes 1.36, arm64, iOS 26.5, 7168 MB RAM, bundle app.minutes.recorder
+models ready: true, mail configured: true, voices: 0, meetings: 1
+language model: available
+- BD0571DF done/finished 115s speakers=5 assemble=0s email=0s separateSpeakers=38s transcribe=17s writeNotes=3s Apple's language model couldn't write the notes: it reported an error Minutes doesn't recognize.
+
+--- log ---
+2026-11-19 17:53:15.343 [info] launch: Minutes 1.36, arm64, iOS 26.5, 7168 MB RAM, bundle app.minutes.recorder
+2026-11-19 17:53:19.221 [info] calendar: on, access not asked yet
+2026-11-19 17:53:20.052 [info] app came to the foreground
+2026-11-19 17:53:57.340 [info] transcription model (processor) ready in 35.3s (files 35.3s, load 0.1s; Preprocessor 0s, Encoder 7s, Decoder 0s, JointDecisionv3 0s, Preprocessor 0s, Encoder 6s, Decoder 0s, JointDecisionv3 0s; caches 2336 MB, newest 0 min ago)
+2026-11-19 17:54:07.980 [info] speaker-separation models ready in 10.6s
+2026-11-19 17:54:13.504 [info] transcription model warmed up in 5.5s
+2026-11-19 17:54:13.509 [info] speech models downloaded
+2026-11-19 17:54:13.998 [info] imported 115s of audio as meeting BD0571DF-F7B5-4011-9432-D9D7E0D90CC2
+2026-11-19 17:54:16.331 [info] meeting BD0571DF-F7B5-4011-9432-D9D7E0D90CC2: starting separateSpeakers
+2026-11-19 17:54:54.694 [info] meeting BD0571DF-F7B5-4011-9432-D9D7E0D90CC2: finished separateSpeakers in 38.4s
+2026-11-19 17:54:54.695 [info] meeting BD0571DF-F7B5-4011-9432-D9D7E0D90CC2: starting transcribe
+2026-11-19 17:55:11.617 [info] meeting BD0571DF-F7B5-4011-9432-D9D7E0D90CC2: finished transcribe in 16.9s
+2026-11-19 17:55:11.617 [info] meeting BD0571DF-F7B5-4011-9432-D9D7E0D90CC2: starting assemble
+2026-11-19 17:55:11.944 [info] meeting BD0571DF-F7B5-4011-9432-D9D7E0D90CC2: voice levels Speaker 1 -17 dBFS, Speaker 2 -20 dBFS, Speaker 3 -18 dBFS, Speaker 4 -19 dBFS, Speaker 5 -18 dBFS; room floor -55 dBFS
+2026-11-19 17:55:11.948 [info] meeting BD0571DF-F7B5-4011-9432-D9D7E0D90CC2: finished assemble in 0.3s
+2026-11-19 17:55:11.949 [info] meeting BD0571DF-F7B5-4011-9432-D9D7E0D90CC2: starting writeNotes
+2026-11-19 17:55:14.816 [error] language model error: Error Domain=FoundationModels.LanguageModelSession.GenerationError Code=-1 "(null)" UserInfo={NSMultipleUnderlyingErrorsKey=(
+    "Error Domain=FoundationModels.LanguageModelSession.GenerationError Code=-1 \"(null)\" UserInfo={NSMultipleUnderlyingErrorsKey=(\n    \"Error Domain=ModelManagerServices.ModelManagerError Code=1026 \\\"(null)\\\" UserInfo={NSMultipleUnderlyingErrorsKey=(\\n)}\"\n)}"
+)}
+2026-11-19 17:55:14.832 [info] meeting BD0571DF-F7B5-4011-9432-D9D7E0D90CC2: finished writeNotes in 2.9s
+2026-11-19 17:55:14.832 [info] meeting BD0571DF-F7B5-4011-9432-D9D7E0D90CC2: starting email
+2026-11-19 17:55:15.259 [info] mail accepted by 127.0.0.1: 2.0.0 OK queued
+2026-11-19 17:55:15.261 [info] meeting BD0571DF-F7B5-4011-9432-D9D7E0D90CC2: finished email in 0.4s
+2026-11-19 17:55:15.278 [info] meeting BD0571DF-F7B5-4011-9432-D9D7E0D90CC2 ended run as done at finished
