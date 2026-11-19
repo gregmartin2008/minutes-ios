@@ -38,6 +38,18 @@ public struct SpeechOptions: Sendable {
     /// Which build of the Parakeet recognizer transcribes: "ultra" (what the app ships), or
     /// "v3", "redux" or "phonon2", which the benchmark tool compares it with.
     public var transcriptionModel = "ultra"
+    /// Run the recognizer on the processor alone, for good. Measured on the iPhone 18 Pro Max: the
+    /// processor copy loads in under three seconds and transcribes about 65 times faster than
+    /// real time (a second of work for each minute of meeting), while the Neural Engine copy took
+    /// nine minutes to prepare after a cold start, every time. Speaker separation still uses the
+    /// Neural Engine; its models load in seconds.
+    public var transcribeOnProcessor: Bool = {
+        #if os(iOS)
+        return true
+        #else
+        return false
+        #endif
+    }()
     /// Start transcribing on the processor while the Neural Engine copy of the recognizer is
     /// still being prepared. Preparing that copy has taken from a minute and a half to twelve
     /// minutes after every cold start of the app; the processor copy is ready in seconds and
@@ -53,6 +65,8 @@ public struct SpeechOptions: Sendable {
     public init() {}
 
     var computeUnits: MLComputeUnits { useNeuralEngine ? .cpuAndNeuralEngine : .cpuOnly }
+    /// The compute units for the recognizer, as opposed to the speaker-separation models.
+    var recognizerUnits: MLComputeUnits { transcribeOnProcessor ? .cpuOnly : computeUnits }
 
     var asrVersion: AsrModelVersion {
         switch transcriptionModel {
@@ -168,7 +182,8 @@ public actor SpeechModels {
         let task = Task<AsrManager, Error> {
             do {
                 let manager = try await Self.load(
-                    options: options, units: options.computeUnits, label: "transcription model", log: log, progress: progress)
+                    options: options, units: options.recognizerUnits,
+                    label: options.recognizerUnits == .cpuOnly ? "transcription model (processor)" : "transcription model", log: log, progress: progress)
                 await self.adopt(manager, generation: generation)
                 return manager
             } catch {
@@ -228,7 +243,7 @@ public actor SpeechModels {
         if let asr { return asr }
         // The stand-in needs the files on the phone already (two loads at once must not both
         // download them) and only makes sense when the main copy is headed for the Neural Engine.
-        guard options.quickStart, options.useNeuralEngine, transcriptionModelIsDownloaded() else {
+        guard options.quickStart, options.recognizerUnits != .cpuOnly, transcriptionModelIsDownloaded() else {
             return try await mainLoad(progress: progress).value
         }
         let main = mainLoad(progress: progress)
@@ -247,6 +262,15 @@ public actor SpeechModels {
     func mainTranscriber(progress: (@Sendable (Double, Bool) -> Void)? = nil) async throws -> AsrManager {
         if let asr { return asr }
         return try await mainLoad(progress: progress).value
+    }
+
+    /// Writes how much audio the recognizer has transcribed and how long it took, then starts over.
+    func logRecognizerUse() {
+        guard standInAudio > 0 || mainAudio > 0 else { return }
+        log.info(String(
+            format: "recognizer use: stand-in %.0fs of audio in %.1fs, main %.0fs in %.1fs",
+            standInAudio, standInTook, mainAudio, mainTook))
+        standInAudio = 0; standInTook = 0; mainAudio = 0; mainTook = 0
     }
 
     /// Notes how long a piece took, so the diagnostics show how the two copies compare.
@@ -322,12 +346,7 @@ public actor SpeechModels {
             standInLoading?.cancel()
             standInLoading = nil
             standIn = nil
-            if standInAudio > 0 || mainAudio > 0 {
-                log.info(String(
-                    format: "recognizer use: processor %.0fs of audio in %.1fs, Neural Engine %.0fs in %.1fs",
-                    standInAudio, standInTook, mainAudio, mainTook))
-            }
-            standInAudio = 0; standInTook = 0; mainAudio = 0; mainTook = 0
+            logRecognizerUse()
             if let asr { await asr.cleanup() }
             asr = nil
         case .separation:

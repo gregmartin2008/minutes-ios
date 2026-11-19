@@ -266,9 +266,10 @@ public struct GeminiNotesWriter: CloudNotesWriting {
         - keyFacts: the terms and numbers the reader will look up later, one per entry, as a short \
         label and its value ("Control equity check", "$15 million to $75 million per deal"). This is \
         the most important list: go through the whole transcript for it and leave out nothing that was stated. \
-        It is about the other side only: what the people who are not from the reader's own firm said \
-        about themselves, their firm, their money and their company. The reader already knows their own \
-        firm's numbers, so nothing the reader's own side said about itself goes in this list. \
+        When people from outside the reader's own firm are in the meeting, the list is about that other \
+        side only: what they said about themselves, their firm, their money and their company. The reader \
+        already knows their own firm, so nothing the reader's side said to introduce itself (its history, \
+        team, deal count, what it looks for) goes in this list. \
         When the other side is an investor, a capital partner, a family office or a lender, give every \
         one of these that was said, each as its own entry: who they are and whose money it is; the size \
         of company they invest in (revenue or EBITDA); check size, for each kind of deal they do; control \
@@ -278,11 +279,14 @@ public struct GeminiNotesWriter: CloudNotesWriting {
         have done; fees, carry and how a sponsor is paid; how early they want to see a deal and how fast \
         they decide. When the other side is a seller or a company: revenue, EBITDA and margins, growth, \
         the price or multiple asked or offered, customer concentration, employees, ownership, debt and \
-        timing. For any other meeting: the figures, dates and terms that matter. Write each amount with \
+        timing. When everyone in the meeting is from the reader's own firm, it is an internal meeting: \
+        give the figures, dates and terms discussed about each deal, portfolio company and plan, with the \
+        company's name in the label. Write each amount with \
         the unit the speaker meant ("15 to 75" said about check sizes is "$15 million to $75 million"); \
-        when the unit is not clear, keep the words as said. For an investor, lender, seller or company \
-        meeting, finish with one entry labeled "Not covered" whose value names the items above that \
-        nobody stated, so the reader knows what to ask next; leave that entry out when all were covered.
+        when the unit is not clear, keep the words as said. Only when the other side is an investor, \
+        lender, seller or company, finish with one entry labeled "Not covered" whose value names the \
+        items above that nobody stated, so the reader knows what to ask next; leave that entry out when \
+        all were covered. An internal meeting never has a "Not covered" entry.
         - nextSteps: only concrete things a named person committed to do after the meeting (send, \
         schedule, introduce, review, revise, submit, call). Owner is the person's name as in the \
         transcript; "The group" when everyone. Include the deadline if one was said. An agreement to \
@@ -319,7 +323,7 @@ public struct GeminiNotesWriter: CloudNotesWriting {
                 + "Get the sides right: \(recorder)'s firm is the one making the offer, lending or investing unless the transcript plainly says otherwise, "
                 + "and is never called the seller when it is buying. A firm named in the meeting's title is not necessarily the firm the other participants are from."
             p += "\nThe reader is \(recorder), so \"the reader's own firm\" is \(recorder)'s firm and \"the other side\" is everyone else. "
-                + "keyFacts holds nothing about \(recorder)'s firm."
+                + "When the other side is in the meeting, keyFacts holds nothing \(recorder)'s firm said to introduce itself."
         }
         if let title, !title.isEmpty { p += "\nThe meeting was named \"\(title)\"; keep that as the title unless it is only a date." }
         if !spellings.isEmpty { p += "\nSpell these exactly as written: " + spellings.prefix(60).joined(separator: ", ") + "." }

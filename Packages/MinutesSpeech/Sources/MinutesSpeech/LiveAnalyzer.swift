@@ -140,6 +140,7 @@ public actor LiveAnalyzer {
         working = true
         await work(flush: true)
         let analysis = pieces.isEmpty ? nil : FluidSeparator.PieceAnalysis(pieces: pieces, options: models.options)
+        await models.logRecognizerUse()
         log.info(String(
             format: "live analysis finished: %d words, %d voice pieces, %.0fs received, errors %d/%d, %@",
             words.count, pieces.count, Double(receivedSamples) / Double(sampleRate), transcriptionErrors, separationErrors,

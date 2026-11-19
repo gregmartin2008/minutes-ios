@@ -325,6 +325,7 @@ final class CloudNotesTests: XCTestCase {
         // Without the names, the firm's own name gets the sentence thrown out.
         XCTAssertEqual(try GeminiNotesWriter.notes(from: json, transcript: transcript).figures, [])
         let prompt = GeminiNotesWriter.prompt(transcript: transcript, title: nil, spellings: [], brief: brief)
-        XCTAssertTrue(prompt.contains("keyFacts holds nothing about Jordan Carver's firm."))
+        XCTAssertTrue(prompt.contains("keyFacts holds nothing Jordan Carver's firm said to introduce itself."))
+        XCTAssertTrue(prompt.contains("An internal meeting never has a \"Not covered\" entry."))
     }
 }
