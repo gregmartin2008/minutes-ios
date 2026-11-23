@@ -1,0 +1,36 @@
+/private/tmp/venv/lib/python3.9/site-packages/aiosmtpd/smtp.py:372: UserWarning: Requiring AUTH while not requiring TLS can lead to security vulnerabilities!
+  warn("Requiring AUTH while not requiring TLS "
+auth_required == True but auth_require_tls == False
+[    0s] mail server listening on 127.0.0.1:56523
+[   12s] launching: app.minutes.recorder: 37133
+[   18s] app: downloading models | None None
+[   41s] app: recording (simulated) | None None
+[  224s] app: processing | processing separateSpeakers
+[  228s] app: processing | processing assemble
+/private/tmp/venv/lib/python3.9/site-packages/aiosmtpd/smtp.py:372: UserWarning: Requiring AUTH while not requiring TLS can lead to security vulnerabilities!
+  warn("Requiring AUTH while not requiring TLS "
+auth_required == True but auth_require_tls == False
+Session.login_data is deprecated and will be removed in version 2.0
+[  230s] app: finished | done finished
+PASS the app reported back before the time limit  (finished)
+PASS speech models downloaded inside the app
+PASS the meeting finished processing  (done at finished: None)
+PASS several voices were told apart  (5 voices)
+PASS overlapping speech was detected  (5 passages with overlap, 0 marked as crosstalk)
+PASS the app recorded the email as sent
+PASS exactly one email reached the mail server  (1)
+PASS envelope sender and recipient  (minutes-test@example.com -> ['reader@example.com'])
+PASS subject  (Meeting notes: Meeting, Nov 23 at 10:38 PM (Nov 23, 2026))
+PASS no parsing defects
+PASS has an HTML body with the transcript
+PASS one Word document attached  (['Meeting, Nov 23 at 10 38 PM 2026-11-23 - Notes and Transcript.docx'])
+PASS the document carries the transcript
+PASS emailed transcript matches what was said  (word error 4.4% over 344 words)
+PASS transcript names each voice  (['Speaker 1', 'Speaker 2', 'Speaker 3', 'Speaker 4', 'Speaker 5'])
+PASS the vocabulary terms were written as given  (['Meridyan', 'Kestrel'])
+PASS after the recording ended, the email was sent within 90 seconds (simulator)  (73.7s from end to done)
+
+app timings: assemble 0.5s, email 1.1s, separateSpeakers 2.2s, transcribe 0.0s, writeNotes 0.5s | audio 116s | whole run 212s | after end 73.7s
+notes: Apple's language model couldn't write the notes: it reported an error Minutes doesn't recognize.
+
+17/17 end-to-end checks passed
