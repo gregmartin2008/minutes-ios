@@ -1,0 +1,17 @@
+PASS the phone's side passed its three tests
+PASS the short meeting was asked for once
+PASS the long meeting was asked for in three parts, in order
+PASS each part carries only its own stretch of the transcript
+PASS the closing request holds the parts' notes in place of the marker
+PASS the request carries the transcript, accents intact
+PASS the request carries the app's instructions and spellings
+PASS the answer format is plain JSON Schema
+PASS the model is told to answer in the format, without thinking aloud
+PASS nothing is left in the shared folder
+PASS nothing is left in the unanswered folder
+PASS what was removed went to the Trash, not to All Mail
+PASS nothing reached the inbox
+PASS the desktop program logged the ping and the notes
+PASS the desktop program's log holds no transcript text
+
+15/15 checks passed
