@@ -121,6 +121,20 @@ final class DesktopNotesIntegrationTests: XCTestCase {
             "a sentence citing a figure never said is left out")
     }
 
+    /// A meeting of half an hour or more goes over in parts and comes back as one set of notes.
+    func testALongMeetingIsWrittenInPartsAndClosed() async throws {
+        let w = try writer()
+        var lines: [String] = []
+        for minute in 0..<45 {
+            lines.append("\(minute % 2 == 0 ? "Greg Marsh" : "Dana Lee") [\(minute):10]: We covered item \(minute) and agreed on 16 and a half plus eight for it.")
+        }
+        let notes = try await w.write(transcript: lines.joined(separator: "\n"), title: "Long call", spellings: [])
+        XCTAssertEqual(notes.summary, "The closing summary of the long call.")
+        XCTAssertEqual(notes.details?.count, 3, "one part's notes from each of three parts")
+        XCTAssertEqual(notes.actionItems, ["Dana Lee: Send the model (Friday)"], "the same step from three parts is given once")
+        XCTAssertEqual(notes.figures, ["Not covered: hold period"])
+    }
+
     /// Nothing is watching this folder: the phone gives up quickly and says why.
     func testNoDesktopIsNoticedQuickly() async throws {
         var w = try writer(folder: "Nobody Home")

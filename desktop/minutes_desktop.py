@@ -228,28 +228,54 @@ def ollama_models(config):
     return [m.get("name") for m in ollama(config, "/api/tags").get("models", [])]
 
 
-def write_notes(config, job):
-    words = int(job.get("words") or len(job["prompt"].split()))
-    room = max(4096, min(16384, int(job.get("max_output") or 4096)))   # tokens the answer may take
+def generate(config, prompt, schema, words=None, max_output=None):
+    """One request to the model. Returns its answer as a dict, the context size used and the speed."""
+    words = int(words or len(prompt.split()))
+    room = max(4096, min(16384, int(max_output or 4096)))              # tokens the answer may take
     needed = int(words * 1.5) + 2000 + room        # the transcript, the instructions, the answer
     context = next((size for size in (16384, 24576, 32768, 49152, 65536) if size >= needed), 65536)
     body = {
         "model": config["model"],
         "stream": False,
         "think": False,
-        "format": job["schema"],
+        "format": schema,
         "keep_alive": config.get("keep_loaded", "10m"),
         "options": {"num_ctx": context, "temperature": 0.2, "num_predict": room},
-        "messages": [{"role": "user", "content": job["prompt"] + "\nAnswer with one JSON object and nothing else."}],
+        "messages": [{"role": "user", "content": prompt + "\nAnswer with one JSON object and nothing else."}],
     }
     reply = ollama(config, "/api/chat", body, timeout=1500)
     if reply.get("done_reason") == "length":
         raise ValueError("the notes were longer than the %d tokens allowed and were cut off" % room)
-    notes = json.loads(reply["message"]["content"])
-    if not isinstance(notes, dict) or not notes.get("summary"):
+    answer = json.loads(reply["message"]["content"])
+    if not isinstance(answer, dict) or not answer.get("summary"):
         raise ValueError("the model's answer had no summary")
     speed = reply.get("eval_count", 0) / (reply.get("eval_duration", 0) / 1e9) if reply.get("eval_duration") else 0
-    return notes, context, speed
+    return answer, context, speed
+
+
+def write_notes(config, job):
+    """The notes for a job: in one go, or part by part with a closing request when the phone
+    cut a long meeting into parts. Returns what goes into the result, the context size and speed."""
+    parts = job.get("parts")
+    if not parts:
+        notes, context, speed = generate(config, job["prompt"], job["schema"], job.get("words"), job.get("max_output"))
+        return {"notes": notes}, context, speed
+    written, context, speeds = [], 0, []
+    for part in parts:
+        notes, size, speed = generate(config, part["prompt"], job["schema"], part.get("words"), part.get("max_output"))
+        written.append(notes)
+        context = max(context, size)
+        speeds.append(speed)
+    out = {"parts": written}
+    closing = job.get("closing")
+    if closing:
+        text = json.dumps(written, ensure_ascii=False)
+        prompt = closing["prompt"].replace(closing.get("marker") or "{{PARTS}}", text)
+        try:
+            out["closing"], _, _ = generate(config, prompt, closing["schema"], len(text.split()), closing.get("max_output"))
+        except Exception as e:                      # the parts stand without it
+            log("the closing request failed, sending the parts alone: %s: %s" % (type(e).__name__, str(e)[:120]))
+    return out, context, sum(speeds) / len(speeds)
 
 
 # ------------------------------------------------------------------ the loop
@@ -271,9 +297,10 @@ def handle(box, config, uid, subject):
     log("job %s: %s words; writing the notes" % (job_id, job.get("words", "?")))
     started = time.time()
     try:
-        notes, context, speed = write_notes(config, job)
-        result = dict(about, notes=notes, seconds=round(time.time() - started, 1))
-        log("job %s: notes written in %.0fs (%.0f words a second, room for %d)" % (job_id, time.time() - started, speed, context))
+        written, context, speed = write_notes(config, job)
+        result = dict(about, seconds=round(time.time() - started, 1), **written)
+        log("job %s: notes written in %.0fs (%d part(s), %.0f words a second, room for %d)"
+            % (job_id, time.time() - started, len(written.get("parts") or [1]), speed, context))
     except Exception as e:                                    # the phone falls back to its own way
         result = dict(about, error=("%s: %s" % (type(e).__name__, e))[:300])
         log("job %s: failed: %s" % (job_id, result["error"]))

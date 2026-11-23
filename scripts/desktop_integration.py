@@ -30,6 +30,10 @@ class Ollama(BaseHTTPRequestHandler):
     def do_POST(self):
         body = json.loads(self.rfile.read(int(self.headers["Content-Length"])).decode("utf-8"))
         asked.append(body)
+        if "notCovered" in body["format"]["properties"]:
+            closing = {"title": "Long call", "summary": "The closing summary of the long call.", "notCovered": "hold period"}
+            self.reply({"message": {"content": json.dumps(closing)}, "eval_count": 50, "eval_duration": 1_000_000_000})
+            return
         notes = {
             "title": "Offer call", "summary": "Greg Marsh and Dana Lee agreed terms.",
             "nextSteps": [{"owner": "Dana Lee", "action": "Send the model", "when": "Friday"}],
@@ -77,11 +81,21 @@ def main():
             ["swift", "test", "--filter", "DesktopNotesIntegrationTests"], cwd=core,
             env=dict(os.environ, MINUTES_IMAP_PORT=str(imap_port)), capture_output=True, text=True)
         out = run.stdout + run.stderr
-        check("the phone's side passed its two tests", "Executed 2 tests, with 0 failures" in out, out[-1500:])
+        check("the phone's side passed its three tests", "Executed 3 tests, with 0 failures" in out, out[-1500:])
         time.sleep(1.0)
 
-        notes_jobs = [a for a in asked]
-        check("the model was asked once", len(notes_jobs) == 1, len(notes_jobs))
+        texts = [a["messages"][0]["content"] for a in asked]
+        part_asks = [t for t in texts if "of 3 of one meeting" in t]
+        closing_asks = [a for a in asked if "notCovered" in a["format"]["properties"]]
+        notes_jobs = [a for a, t in zip(asked, texts) if "of 3 of one meeting" not in t and "notCovered" not in a["format"]["properties"]]
+        check("the short meeting was asked for once", len(notes_jobs) == 1, len(notes_jobs))
+        check("the long meeting was asked for in three parts, in order",
+              len(part_asks) == 3 and all("part %d of 3" % (i + 1) in t for i, t in enumerate(part_asks)), len(part_asks))
+        check("each part carries only its own stretch of the transcript",
+              len(part_asks) == 3 and "item 0 " in part_asks[0] and "item 44 " not in part_asks[0] and "item 44 " in part_asks[2] and "item 0 " not in part_asks[2])
+        check("the closing request holds the parts' notes in place of the marker",
+              len(closing_asks) == 1 and "{{PARTS}}" not in closing_asks[0]["messages"][0]["content"]
+              and closing_asks[0]["messages"][0]["content"].count("Greg Marsh and Dana Lee agreed terms.") == 3)
         if notes_jobs:
             a = notes_jobs[0]
             prompt = a["messages"][0]["content"]

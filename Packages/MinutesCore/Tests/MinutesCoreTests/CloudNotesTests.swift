@@ -365,4 +365,48 @@ final class CloudNotesTests: XCTestCase {
         XCTAssertEqual(DesktopNotesWriter.patience(words: 10_000, base: 300), 580, accuracy: 0.1)
         XCTAssertEqual(DesktopNotesWriter.patience(words: 40_000, base: 300), 780, accuracy: 0.1)
     }
+
+    func testALongTranscriptIsCutIntoQuarterHoursAtLineBreaks() {
+        let lines = (0..<62).map { "Dana Whitfield [\($0 >= 60 ? "1:0\($0 - 60)" : "\($0)"):30]: line \($0) has a few words in it." }
+        let parts = GeminiNotesWriter.parts(of: lines.joined(separator: "\n"))
+        XCTAssertEqual(parts.count, 4)
+        XCTAssertEqual(parts.map(\.index), [1, 2, 3, 4])
+        XCTAssertEqual(parts.first?.fromMinute, 0)
+        XCTAssertEqual(parts.last?.toMinute, 62)
+        XCTAssertEqual(parts.map(\.transcript).joined(separator: "\n"), lines.joined(separator: "\n"), "nothing is lost or repeated")
+        XCTAssertTrue(parts.allSatisfy { (14...17).contains($0.transcript.split(separator: "\n").count) })
+        XCTAssertEqual(GeminiNotesWriter.parts(of: lines.prefix(25).joined(separator: "\n")), [], "a short meeting is written in one go")
+
+        let prompt = GeminiNotesWriter.prompt(transcript: parts[1].transcript, title: nil, spellings: [], part: parts[1])
+        XCTAssertTrue(prompt.contains("This transcript is part 2 of 4 of one meeting"), prompt)
+        XCTAssertFalse(prompt.contains("This meeting runs about"))
+        XCTAssertTrue(GeminiNotesWriter.closingPrompt(title: "Weekly", brief: NotesBrief()).hasSuffix(GeminiNotesWriter.partsMarker))
+    }
+
+    func testPartsAreMergedIntoOneSetOfNotes() throws {
+        let transcript = "Dana Whitfield [0:05]: We pay 6 to 10 times.\nJordan Carver [40:00]: I will send the model."
+        let one: [String: Any] = [
+            "title": "Part one", "summary": "First.",
+            "keyFacts": [["label": "Valuation", "value": "6 to 10 times"], ["label": "Not covered", "value": "everything"]],
+            "nextSteps": [], "decisions": ["The group decided to submit a revised offer at a higher valuation."],
+            "details": [["topic": "Valuation", "start": "0:05", "text": "Dana Whitfield said they pay 6 to 10 times."]],
+        ]
+        let two: [String: Any] = [
+            "title": "Part two", "summary": "Second.", "keyFacts": [],
+            "nextSteps": [["owner": "Jordan Carver", "action": "send the model"]],
+            "decisions": ["The group decided to submit a revised offer at a higher valuation to match."],
+            "details": [["topic": "Model", "start": "40:00", "text": "Jordan Carver will send the model."]],
+        ]
+        let merged = GeminiNotesWriter.merged(parts: [one, two], closing: ["title": "Introduction", "summary": "Whole.", "notCovered": "hold period"])
+        let notes = try GeminiNotesWriter.notes(from: merged, transcript: transcript)
+        XCTAssertEqual(notes.summary, "Whole.")
+        XCTAssertEqual(notes.figures, ["Valuation: 6 to 10 times", "Not covered: hold period"])
+        XCTAssertEqual(notes.details?.map(\.topic), ["Valuation", "Model"])
+        XCTAssertEqual(notes.decisions.count, 1)
+        XCTAssertEqual(notes.actionItems, ["Jordan Carver: send the model"])
+        // Without a closing answer the parts' own summaries stand in.
+        let bare = try GeminiNotesWriter.notes(from: GeminiNotesWriter.merged(parts: [one, two], closing: [:]), transcript: transcript)
+        XCTAssertEqual(bare.summary, "First. Second.")
+        XCTAssertEqual(bare.figures, ["Valuation: 6 to 10 times"])
+    }
 }

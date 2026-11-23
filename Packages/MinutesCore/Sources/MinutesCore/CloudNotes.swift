@@ -249,6 +249,109 @@ public struct GeminiNotesWriter: CloudNotesWriting {
         return out
     }
 
+    // MARK: A long meeting in parts
+
+    /// One stretch of a long meeting, written up on its own.
+    struct NotesPart: Equatable {
+        var index: Int
+        var count: Int
+        var fromMinute: Int
+        var toMinute: Int
+        var transcript: String
+    }
+
+    /// A long transcript cut at line breaks into stretches of about fifteen minutes; nothing for a
+    /// meeting under half an hour. A model small enough for a desktop graphics card writes the
+    /// first forty minutes of an hour well and skims the rest; given a quarter hour at a time it
+    /// covers all of it.
+    static func parts(of transcript: String) -> [NotesPart] {
+        guard let minutes = Self.minutes(of: transcript), minutes >= 30 else { return [] }
+        let lines = transcript.split(separator: "\n", omittingEmptySubsequences: true).map(String.init)
+        let count = min(8, max(2, Int((Double(minutes) / 15).rounded())))
+        guard lines.count >= count * 2 else { return [] }
+        let words = lines.map { $0.split(separator: " ").count }
+        let total = words.reduce(0, +)
+        var out: [[String]] = [[]]
+        var running = 0
+        for (line, n) in zip(lines, words) {
+            if out.count < count, running >= total * out.count / count, !out[out.count - 1].isEmpty { out.append([]) }
+            out[out.count - 1].append(line)
+            running += n
+        }
+        func minute(_ line: String) -> Int? {
+            guard let open = line.firstIndex(of: "["), let close = line[open...].firstIndex(of: "]") else { return nil }
+            return Self.seconds(String(line[line.index(after: open)..<close])).map { Int($0 / 60) }
+        }
+        return out.enumerated().map { i, chunk in
+            NotesPart(
+                index: i + 1, count: out.count,
+                fromMinute: chunk.lazy.compactMap(minute).first ?? 0,
+                toMinute: chunk.reversed().lazy.compactMap(minute).first.map { $0 + 1 } ?? minutes,
+                transcript: chunk.joined(separator: "\n"))
+        }
+    }
+
+    /// Where the desktop program puts the parts' notes in the closing request.
+    static let partsMarker = "{{PARTS}}"
+
+    /// The closing request for a meeting written in parts: its title, its summary, and what an
+    /// outside party left unsaid.
+    static func closingPrompt(title: String?, brief: NotesBrief) -> String {
+        var p = """
+        You are finishing the notes of one meeting for a private equity firm. Below are the notes \
+        already written for each part of the meeting, in order, as JSON. Use only what they say. Write:
+        - title: 3 to 8 words naming the meeting's subject, no date.
+        - summary: 2 to 4 sentences. Who met about what, the most important things said across the whole \
+        meeting, and where it ended up. Specific, no filler like "met to discuss".
+        - notCovered: only when the other side in the meeting is an investor, a capital partner, a family \
+        office, a lender, a seller or a company. For an investor or lender, name which of these nobody \
+        stated: the size of company they invest in; check size; control or minority; board seat and \
+        governance; industries pursued and avoided; valuation multiples and their limit; debt comfort \
+        and limit; hold period; number of such deals done; fees and carry; how early they want to see a \
+        deal and how fast they decide. For a seller or company: revenue, EBITDA and margins, growth, \
+        price or multiple, customer concentration, employees, ownership, debt, timing. Check each item \
+        against the notes one by one. An empty string when all were covered, and always an empty string \
+        when everyone in the meeting is from the reader's own firm.
+        """
+        if let recorder = brief.recorder, !recorder.isEmpty {
+            p += "\nThe notes are for \(recorder), who recorded the meeting."
+            if let about = brief.about?.trimmingCharacters(in: .whitespacesAndNewlines), !about.isEmpty { p += " \(about)" }
+        }
+        if let title, !title.isEmpty { p += "\nThe calendar calls the meeting: \(title)" }
+        p += "\n\nNotes of the parts:\n\(Self.partsMarker)"
+        return p
+    }
+
+    static let closingSchema: [String: Any] = [
+        "type": "OBJECT",
+        "properties": [
+            "title": ["type": "STRING"], "summary": ["type": "STRING"], "notCovered": ["type": "STRING"],
+        ],
+        "required": ["title", "summary", "notCovered"],
+    ]
+
+    /// The parts' notes and the closing answer as one set of notes, in the shape `notes(from:)` reads.
+    static func merged(parts: [[String: Any]], closing: [String: Any]) -> [String: Any] {
+        func all(_ key: String) -> [Any] { parts.flatMap { $0[key] as? [Any] ?? [] } }
+        var facts = all("keyFacts").compactMap { $0 as? [String: Any] }
+            .filter { ($0["label"] as? String ?? "").lowercased() != "not covered" }
+        let missing = (closing["notCovered"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        if !missing.isEmpty { facts.append(["label": "Not covered", "value": missing]) }
+        let summary = (closing["summary"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+            ?? parts.compactMap { $0["summary"] as? String }.joined(separator: " ")
+        var out: [String: Any] = [
+            "summary": summary,
+            "keyFacts": facts,
+            "nextSteps": all("nextSteps"),
+            "decisions": Self.withoutRepeatedSteps(all("decisions").compactMap { $0 as? String }),
+            "openQuestions": all("openQuestions"),
+            "details": all("details"),
+            "speakerNames": all("speakerNames"),
+        ]
+        if let title = (closing["title"] as? String) ?? (parts.first?["title"] as? String) { out["title"] = title }
+        return out
+    }
+
     /// How long the meeting ran, from the last time stamp in the transcript.
     static func minutes(of transcript: String) -> Int? {
         for line in transcript.split(separator: "\n").reversed() {
@@ -261,7 +364,9 @@ public struct GeminiNotesWriter: CloudNotesWriting {
 
     // MARK: Prompt and schema
 
-    static func prompt(transcript: String, title: String?, spellings: [String], brief: NotesBrief = NotesBrief()) -> String {
+    static func prompt(
+        transcript: String, title: String?, spellings: [String], brief: NotesBrief = NotesBrief(), part: NotesPart? = nil
+    ) -> String {
         var p = """
         You write meeting notes for a private equity firm from a transcript. Each transcript line is \
         "Name [m:ss]: what they said"; the names are the people in the meeting (a "Speaker N" is a \
@@ -273,8 +378,9 @@ public struct GeminiNotesWriter: CloudNotesWriting {
         keep every number, date and name exactly as said. Never change a unit: "a dollar" stays a \
         dollar, not a million dollars.
         - Keep companies apart. When the talk moves to another deal or company, what is said next belongs \
-        to that one, not to the one before. If the transcript garbles a company's name, call it by what \
-        it does ("the vacation-rental design firm") and do not borrow a name mentioned nearby.
+        to that one, not to the one before. Call a company by the name the transcript uses for it. Only when the transcript never gives it a \
+        usable name, call it by what it does ("the vacation-rental design firm"); do not borrow a name \
+        mentioned nearby.
         - summary: 2 to 4 sentences. Who met about what, the one or two most important things each side \
         said, and where it ended up. Specific, no filler like "met to discuss".
         - keyFacts: the terms and numbers the reader will look up later, one per entry, as a short \
@@ -332,7 +438,12 @@ public struct GeminiNotesWriter: CloudNotesWriting {
         most meetings have none.
         - title: 3 to 8 words naming the meeting's subject, no date.
         """
-        if let minutes = Self.minutes(of: transcript), minutes >= 20 {
+        if let part {
+            let length = max(1, part.toMinute - part.fromMinute)
+            p += "\nThis transcript is part \(part.index) of \(part.count) of one meeting, from about minute \(part.fromMinute) to minute \(part.toMinute). "
+                + "Write notes for this part only, through its last line. details has about \(max(2, length / 5)) to \(max(3, length / 3)) entries. "
+                + "summary is two sentences on what this part covered. keyFacts has no \"Not covered\" entry; that is added later."
+        } else if let minutes = Self.minutes(of: transcript), minutes >= 20 {
             p += "\nThis meeting runs about \(minutes) minutes, so details has about \(max(5, minutes / 5)) to \(max(7, minutes / 4)) entries, the last one starting in its final minutes."
         }
         if let recorder = brief.recorder, !recorder.isEmpty {

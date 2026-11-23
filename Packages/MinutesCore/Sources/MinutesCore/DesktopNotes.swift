@@ -293,7 +293,7 @@ public struct DesktopNotesWriter: CloudNotesWriting {
     public func write(transcript: String, title: String?, spellings: [String], brief: NotesBrief) async throws -> MeetingNotes {
         let prompt = GeminiNotesWriter.prompt(transcript: transcript, title: title, spellings: spellings, brief: brief)
         let words = transcript.split(whereSeparator: { $0 == " " || $0 == "\n" }).count
-        let job: [String: Any] = [
+        var job: [String: Any] = [
             "v": 1,
             "kind": "notes",
             "prompt": prompt,
@@ -303,8 +303,37 @@ public struct DesktopNotesWriter: CloudNotesWriting {
             // desktop program allowed at first, and an answer cut short is no answer.
             "max_output": Self.outputRoom(words: words),
         ]
-        let result = try await exchange(job, finishWithin: Self.patience(words: words, base: finishWithin))
-        guard let notesJSON = result["notes"] as? [String: Any] else {
+        // A meeting of half an hour or more is written a quarter hour at a time and closed with
+        // one short request. A desktop program from before this was added writes it in one go
+        // from "prompt", as before.
+        let parts = GeminiNotesWriter.parts(of: transcript)
+        var wait = Self.patience(words: words, base: finishWithin)
+        if parts.count >= 2 {
+            job["parts"] = parts.map { part -> [String: Any] in
+                let partWords = part.transcript.split(whereSeparator: { $0 == " " || $0 == "\n" }).count
+                return [
+                    "prompt": GeminiNotesWriter.prompt(
+                        transcript: part.transcript, title: title, spellings: spellings, brief: brief, part: part),
+                    "words": partWords,
+                    "max_output": Self.outputRoom(words: partWords),
+                ]
+            }
+            job["closing"] = [
+                "prompt": GeminiNotesWriter.closingPrompt(title: title, brief: brief),
+                "schema": DesktopExchange.jsonSchema(GeminiNotesWriter.closingSchema),
+                "marker": GeminiNotesWriter.partsMarker,
+                "max_output": 4_096,
+            ] as [String: Any]
+            wait = min(900, max(wait, 240 + 90 * Double(parts.count)))
+        }
+        let result = try await exchange(job, finishWithin: wait)
+        let notesJSON: [String: Any]
+        if let written = result["parts"] as? [[String: Any]], !written.isEmpty {
+            notesJSON = GeminiNotesWriter.merged(parts: written, closing: result["closing"] as? [String: Any] ?? [:])
+            Log.shared.info("desktop: notes written in \(written.count) parts")
+        } else if let whole = result["notes"] as? [String: Any] {
+            notesJSON = whole
+        } else {
             throw DesktopNotesError.desktop("the answer held no notes")
         }
         var notes = try GeminiNotesWriter.notes(
