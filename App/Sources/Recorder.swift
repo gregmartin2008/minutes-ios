@@ -165,7 +165,19 @@ final class Recorder: NSObject {
         let session = AVAudioSession.sharedInstance()
         // Record only, through the iPhone's own microphones: a Bluetooth headset's microphone is
         // tuned for one nearby voice and would miss the rest of the table.
-        try session.setCategory(.record, mode: .default, options: [])
+        //
+        // The session mixes with other apps' sound. A record-only session is cut off the moment
+        // another app plays anything (a video in a feed, a voice message), and the meeting has a
+        // hole until that app lets go. Mixing, the recording carries on underneath. If iOS refuses
+        // the mixing setup, record-only still works as it always has.
+        do {
+            try session.setCategory(.playAndRecord, mode: .default, options: [.mixWithOthers, .defaultToSpeaker])
+        } catch {
+            Log.shared.warn("mixing audio session refused (\(error.localizedDescription)); recording without it")
+            try session.setCategory(.record, mode: .default, options: [])
+        }
+        // A call that rings and is not answered no longer stops the recording; answering it still does.
+        try? session.setPrefersNoInterruptionsFromSystemAlerts(true)
         if let mic = session.availableInputs?.first(where: { $0.portType == .builtInMic }) {
             try? session.setPreferredInput(mic)
             // Prefer a microphone that can listen in all directions.
