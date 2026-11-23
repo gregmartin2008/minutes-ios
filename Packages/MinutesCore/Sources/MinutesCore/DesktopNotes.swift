@@ -292,14 +292,18 @@ public struct DesktopNotesWriter: CloudNotesWriting {
 
     public func write(transcript: String, title: String?, spellings: [String], brief: NotesBrief) async throws -> MeetingNotes {
         let prompt = GeminiNotesWriter.prompt(transcript: transcript, title: title, spellings: spellings, brief: brief)
+        let words = transcript.split(whereSeparator: { $0 == " " || $0 == "\n" }).count
         let job: [String: Any] = [
             "v": 1,
             "kind": "notes",
             "prompt": prompt,
             "schema": DesktopExchange.jsonSchema(GeminiNotesWriter.schema),
-            "words": transcript.split(whereSeparator: { $0 == " " || $0 == "\n" }).count,
+            "words": words,
+            // Room for the answer: a long meeting's notes run well past the 4,096 tokens the
+            // desktop program allowed at first, and an answer cut short is no answer.
+            "max_output": Self.outputRoom(words: words),
         ]
-        let result = try await exchange(job)
+        let result = try await exchange(job, finishWithin: Self.patience(words: words, base: finishWithin))
         guard let notesJSON = result["notes"] as? [String: Any] else {
             throw DesktopNotesError.desktop("the answer held no notes")
         }
@@ -307,6 +311,15 @@ public struct DesktopNotesWriter: CloudNotesWriting {
             from: notesJSON, transcript: transcript, names: GeminiNotesWriter.names(title: title, spellings: spellings, brief: brief))
         notes.writer = (result["writer"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? "a model on the desktop"
         return notes
+    }
+
+    /// Tokens the desktop's model may write: more for a longer meeting.
+    static func outputRoom(words: Int) -> Int { min(12_000, max(4_096, 3_000 + words / 2)) }
+
+    /// How long to wait for the notes: the model writes about 25 tokens a second, so an hour-long
+    /// meeting's fuller notes take four to five minutes.
+    static func patience(words: Int, base: TimeInterval) -> TimeInterval {
+        min(900, max(base, 180 + Double(outputRoom(words: words)) / 20))
     }
 
     /// Asks the desktop whether it is there. Returns what it says about itself.
@@ -318,7 +331,8 @@ public struct DesktopNotesWriter: CloudNotesWriting {
     }
 
     /// Leaves a job, waits for the desktop's ack and (unless only the ack is wanted) its result.
-    func exchange(_ job: [String: Any], needsResult: Bool = true) async throws -> [String: Any] {
+    func exchange(_ job: [String: Any], needsResult: Bool = true, finishWithin: TimeInterval? = nil) async throws -> [String: Any] {
+        let finishWithin = finishWithin ?? self.finishWithin
         let id = String(UUID().uuidString.replacingOccurrences(of: "-", with: "").prefix(16)).lowercased()
         var body = job
         body["id"] = id

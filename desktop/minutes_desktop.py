@@ -230,7 +230,8 @@ def ollama_models(config):
 
 def write_notes(config, job):
     words = int(job.get("words") or len(job["prompt"].split()))
-    needed = int(words * 1.5) + 4500               # the transcript, the instructions, the answer
+    room = max(4096, min(16384, int(job.get("max_output") or 4096)))   # tokens the answer may take
+    needed = int(words * 1.5) + 2000 + room        # the transcript, the instructions, the answer
     context = next((size for size in (16384, 24576, 32768, 49152, 65536) if size >= needed), 65536)
     body = {
         "model": config["model"],
@@ -238,10 +239,12 @@ def write_notes(config, job):
         "think": False,
         "format": job["schema"],
         "keep_alive": config.get("keep_loaded", "10m"),
-        "options": {"num_ctx": context, "temperature": 0.2, "num_predict": 4096},
+        "options": {"num_ctx": context, "temperature": 0.2, "num_predict": room},
         "messages": [{"role": "user", "content": job["prompt"] + "\nAnswer with one JSON object and nothing else."}],
     }
     reply = ollama(config, "/api/chat", body, timeout=1500)
+    if reply.get("done_reason") == "length":
+        raise ValueError("the notes were longer than the %d tokens allowed and were cut off" % room)
     notes = json.loads(reply["message"]["content"])
     if not isinstance(notes, dict) or not notes.get("summary"):
         raise ValueError("the model's answer had no summary")

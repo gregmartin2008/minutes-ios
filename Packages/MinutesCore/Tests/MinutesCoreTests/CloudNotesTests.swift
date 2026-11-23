@@ -343,4 +343,26 @@ final class CloudNotesTests: XCTestCase {
             "Jordan Carver: send the model",
         ])
     }
+
+    /// A long meeting is told how long it ran and how many parts to write, so its last
+    /// minutes are covered like its first.
+    func testALongMeetingIsToldItsLengthAndHowManyPartsToWrite() {
+        let transcript = "Dana Whitfield [0:05]: Hello.\nJordan Carver [1:01:48]: Good stuff, talk soon."
+        XCTAssertEqual(GeminiNotesWriter.minutes(of: transcript), 62)
+        let prompt = GeminiNotesWriter.prompt(transcript: transcript, title: nil, spellings: [])
+        XCTAssertTrue(prompt.contains("This meeting runs about 62 minutes, so details has about 12 to 15 entries"))
+        XCTAssertTrue(prompt.contains("\"a dollar\" stays a"))
+        let short = GeminiNotesWriter.prompt(transcript: "Dana Whitfield [4:10]: Bye.", title: nil, spellings: [])
+        XCTAssertFalse(short.contains("This meeting runs about"))
+        XCTAssertNil(GeminiNotesWriter.minutes(of: "no time stamps here"))
+    }
+
+    func testTheDesktopIsGivenMoreRoomAndTimeForALongMeeting() {
+        XCTAssertEqual(DesktopNotesWriter.outputRoom(words: 900), 4_096)
+        XCTAssertEqual(DesktopNotesWriter.outputRoom(words: 10_000), 8_000)
+        XCTAssertEqual(DesktopNotesWriter.outputRoom(words: 40_000), 12_000)
+        XCTAssertEqual(DesktopNotesWriter.patience(words: 900, base: 300), 384.8, accuracy: 0.1)
+        XCTAssertEqual(DesktopNotesWriter.patience(words: 10_000, base: 300), 580, accuracy: 0.1)
+        XCTAssertEqual(DesktopNotesWriter.patience(words: 40_000, base: 300), 780, accuracy: 0.1)
+    }
 }

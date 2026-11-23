@@ -249,6 +249,16 @@ public struct GeminiNotesWriter: CloudNotesWriting {
         return out
     }
 
+    /// How long the meeting ran, from the last time stamp in the transcript.
+    static func minutes(of transcript: String) -> Int? {
+        for line in transcript.split(separator: "\n").reversed() {
+            guard let open = line.firstIndex(of: "["), let close = line[open...].firstIndex(of: "]") else { continue }
+            let seconds = Self.seconds(String(line[line.index(after: open)..<close]))
+            if let seconds { return Int((seconds / 60).rounded()) }
+        }
+        return nil
+    }
+
     // MARK: Prompt and schema
 
     static func prompt(transcript: String, title: String?, spellings: [String], brief: NotesBrief = NotesBrief()) -> String {
@@ -260,7 +270,11 @@ public struct GeminiNotesWriter: CloudNotesWriting {
 
         Rules:
         - Use only what the transcript says. Never add a number, name or fact that is not in it, and \
-        keep every number, date and name exactly as said.
+        keep every number, date and name exactly as said. Never change a unit: "a dollar" stays a \
+        dollar, not a million dollars.
+        - Keep companies apart. When the talk moves to another deal or company, what is said next belongs \
+        to that one, not to the one before. If the transcript garbles a company's name, call it by what \
+        it does ("the vacation-rental design firm") and do not borrow a name mentioned nearby.
         - summary: 2 to 4 sentences. Who met about what, the one or two most important things each side \
         said, and where it ended up. Specific, no filler like "met to discuss".
         - keyFacts: the terms and numbers the reader will look up later, one per entry, as a short \
@@ -281,7 +295,7 @@ public struct GeminiNotesWriter: CloudNotesWriting {
         the price or multiple asked or offered, customer concentration, employees, ownership, debt and \
         timing. When everyone in the meeting is from the reader's own firm, it is an internal meeting: \
         give the figures, dates and terms discussed about each deal, portfolio company and plan, with the \
-        company's name in the label. Write each amount with \
+        company's name in the label, and nothing about news, markets or small talk. Write each amount with \
         the unit the speaker meant ("15 to 75" said about check sizes is "$15 million to $75 million"); \
         when the unit is not clear, keep the words as said. Only when the other side is an investor, \
         lender, seller or company, finish with one entry labeled "Not covered" whose value names the \
@@ -292,7 +306,8 @@ public struct GeminiNotesWriter: CloudNotesWriting {
         schedule, introduce, review, revise, submit, call). Owner is the person's name as in the \
         transcript; "The group" when everyone. Include the deadline if one was said. An agreement to \
         talk again, reconnect or follow up by some date is a next step, and so is something a person \
-        offered to send. Not opinions, not things done during the meeting, not "continue to". Usually 0 to 8.
+        offered to send. Not opinions, not things done during the meeting, not "continue to". Go through \
+        the whole transcript for these, to the last line; a long meeting can have a dozen or more.
         - decisions: only what the people settled between them: a price, a plan, an option chosen, or \
         to hold off for now and revisit later. \
         One short sentence each. Not one person's view, and not one person's promise to do something \
@@ -300,11 +315,14 @@ public struct GeminiNotesWriter: CloudNotesWriting {
         - openQuestions: what someone asked or raised that was left without an answer by the end, and \
         matters for what happens next. One short sentence each, naming who needs to answer when that \
         was clear. Not questions that were answered in the meeting. Usually 0 to 5.
-        - details: the meeting part by part, in order, one entry per topic (typically 5 to 12 for an \
-        hour). Each has a heading of 3 to 8 words, the start time of that part copied from the transcript \
-        ("12:43"), and a paragraph of 3 to 7 sentences stating the substance: what each person said as \
+        - details: the meeting part by part, in order, one entry per topic: about one for every four \
+        or five minutes of meeting, so an hour has 12 to 16. Cover the whole meeting through its last \
+        minutes with the same care as the start; the last entry begins near the end of the transcript. \
+        Every deal, company or project discussed gets its own entry, however briefly it came up. \
+        Each has a heading of 3 to 8 words, the start time of that part copied from the transcript \
+        ("12:43"), and a paragraph of 2 to 6 sentences stating the substance: what each person said as \
         fact, with the numbers. No quotes, no bullet points, no "X asked and Y responded" play-by-play. \
-        Small talk gets one sentence at most, or nothing. Give the most room to what the other side said \
+        Small talk, jokes and news of the day get one sentence at most, or nothing. Give the most room to what the other side said \
         about itself, with every number it gave; the reader's own firm describing itself gets two or \
         three sentences in all, since the reader knows it.
         - speakerNames: only for voices the transcript calls "Speaker 1", "Speaker 2" and so on, and only \
@@ -314,6 +332,9 @@ public struct GeminiNotesWriter: CloudNotesWriting {
         most meetings have none.
         - title: 3 to 8 words naming the meeting's subject, no date.
         """
+        if let minutes = Self.minutes(of: transcript), minutes >= 20 {
+            p += "\nThis meeting runs about \(minutes) minutes, so details has about \(max(5, minutes / 5)) to \(max(7, minutes / 4)) entries, the last one starting in its final minutes."
+        }
         if let recorder = brief.recorder, !recorder.isEmpty {
             p += "\nThe notes are for \(recorder), who recorded the meeting."
             if let about = brief.about?.trimmingCharacters(in: .whitespacesAndNewlines), !about.isEmpty { p += " \(about)" }
