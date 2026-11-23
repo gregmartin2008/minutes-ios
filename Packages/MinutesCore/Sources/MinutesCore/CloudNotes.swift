@@ -258,6 +258,8 @@ public struct GeminiNotesWriter: CloudNotesWriting {
         var fromMinute: Int
         var toMinute: Int
         var transcript: String
+        /// When this part's first line was said, in seconds.
+        var startSeconds: Double = 0
         /// The last lines of the part before, so a discussion cut by the split keeps its subject.
         var before: String = ""
 
@@ -300,11 +302,15 @@ public struct GeminiNotesWriter: CloudNotesWriting {
                     if count >= 300 { break }
                 }
             }
+            let first = chunk.lazy.compactMap { line -> Double? in
+                guard let open = line.firstIndex(of: "["), let close = line[open...].firstIndex(of: "]") else { return nil }
+                return Self.seconds(String(line[line.index(after: open)..<close]))
+            }.first ?? 0
             return NotesPart(
                 index: i + 1, count: out.count,
                 fromMinute: chunk.lazy.compactMap(minute).first ?? 0,
                 toMinute: chunk.reversed().lazy.compactMap(minute).first.map { $0 + 1 } ?? minutes,
-                transcript: chunk.joined(separator: "\n"), before: before.joined(separator: "\n"))
+                transcript: chunk.joined(separator: "\n"), startSeconds: first, before: before.joined(separator: "\n"))
         }
     }
 
@@ -320,6 +326,19 @@ public struct GeminiNotesWriter: CloudNotesWriting {
         - title: 3 to 8 words naming the meeting's subject, no date.
         - summary: 2 to 4 sentences. Who met about what, the most important things said across the whole \
         meeting, and where it ended up. Specific, no filler like "met to discuss".
+        - keyFacts: the final list of terms and numbers, from the parts' keyFacts. Give each fact once. \
+        Where two labels plainly mean the same company under different names, use one name for both. \
+        Keep every value exactly as written. When people from outside the reader's firm are in the \
+        meeting, keep everything about that other side. When everyone is from the reader's own firm, \
+        keep only figures about the firm's own deals, portfolio companies and pipeline, and drop public \
+        companies in the news, stock prices, travel, hotels, game and event dates, who will attend \
+        something, and when something will be run or discussed.
+        - nextSteps: the final list, from the parts' nextSteps. Keep every real step, each once; two \
+        entries for the same task become one. The owner is a person in the meeting or "The group"; drop \
+        a step owned by a company or by someone outside the meeting. Leave "when" empty unless a \
+        deadline was said.
+        - decisions: the final list, from the parts' decisions, each once. Only what was settled, not \
+        views or observations. A new or revised offer the group agreed to make is a decision.
         - notCovered: only when the other side in the meeting is an investor, a capital partner, a family \
         office, a lender, a seller or a company. For an investor or lender, name which of these nobody \
         stated: the size of company they invest in; check size; control or minority; board seat and \
@@ -343,26 +362,74 @@ public struct GeminiNotesWriter: CloudNotesWriting {
         "type": "OBJECT",
         "properties": [
             "title": ["type": "STRING"], "summary": ["type": "STRING"], "notCovered": ["type": "STRING"],
+            "keyFacts": ["type": "ARRAY", "items": [
+                "type": "OBJECT",
+                "properties": ["label": ["type": "STRING"], "value": ["type": "STRING"]],
+                "required": ["label", "value"],
+            ]],
+            "nextSteps": ["type": "ARRAY", "items": [
+                "type": "OBJECT",
+                "properties": ["owner": ["type": "STRING"], "action": ["type": "STRING"], "when": ["type": "STRING"]],
+                "required": ["owner", "action"],
+            ]],
+            "decisions": ["type": "ARRAY", "items": ["type": "STRING"]],
         ],
-        "required": ["title", "summary", "notCovered"],
+        "required": ["title", "summary", "keyFacts", "nextSteps", "decisions", "notCovered"],
     ]
 
+    /// Key facts with a repeat removed: the same numbers under nearly the same label, which is
+    /// what two parts make of one stretch of the meeting.
+    static func withoutRepeatedFacts(_ facts: [[String: Any]]) -> [[String: Any]] {
+        func parts(_ fact: [String: Any]) -> (words: Set<String>, numbers: Set<String>) {
+            let text = "\(fact["label"] as? String ?? "") \(fact["value"] as? String ?? "")".lowercased()
+            let words = text.split(whereSeparator: { !$0.isLetter }).filter { $0.count >= 4 }.map { String($0.prefix(4)) }
+            return (Set(words), Set(NotesEngine.numbers(text)))
+        }
+        var kept: [(fact: [String: Any], words: Set<String>, numbers: Set<String>)] = []
+        for fact in facts {
+            let p = parts(fact)
+            let repeated = kept.contains { k in
+                let smaller = min(k.words.count, p.words.count)
+                guard smaller >= 2, !p.numbers.isEmpty, !k.numbers.isEmpty else { return false }
+                guard p.numbers.isSubset(of: k.numbers) || k.numbers.isSubset(of: p.numbers) else { return false }
+                return Double(k.words.intersection(p.words).count) / Double(smaller) >= 0.7
+            }
+            if !repeated { kept.append((fact, p.words, p.numbers)) }
+        }
+        return kept.map(\.fact)
+    }
+
     /// The parts' notes and the closing answer as one set of notes, in the shape `notes(from:)` reads.
-    static func merged(parts: [[String: Any]], closing: [String: Any]) -> [String: Any] {
+    static func merged(parts: [[String: Any]], closing: [String: Any], starts: [Double] = []) -> [String: Any] {
         func all(_ key: String) -> [Any] { parts.flatMap { $0[key] as? [Any] ?? [] } }
-        var facts = all("keyFacts").compactMap { $0 as? [String: Any] }
+        /// The closing answer's list when it gave one; the parts' own otherwise.
+        func final(_ key: String) -> [Any]? {
+            guard let list = closing[key] as? [Any], !list.isEmpty else { return nil }
+            return list
+        }
+        var facts = ((final("keyFacts") ?? all("keyFacts")).compactMap { $0 as? [String: Any] })
             .filter { ($0["label"] as? String ?? "").lowercased() != "not covered" }
+        facts = Self.withoutRepeatedFacts(facts)
         let missing = (closing["notCovered"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
         if !missing.isEmpty { facts.append(["label": "Not covered", "value": missing]) }
         let summary = (closing["summary"] as? String).flatMap { $0.isEmpty ? nil : $0 }
             ?? parts.compactMap { $0["summary"] as? String }.joined(separator: " ")
+        // A part is shown the last lines of the part before and sometimes writes them up again:
+        // an entry that starts before its own part began is that repeat.
+        var details: [Any] = []
+        for (i, part) in parts.enumerated() {
+            for entry in part["details"] as? [[String: Any]] ?? [] {
+                if i > 0, i < starts.count, let start = (entry["start"] as? String).flatMap(Self.seconds), start < starts[i] - 20 { continue }
+                details.append(entry)
+            }
+        }
         var out: [String: Any] = [
             "summary": summary,
             "keyFacts": facts,
-            "nextSteps": all("nextSteps"),
-            "decisions": Self.withoutRepeatedSteps(all("decisions").compactMap { $0 as? String }),
+            "nextSteps": final("nextSteps") ?? all("nextSteps"),
+            "decisions": Self.withoutRepeatedSteps((final("decisions") ?? all("decisions")).compactMap { $0 as? String }),
             "openQuestions": all("openQuestions"),
-            "details": all("details"),
+            "details": details,
             "speakerNames": all("speakerNames"),
         ]
         if let title = (closing["title"] as? String) ?? (parts.first?["title"] as? String) { out["title"] = title }

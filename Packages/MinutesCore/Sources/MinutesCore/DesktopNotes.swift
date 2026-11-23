@@ -329,7 +329,8 @@ public struct DesktopNotesWriter: CloudNotesWriting {
         let result = try await exchange(job, finishWithin: wait)
         let notesJSON: [String: Any]
         if let written = result["parts"] as? [[String: Any]], !written.isEmpty {
-            notesJSON = GeminiNotesWriter.merged(parts: written, closing: result["closing"] as? [String: Any] ?? [:])
+            notesJSON = GeminiNotesWriter.merged(
+                parts: written, closing: result["closing"] as? [String: Any] ?? [:], starts: parts.map(\.startSeconds))
             Log.shared.info("desktop: notes written in \(written.count) parts")
         } else if let whole = result["notes"] as? [String: Any] {
             notesJSON = whole

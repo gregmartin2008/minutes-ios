@@ -428,4 +428,43 @@ final class CloudNotesTests: XCTestCase {
             "Jordan Carver: research printing margins", "Dana Whitfield: confirm the visit", "Dana Whitfield: send the model (Friday)",
         ])
     }
+
+    /// The closing answer's lists replace the parts' own, a part's rewrite of the lines before it
+    /// is dropped, and one fact given by two parts appears once.
+    func testTheClosingAnswerCuratesAndRepeatsAreDropped() throws {
+        let transcript = "Dana Whitfield [14:20]: The score was 54 this quarter and 59 for the year.\nJordan Carver [31:02]: EBITDA is 6 million and margins are almost 40 percent."
+        let one: [String: Any] = [
+            "summary": "First.", "nextSteps": [["owner": "Meridyan", "action": "send financials"]], "decisions": [],
+            "keyFacts": [["label": "Deal quality score (quarter)", "value": "54"]],
+            "details": [["topic": "Metrics", "start": "14:20", "text": "The score was 54."]],
+        ]
+        let two: [String: Any] = [
+            "summary": "Second.", "nextSteps": [["owner": "Jordan Carver", "action": "send a new offer"]], "decisions": [],
+            "keyFacts": [
+                ["label": "Deal quality score", "value": "54 for the quarter; 59 for the year"],
+                ["label": "Meridyan EBITDA", "value": "$6 million"], ["label": "Meridyan EBITDA margins", "value": "Almost 40%"],
+            ],
+            "details": [
+                ["topic": "Metrics again", "start": "14:20", "text": "The score was 54."],
+                ["topic": "Offer", "start": "31:02", "text": "EBITDA is $6 million."],
+            ],
+        ]
+        let bare = try GeminiNotesWriter.notes(
+            from: GeminiNotesWriter.merged(parts: [one, two], closing: [:], starts: [860, 1862]), transcript: transcript)
+        XCTAssertEqual(bare.details?.map(\.topic), ["Metrics", "Offer"])
+        XCTAssertEqual(bare.figures, ["Deal quality score (quarter): 54", "Meridyan EBITDA: $6 million", "Meridyan EBITDA margins: Almost 40%"])
+        XCTAssertEqual(bare.actionItems.count, 2)
+
+        let closing: [String: Any] = [
+            "title": "Weekly", "summary": "Whole.", "notCovered": "",
+            "keyFacts": [["label": "Meridyan EBITDA", "value": "$6 million"]],
+            "nextSteps": [["owner": "Jordan Carver", "action": "send a new offer"]],
+            "decisions": ["The group decided to make a new offer."],
+        ]
+        let curated = try GeminiNotesWriter.notes(
+            from: GeminiNotesWriter.merged(parts: [one, two], closing: closing, starts: [860, 1862]), transcript: transcript)
+        XCTAssertEqual(curated.figures, ["Meridyan EBITDA: $6 million"])
+        XCTAssertEqual(curated.actionItems, ["Jordan Carver: send a new offer"])
+        XCTAssertEqual(curated.decisions, ["The group decided to make a new offer."])
+    }
 }
