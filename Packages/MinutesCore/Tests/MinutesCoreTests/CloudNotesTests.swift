@@ -467,4 +467,36 @@ final class CloudNotesTests: XCTestCase {
         XCTAssertEqual(curated.actionItems, ["Jordan Carver: send a new offer"])
         XCTAssertEqual(curated.decisions, ["The group decided to make a new offer."])
     }
+
+    /// A name with an initial does not end a sentence, "a million and a half" is 1.5 million, and
+    /// the parts of a meeting come out in the order they were said.
+    func testInitialsHalvesAndOrder() throws {
+        XCTAssertEqual(
+            NotesEngine.sentences("Dana M. Whitfield said the firm bought it in late 2024. Dr. Carver agreed. It grew."),
+            ["Dana M. Whitfield said the firm bought it in late 2024. Dr. Carver agreed.", "It grew."])
+        let transcript = """
+        Dana Whitfield [1:31]: At the time they did around five million of revenue and about a million and a half of EBITDA.
+        Dana Whitfield [10:49]: They hired press operators.
+        Jordan Carver [14:25]: The run rate is 900 thousand a month.
+        """
+        let json: [String: Any] = [
+            "title": "t", "summary": "s", "keyFacts": [], "nextSteps": [], "decisions": [],
+            "details": [
+                ["topic": "Background", "start": "1:31", "text": "Dana M. Whitfield said it had $5 million of revenue and $1.5 million of EBITDA. It has grown since."],
+                ["topic": "Run rate", "start": "14:25", "text": "The run rate is $900,000 a month."],
+                ["topic": "Hiring", "start": "10:49", "text": "They hired press operators."],
+            ],
+        ]
+        let notes = try GeminiNotesWriter.notes(from: json, transcript: transcript)
+        XCTAssertEqual(notes.details?.map(\.topic), ["Background", "Hiring", "Run rate"])
+        XCTAssertEqual(notes.details?.first?.text, "Dana M. Whitfield said it had $5 million of revenue and $1.5 million of EBITDA. It has grown since.")
+    }
+
+    func testTheClosingAnswerMayRenameACompanyButNotAMeasure() {
+        let written: [[String: Any]] = [["label": "Meridyan EBITDA", "value": "$3.7 million"], ["label": "Foil wrap business EBITDA", "value": "$6 million"]]
+        let relabeled = GeminiNotesWriter.keepingItsMeasure(["label": "Meridyan valuation", "value": "$3.7 million"], written: written)
+        XCTAssertEqual(relabeled["label"] as? String, "Meridyan EBITDA")
+        let renamed = GeminiNotesWriter.keepingItsMeasure(["label": "Carver Foils EBITDA", "value": "$6 million"], written: written)
+        XCTAssertEqual(renamed["label"] as? String, "Carver Foils EBITDA")
+    }
 }

@@ -951,6 +951,25 @@ public struct NotesEngine: Sendable {
             out.formUnion(numbers(body))
             out.formUnion(spokenNumbers(body))
             out.formUnion(scaledNumbers(body))
+            out.formUnion(halfUnits(body))
+        }
+        return out
+    }
+
+    /// "A million and a half" is 1.5 (million), "two million and a half" 2.5: the half belongs to
+    /// the unit, where "two and a half million" puts it with the number.
+    static func halfUnits(_ text: String) -> [String] {
+        let small = ["a": 1.0, "one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10]
+        let units = ["thousand": 1_000.0, "million": 1_000_000, "billion": 1_000_000_000]
+        let words = text.lowercased().split(whereSeparator: { !$0.isLetter && !$0.isNumber && $0 != "." }).map(String.init)
+        var out: [String] = []
+        guard words.count >= 5 else { return out }
+        for i in 0...(words.count - 5) {
+            guard let unit = units[words[i + 1]], words[i + 2] == "and", words[i + 3] == "a" || words[i + 3] == "one",
+                  words[i + 4].hasPrefix("half"), let n = small[words[i]] ?? Double(words[i]) else { continue }
+            let value = n + 0.5
+            out.append(value == value.rounded() ? String(Int64(value)) : String(value))
+            out.append(String(Int64(value * unit)))
         }
         return out
     }
@@ -1188,6 +1207,12 @@ public struct NotesEngine: Sendable {
             // An end mark followed by a space and a capital (or the end) ends a sentence.
             guard next == " " || next == "\n", after.isUppercase || after == "\"" || i + 2 >= chars.count else { continue }
             if ch == ".", let last = current.dropLast().last, last.isNumber { continue }
+            // "Daniel M. Bowman", "Dr. Whitfield": an initial or a title, not the end of a sentence.
+            if ch == "." {
+                let word = current.dropLast().split(whereSeparator: { $0 == " " || $0 == "\n" }).last.map(String.init) ?? ""
+                if word.count == 1, word.first?.isUppercase == true { continue }
+                if ["Dr", "Mr", "Mrs", "Ms", "St", "Jr", "Sr", "vs", "Inc", "Co", "Corp", "Ltd", "No"].contains(word) { continue }
+            }
             let trimmed = current.trimmingCharacters(in: .whitespacesAndNewlines)
             if !trimmed.isEmpty { out.append(trimmed) }
             current = ""

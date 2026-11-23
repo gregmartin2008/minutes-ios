@@ -328,7 +328,8 @@ public struct GeminiNotesWriter: CloudNotesWriting {
         meeting, and where it ended up. Specific, no filler like "met to discuss".
         - keyFacts: the final list of terms and numbers, from the parts' keyFacts. Give each fact once. \
         Where two labels plainly mean the same company under different names, use one name for both. \
-        Keep every value exactly as written. When people from outside the reader's firm are in the \
+        Otherwise copy each label and value exactly as written: never change what a number measures \
+        (EBITDA stays EBITDA, it does not become a valuation). When people from outside the reader's firm are in the \
         meeting, keep everything about that other side. When everyone is from the reader's own firm, \
         keep only figures about the firm's own deals, portfolio companies and pipeline, and drop public \
         companies in the news, stock prices, travel, hotels, game and event dates, who will attend \
@@ -345,8 +346,8 @@ public struct GeminiNotesWriter: CloudNotesWriting {
         governance; industries pursued and avoided; valuation multiples and their limit; debt comfort \
         and limit; hold period; number of such deals done; fees and carry; how early they want to see a \
         deal and how fast they decide. For a seller or company: revenue, EBITDA and margins, growth, \
-        price or multiple, customer concentration, employees, ownership, debt, timing. Check each item \
-        against the notes one by one. An empty string when all were covered, and always an empty string \
+        price or multiple, customer concentration, employees, ownership, debt, timing. Use the one list \
+        that fits the other side, never both. Check each item against the notes one by one. An empty string when all were covered, and always an empty string \
         when everyone in the meeting is from the reader's own firm.
         """
         if let recorder = brief.recorder, !recorder.isEmpty {
@@ -376,6 +377,21 @@ public struct GeminiNotesWriter: CloudNotesWriting {
         ],
         "required": ["title", "summary", "keyFacts", "nextSteps", "decisions", "notCovered"],
     ]
+
+    /// What a figure can be a measure of. The closing request may rename a company in a label;
+    /// it may not turn an EBITDA into a valuation.
+    static let measures = ["ebitda", "revenue", "margin", "valuation", "multiple", "price", "bid", "offer", "debt", "check", "backlog", "capex"]
+
+    /// A fact from the closing answer, with the label a part gave it put back when the closing
+    /// answer kept the value but changed what it measures.
+    static func keepingItsMeasure(_ fact: [String: Any], written: [[String: Any]]) -> [String: Any] {
+        func tidy(_ value: Any?) -> String { (value as? String ?? "").lowercased().trimmingCharacters(in: .whitespacesAndNewlines) }
+        let label = tidy(fact["label"])
+        guard let original = written.first(where: { tidy($0["value"]) == tidy(fact["value"]) && !tidy($0["value"]).isEmpty }) else { return fact }
+        let was = tidy(original["label"])
+        let changed = Self.measures.contains { was.contains($0) != label.contains($0) }
+        return changed ? original : fact
+    }
 
     /// Key facts with a repeat removed: the same numbers under nearly the same label, which is
     /// what two parts make of one stretch of the meeting.
@@ -407,8 +423,10 @@ public struct GeminiNotesWriter: CloudNotesWriting {
             guard let list = closing[key] as? [Any], !list.isEmpty else { return nil }
             return list
         }
-        var facts = ((final("keyFacts") ?? all("keyFacts")).compactMap { $0 as? [String: Any] })
+        let written = all("keyFacts").compactMap { $0 as? [String: Any] }
+        var facts = ((final("keyFacts") ?? written).compactMap { $0 as? [String: Any] })
             .filter { ($0["label"] as? String ?? "").lowercased() != "not covered" }
+            .map { fact in Self.keepingItsMeasure(fact, written: written) }
         facts = Self.withoutRepeatedFacts(facts)
         let missing = (closing["notCovered"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
         if !missing.isEmpty { facts.append(["label": "Not covered", "value": missing]) }
@@ -492,7 +510,8 @@ public struct GeminiNotesWriter: CloudNotesWriting {
         the unit the speaker meant ("15 to 75" said about check sizes is "$15 million to $75 million"); \
         when the unit is not clear, keep the words as said. Only when the other side is an investor, \
         lender, seller or company, finish with one entry labeled "Not covered" whose value names the \
-        items above that nobody stated, so the reader knows what to ask next; check every item above one \
+        items nobody stated, so the reader knows what to ask next. Take them from the one list above that \
+        fits the other side, the investor and lender list or the seller and company list, never from both; check every item above one \
         by one for it, and leave that entry out when all were covered. Give a condition with the term it \
         belongs to ("Board seat: wanted at around a $10 million check, depending on the size of the raise"). An internal meeting never has a "Not covered" entry.
         - nextSteps: only concrete things a named person committed to do after the meeting (send, \
@@ -704,6 +723,12 @@ public struct GeminiNotesWriter: CloudNotesWriting {
             dropped += all.count - kept.count
             guard !kept.isEmpty else { continue }
             details.append(NotesDetail(topic: NotesEngine.tidyTopic(topic), text: kept.joined(separator: " "), startSeconds: Self.seconds(item["start"] as? String)))
+        }
+        // In the order things were said: a writer now and then goes back for something it skipped.
+        if details.allSatisfy({ $0.startSeconds != nil }) {
+            details = details.enumerated().sorted { a, b in
+                a.element.startSeconds! == b.element.startSeconds! ? a.offset < b.offset : a.element.startSeconds! < b.element.startSeconds!
+            }.map(\.element)
         }
         if dropped > 0 { Log.shared.info("notes: \(dropped) sentence(s) or key fact(s) left out for citing a number the transcript does not have") }
         return MeetingNotes(
