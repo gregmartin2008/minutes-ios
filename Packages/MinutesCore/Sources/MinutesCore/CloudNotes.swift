@@ -258,6 +258,13 @@ public struct GeminiNotesWriter: CloudNotesWriting {
         var fromMinute: Int
         var toMinute: Int
         var transcript: String
+        /// The last lines of the part before, so a discussion cut by the split keeps its subject.
+        var before: String = ""
+
+        /// What the writer is given: this part, opened by the lines before it when there are any.
+        var transcriptWithContext: String {
+            before.isEmpty ? transcript : "(earlier, for context only)\n\(before)\n(this part starts here)\n\(transcript)"
+        }
     }
 
     /// A long transcript cut at line breaks into stretches of about fifteen minutes; nothing for a
@@ -283,11 +290,21 @@ public struct GeminiNotesWriter: CloudNotesWriting {
             return Self.seconds(String(line[line.index(after: open)..<close])).map { Int($0 / 60) }
         }
         return out.enumerated().map { i, chunk in
-            NotesPart(
+            // About 300 words from the end of the part before.
+            var before: [String] = []
+            if i > 0 {
+                var count = 0
+                for line in out[i - 1].reversed() {
+                    before.insert(line, at: 0)
+                    count += line.split(separator: " ").count
+                    if count >= 300 { break }
+                }
+            }
+            return NotesPart(
                 index: i + 1, count: out.count,
                 fromMinute: chunk.lazy.compactMap(minute).first ?? 0,
                 toMinute: chunk.reversed().lazy.compactMap(minute).first.map { $0 + 1 } ?? minutes,
-                transcript: chunk.joined(separator: "\n"))
+                transcript: chunk.joined(separator: "\n"), before: before.joined(separator: "\n"))
         }
     }
 
@@ -376,7 +393,9 @@ public struct GeminiNotesWriter: CloudNotesWriting {
         Rules:
         - Use only what the transcript says. Never add a number, name or fact that is not in it, and \
         keep every number, date and name exactly as said. Never change a unit: "a dollar" stays a \
-        dollar, not a million dollars.
+        dollar, not a million dollars. Write money as "$3.7 million", with the dollar sign and the word. \
+        Call something a deal, a company or a project only if the transcript does; a book the group is \
+        reading is a book.
         - Keep companies apart. When the talk moves to another deal or company, what is said next belongs \
         to that one, not to the one before. Call a company by the name the transcript uses for it. Only when the transcript never gives it a \
         usable name, call it by what it does ("the vacation-rental design firm"); do not borrow a name \
@@ -401,7 +420,8 @@ public struct GeminiNotesWriter: CloudNotesWriting {
         the price or multiple asked or offered, customer concentration, employees, ownership, debt and \
         timing. When everyone in the meeting is from the reader's own firm, it is an internal meeting: \
         give the figures, dates and terms discussed about each deal, portfolio company and plan, with the \
-        company's name in the label, and nothing about news, markets or small talk. Write each amount with \
+        company's name in the label. Only what bears on the firm's own deals and companies: nothing about \
+        public companies in the news, stock prices, who will attend what, or small talk. Write each amount with \
         the unit the speaker meant ("15 to 75" said about check sizes is "$15 million to $75 million"); \
         when the unit is not clear, keep the words as said. Only when the other side is an investor, \
         lender, seller or company, finish with one entry labeled "Not covered" whose value names the \
@@ -412,7 +432,9 @@ public struct GeminiNotesWriter: CloudNotesWriting {
         schedule, introduce, review, revise, submit, call). Owner is the person's name as in the \
         transcript; "The group" when everyone. Include the deadline if one was said. An agreement to \
         talk again, reconnect or follow up by some date is a next step, and so is something a person \
-        offered to send. Not opinions, not things done during the meeting, not "continue to". Go through \
+        offered to send. Not opinions, not things done during the meeting, not "continue to". The owner \
+        is a person, never a company; something an outside party is expected to send is not a next step. \
+        Leave "when" empty if no deadline was said. Go through \
         the whole transcript for these, to the last line; a long meeting can have a dozen or more.
         - decisions: only what the people settled between them: a price, a plan, an option chosen, or \
         to hold off for now and revisit later. \
@@ -442,7 +464,13 @@ public struct GeminiNotesWriter: CloudNotesWriting {
             let length = max(1, part.toMinute - part.fromMinute)
             p += "\nThis transcript is part \(part.index) of \(part.count) of one meeting, from about minute \(part.fromMinute) to minute \(part.toMinute). "
                 + "Write notes for this part only, through its last line. details has about \(max(2, length / 5)) to \(max(3, length / 3)) entries. "
-                + "summary is two sentences on what this part covered. keyFacts has no \"Not covered\" entry; that is added later."
+                + "summary is two sentences on what this part covered. keyFacts has at most 8 entries, the figures that matter most, "
+                + "and no \"Not covered\" entry; that is added later."
+            if !part.before.isEmpty {
+                p += "\nThe transcript below opens with the last lines of the part before, between the marks "
+                    + "\"(earlier, for context only)\" and \"(this part starts here)\". They are already written up: use them only to know "
+                    + "which company or subject is being discussed when this part begins, call it by the same name, and write nothing about them."
+            }
         } else if let minutes = Self.minutes(of: transcript), minutes >= 20 {
             p += "\nThis meeting runs about \(minutes) minutes, so details has about \(max(5, minutes / 5)) to \(max(7, minutes / 4)) entries, the last one starting in its final minutes."
         }
@@ -520,6 +548,12 @@ public struct GeminiNotesWriter: CloudNotesWriting {
         return nil
     }
 
+    /// What the writer puts for a deadline when none was said.
+    static let noDeadline: Set<String> = [
+        "not specified", "unspecified", "none", "n/a", "na", "tbd", "pending", "unknown", "no deadline",
+        "not stated", "not mentioned", "not given", "not said",
+    ]
+
     /// Next steps with one person's repeated step removed. The writer sometimes gives the same
     /// step twice in different words ("Add Dana to the quarterly pipeline list" and "adding Dana
     /// to the list for the quarterly pipeline updates"); the first, which carries any deadline, stays.
@@ -571,6 +605,7 @@ public struct GeminiNotesWriter: CloudNotesWriting {
             let actionText = action.trimmingCharacters(in: .whitespaces)
             var line = "\(owner.trimmingCharacters(in: .whitespaces)): \(actionText)"
             if let when = (item["when"] as? String)?.trimmingCharacters(in: .whitespaces), !when.isEmpty,
+               !Self.noDeadline.contains(when.lowercased().trimmingCharacters(in: CharacterSet(charactersIn: ".()"))),
                !actionText.lowercased().contains(when.lowercased()) {
                 line += " (\(when))"
             }

@@ -313,7 +313,7 @@ public struct DesktopNotesWriter: CloudNotesWriting {
                 let partWords = part.transcript.split(whereSeparator: { $0 == " " || $0 == "\n" }).count
                 return [
                     "prompt": GeminiNotesWriter.prompt(
-                        transcript: part.transcript, title: title, spellings: spellings, brief: brief, part: part),
+                        transcript: part.transcriptWithContext, title: title, spellings: spellings, brief: brief, part: part),
                     "words": partWords,
                     "max_output": Self.outputRoom(words: partWords),
                 ]

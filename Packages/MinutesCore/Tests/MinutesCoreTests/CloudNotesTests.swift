@@ -377,7 +377,11 @@ final class CloudNotesTests: XCTestCase {
         XCTAssertTrue(parts.allSatisfy { (14...17).contains($0.transcript.split(separator: "\n").count) })
         XCTAssertEqual(GeminiNotesWriter.parts(of: lines.prefix(25).joined(separator: "\n")), [], "a short meeting is written in one go")
 
-        let prompt = GeminiNotesWriter.prompt(transcript: parts[1].transcript, title: nil, spellings: [], part: parts[1])
+        XCTAssertEqual(parts[0].before, "")
+        XCTAssertTrue(parts[1].before.hasSuffix("line 15 has a few words in it.") || parts[1].before.hasSuffix("line 14 has a few words in it."), parts[1].before)
+        XCTAssertTrue(parts[1].transcriptWithContext.contains("(this part starts here)\n" + parts[1].transcript))
+        let prompt = GeminiNotesWriter.prompt(transcript: parts[1].transcriptWithContext, title: nil, spellings: [], part: parts[1])
+        XCTAssertTrue(prompt.contains("write nothing about them"))
         XCTAssertTrue(prompt.contains("This transcript is part 2 of 4 of one meeting"), prompt)
         XCTAssertFalse(prompt.contains("This meeting runs about"))
         XCTAssertTrue(GeminiNotesWriter.closingPrompt(title: "Weekly", brief: NotesBrief()).hasSuffix(GeminiNotesWriter.partsMarker))
@@ -408,5 +412,20 @@ final class CloudNotesTests: XCTestCase {
         let bare = try GeminiNotesWriter.notes(from: GeminiNotesWriter.merged(parts: [one, two], closing: [:]), transcript: transcript)
         XCTAssertEqual(bare.summary, "First. Second.")
         XCTAssertEqual(bare.figures, ["Valuation: 6 to 10 times"])
+    }
+
+    func testADeadlineThatSaysThereIsNoneIsLeftOut() throws {
+        let json: [String: Any] = [
+            "title": "t", "summary": "s", "keyFacts": [], "decisions": [], "details": [],
+            "nextSteps": [
+                ["owner": "Jordan Carver", "action": "research printing margins", "when": "Not specified"],
+                ["owner": "Dana Whitfield", "action": "confirm the visit", "when": "(Pending)"],
+                ["owner": "Dana Whitfield", "action": "send the model", "when": "Friday"],
+            ],
+        ]
+        let notes = try GeminiNotesWriter.notes(from: json, transcript: "Dana Whitfield [0:05]: I will send the model Friday.")
+        XCTAssertEqual(notes.actionItems, [
+            "Jordan Carver: research printing margins", "Dana Whitfield: confirm the visit", "Dana Whitfield: send the model (Friday)",
+        ])
     }
 }
